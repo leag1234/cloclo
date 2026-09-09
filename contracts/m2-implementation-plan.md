@@ -84,3 +84,13 @@ locale, non réexécutée dans M2. Aucun GPU ne sera créé pour ce jalon.
 Coût additionnel de cette préparation : 0 EUR/h. Aucun package installé.
 Validation de cette PR : syntaxe JSON et diff ; pas de validation runtime SQL,
 pas de mesure retrieval et pas de preuve M2. Revue préalable requise par R-02.
+
+## Mise à jour du mandat M2
+L'utilisateur autorise contrat et implémentation dans la même PR, et merge agent
+uniquement après job ci vert. Les anciennes restrictions correspondantes sont
+remplacées. Le moteur L serverless et son plafond sont confirmés dans MISSION.
+E1/E2/E3 sont déjà fournis : aucune modification de leurs clés.
+PyYAML 6.0.3 (MIT, environ 1 Mo, projet maintenu) lit le format des jeux fournis ;
+alternative parseur maison rejetée pour fidélité YAML. types-PyYAML, Apache-2.0,
+environ 50 Ko, stubs maintenus typeshed, assure le typage strict. Aucune autre
+nouvelle dépendance ; stdlib urllib suffit pour le fournisseur.

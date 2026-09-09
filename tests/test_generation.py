@@ -14,7 +14,7 @@ class GenerationTests(unittest.TestCase):
         self.assertEqual(answer["citations"], ["a" * 64])
         self.assertIn("a" * 64, str(answer["text"]))
         self.assertTrue(parse_answer("INSUFFICIENT", request)["refused"])
-        for text in ["No citation.", "Fact [2].", "Fact [0].", ""]:
+        for text in ["No citation.", "Fact [2].", "Fact [0].", "", "x" * 32001 + "[1]"]:
             with self.assertRaisesRegex(ValueError, "invalid_citation"):
                 parse_answer(text, request)
         for payload in [

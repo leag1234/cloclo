@@ -28,3 +28,13 @@ Dépendances : pypdf (BSD-3-Clause, extraction PDF sans moteur bureautique),
 python-docx (MIT, lecture OOXML avec lxml BSD), lxml-stubs (Apache-2.0, typage
 uniquement). La stdlib ne décode pas le PDF ; LibreOffice est plus lourd.
 Versions épinglées dans requirements-dev.txt pour la CI et cet incrément CLI.
+
+## M2 — réponses et preuve
+`make eval-retrieval` mesure E1 (recall et MRR par langue), puis génère trois
+réponses FR/EN/DE depuis le retrieval et résout chaque chunk cité dans Postgres.
+`ATLAS_RETRIEVAL_DSN` et `ATLAS_GATEWAY_URL` configurent ces commandes.
+Une citation absente, inconnue, supprimée ou modifiée fait échouer l'évaluation.
+Le rapport BRAIN/eval/retrieval.json est indicatif : les jeux métier ne sont pas
+validés humainement et la fidélité sémantique E5 reste hors de ce gate.
+Le gate M2 est exécuté par make test en CI, avec PostgreSQL éphémère et les vrais
+moteurs CPU ; seul le fournisseur de génération est rejoué sous tests/.
