@@ -28,3 +28,13 @@ Aucune confirmation de résolution des trois HTTP 403 reçue. Aucun quatrième e
 RÉSOLU : accès Actions HTTP 200 confirmé à cette reprise.
 Le jeton est assumé par l'humain dans HUMAN_ANSWER.md et ne bloque plus M0.
 Les arrêts historiques ci-dessus ne décrivent plus l'état courant.
+
+## 2026-09-09 — M1 : prérequis avant implémentation (R-02/R-10/AUTO-4)
+- Contrat et plan proposés dans contracts/m1.md ; revue et merge humains requis.
+- Gate protégé incomplet au regard de MISSION/docs/13 : vLLM direct, pas de
+  TTFT/débit ni second cycle ; CI sans appel M1 ni credentials cloud.
+  Le propriétaire doit valider la manière de prouver M1 réellement dans le job ci.
+- Credentials cloud absents, aucun .env ; injecter hors dépôt les accès au projet
+  dédié et attester budget/alarme/scheduler avant création. Aucun secret demandé ici.
+Aucune tentative de provisionnement ; blocage de spécification, pas trois échecs
+techniques. Aucun fichier protégé modifié, M1 non terminé.
