@@ -100,3 +100,11 @@ passer au modèle (respect du plafond de contexte, docs/03 REQ-MOD-004), (3) rel
 les essais E4/E6 autant que nécessaire dans la limite du budget par requête (0,05 €).
 Le function-calling Scaleway est supporté (doc officielle vérifiée). Continue jusqu'à
 E4 >= 90% puis merge. Ne baisse pas le seuil E4, ne modifie pas les clés de correction.
+
+### M5 — Juge de référence pour la calibration croisée
+Le juge de référence pour la calibration croisée est **gpt-oss-120b** (Scaleway
+Generative APIs, famille OpenAI, distincte du juge de production glm-5.2 ET du système
+testé Qwen — l'indépendance des 3 familles est respectée). Utilise l'endpoint Scaleway
+déjà configuré (SCW_GENERATIVE_BASE_URL, même clé). Calcule le κ de Cohen entre les
+notes de glm-5.2 et celles de gpt-oss-120b sur l'échantillon d'éval. Aucun accès externe
+ni juge humain requis pour le PoC ; la calibration humaine reste pré-GA.
