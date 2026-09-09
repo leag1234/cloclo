@@ -9,6 +9,9 @@ models:
   glm-5.2:                # JUDGE_MODEL
     input_eur_per_mtok: 1.80
     output_eur_per_mtok: 5.50
+  gpt-oss-120b:           # cross-calibration reference, MISSION M5
+    input_eur_per_mtok: 0.15
+    output_eur_per_mtok: 0.60
   local:                  # Qwen3-30B servi sur GPU L40S loué
     input_eur_per_mtok: 0.0
     output_eur_per_mtok: 0.0
