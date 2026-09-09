@@ -116,3 +116,4 @@ RISK: alertes indépendantes et scheduler non attestés ; question envoyée à l
 NOTICED BUT NOT TOUCHING: VM CPU et volume système préexistants, traces locales non suivies, fichiers protégés. Aucun GPU dans l'inventaire toutes zones du projet.
 Plan concret préparé dans infra/m1-plan.md pour revue préalable docs/11 §9.2 ; branche m1-infra-gateway. Aucun code runtime changé, aucun test exécuté, aucun provisionnement.
 Aucune nouvelle dépendance, coût additionnel 0 EUR/h. M1 non terminé.
+PR de préparation ouverte : https://github.com/leag1234/cloclo/pull/4 ; push uniquement m1-infra-gateway, aucun merge. git diff --check exécuté sans erreur. Cette PR documentaire ne constitue pas une preuve M1.

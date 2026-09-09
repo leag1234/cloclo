@@ -8,3 +8,4 @@
 - GPU prévu L40S-1-48G en fr-par-2 : catalogue 1,469916 €/h HT hors volumes/IP ; availability=shortage. Aucun lancement effectué.
 - Coût total de lancement à compléter avec volumes et IP avant toute création.
 - Attente : revue du plan docs/11 §9.2 et confirmation alertes budget/scheduler demandée à l'humain.
+- PR de préparation (pas de validation M1) : https://github.com/leag1234/cloclo/pull/4
