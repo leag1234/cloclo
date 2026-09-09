@@ -4,6 +4,7 @@ import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from gateway_cpu import CPUModels, EMBEDDING_REVISION
+from generation import Generator
 
 
 def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
@@ -64,6 +65,8 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                             for key, value in zip(ids, scores, strict=True)
                         ]
                     }
+                elif self.path == "/answer":
+                    response = Generator()(request)
                 else:
                     raise ValueError("invalid_input")
                 status = 200
@@ -74,12 +77,15 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                     if reason == "context_exceeded"
                     else "provider_error"
                     if reason.startswith("invalid_provider_")
+                    else "invalid_citation"
+                    if reason == "invalid_citation"
                     else "invalid_input"
                 )
                 status, response = (
                     {
                         "context_exceeded": 413,
                         "provider_error": 502,
+                        "invalid_citation": 502,
                         "invalid_input": 400,
                     }[code],
                     {"code": code},
