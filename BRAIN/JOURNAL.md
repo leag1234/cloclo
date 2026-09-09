@@ -152,3 +152,10 @@ DoD : tests locaux/typage/lint/scan et chemin CI statique contrôlés ; couvertu
 Limites : fallback configuré mais non activé (M4), aucune mesure TTFT revendiquée ; un seul cycle réussi.
 M1 NON TERMINÉ : règle <400 lignes appliquée (PR #5 : 394), intégration préparée sur m1-gpu-cycle,
 publication de sa PR après merge humain #5 selon le plan. Aucun merge agent, aucun push main, aucun fichier protégé modifié.
+
+## 2026-09-09 — reprise de livraison M1
+Source: lectures réglementaires effectuées ; API GitHub confirme PR #5 mergée (bfa214d).
+Plan : rebaser l’intégration préparée, contrôles locaux, PR et job ci vert, puis état final.
+RISK: rebase et publication uniquement sur m1-gpu-cycle ; aucun merge ni push main.
+NOTICED BUT NOT TOUCHING: VM CPU préexistante et traces locales. Inventaire zone configurée sans GPU.
+Cycle réel déjà archivé : 378 s ; aucun changement runtime prévu, pas de nouveau provisionnement requis.
