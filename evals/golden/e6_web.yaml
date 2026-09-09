@@ -1,0 +1,185 @@
+# E6 — Web Q/R : 20 questions dont la réponse vit sur le web
+# Champs: cle_de_correction (la réponse attendue), verification (comment la re-vérifier),
+#         date_cle (date de validité de la clé), statut stale géré par POC-R3.
+# 2 cas vérifiés le 2026-07-23 (sources officielles) ; 18 à vérifier à la création du jeu
+# (méthode fournie — ~2 min/cas, délégable à l'agent PUIS relu par l'humain).
+
+- id: E6-001
+  lang: fr
+  source: verifie-web
+  statut: valide
+  valide_par: "Claude + sources officielles BCE/Banque de France"
+  date_cle: 2026-07-23
+  input: "Quels sont les taux directeurs actuels de la BCE ?"
+  cle_de_correction:
+    doit_contenir: ["2,25", "2,40", "2,65"]
+    contexte: "Facilité de dépôt 2,25 % ; refinancement principal 2,40 % ; prêt marginal
+               2,65 %. Confirmés inchangés par le Conseil des gouverneurs du 23/07/2026."
+  verification: "ecb.europa.eu → communiqués de politique monétaire (dernier en date)"
+  doit_citer_domaine_parmi: ["ecb.europa.eu", "banque-france.fr"]
+
+- id: E6-002
+  lang: de
+  source: verifie-web
+  statut: valide
+  valide_par: "Claude + BMAS/Bundesregierung/Destatis"
+  date_cle: 2026-07-23
+  input: "Wie hoch ist der gesetzliche Mindestlohn in Deutschland aktuell?"
+  cle_de_correction:
+    doit_contenir: ["13,90"]
+    contexte: "13,90 €/h depuis le 01/01/2026 (12,82 € en 2025 ; 14,60 € prévu au
+               01/01/2027). Cinquième Mindestlohnanpassungsverordnung."
+  verification: "bmas.de ou bundesregierung.de → Mindestlohn"
+  doit_citer_domaine_parmi: ["bmas.de", "bundesregierung.de", "destatis.de", "dgb.de"]
+
+# ————— Cas à clé vérifiable en ~2 min chacun (méthode indiquée) —————
+
+- id: E6-003
+  lang: fr
+  source: genere-a-valider
+  statut: draft
+  input: "Quel est le montant du SMIC horaire brut en France actuellement ?"
+  verification: "service-public.fr ou legifrance → SMIC en vigueur"
+  doit_citer_domaine_parmi: ["service-public.fr", "legifrance.gouv.fr", "insee.fr"]
+
+- id: E6-004
+  lang: fr
+  source: genere-a-valider
+  statut: draft
+  input: "Quelle est la dernière version stable de Python et sa date de sortie ?"
+  verification: "python.org/downloads"
+  doit_citer_domaine_parmi: ["python.org"]
+
+- id: E6-005
+  lang: fr
+  source: genere-a-valider
+  statut: draft
+  input: "Quel est le taux d'inflation annuel de la zone euro le plus récent publié par Eurostat ?"
+  verification: "ec.europa.eu/eurostat → flash estimate HICP"
+  doit_citer_domaine_parmi: ["ec.europa.eu", "eurostat"]
+
+- id: E6-006
+  lang: fr
+  source: genere-a-valider
+  statut: draft
+  input: "Qui est l'actuel président ou l'actuelle présidente du Parlement européen ?"
+  verification: "europarl.europa.eu"
+  doit_citer_domaine_parmi: ["europarl.europa.eu"]
+
+- id: E6-007
+  lang: de
+  source: genere-a-valider
+  statut: draft
+  input: "Wie hoch ist der aktuelle CO2-Preis (nationaler Emissionshandel) in Deutschland?"
+  verification: "dehst.de ou bundesregierung.de → CO2-Preis / BEHG"
+  doit_citer_domaine_parmi: ["dehst.de", "bundesregierung.de", "umweltbundesamt.de"]
+
+- id: E6-008
+  lang: de
+  source: genere-a-valider
+  statut: draft
+  input: "Was ist die neueste stabile Version von Node.js (LTS)?"
+  verification: "nodejs.org"
+  doit_citer_domaine_parmi: ["nodejs.org"]
+
+- id: E6-009
+  lang: de
+  source: genere-a-valider
+  statut: draft
+  input: "Wie hoch ist der aktuelle Beitragssatz zur gesetzlichen Rentenversicherung?"
+  verification: "deutsche-rentenversicherung.de"
+  doit_citer_domaine_parmi: ["deutsche-rentenversicherung.de", "bmas.de"]
+
+- id: E6-010
+  lang: es
+  source: genere-a-valider
+  statut: draft
+  input: "¿Cuál es el Salario Mínimo Interprofesional (SMI) vigente en España?"
+  verification: "boe.es ou mites.gob.es → SMI"
+  doit_citer_domaine_parmi: ["boe.es", "mites.gob.es"]
+
+- id: E6-011
+  lang: es
+  source: genere-a-valider
+  statut: draft
+  input: "¿Cuál es el último dato de paro registrado publicado por el SEPE?"
+  verification: "sepe.es → estadísticas de empleo"
+  doit_citer_domaine_parmi: ["sepe.es", "mites.gob.es"]
+
+- id: E6-012
+  lang: es
+  source: genere-a-valider
+  statut: draft
+  input: "¿Quién preside actualmente el Banco Central Europeo?"
+  verification: "ecb.europa.eu"
+  doit_citer_domaine_parmi: ["ecb.europa.eu"]
+  note: "stable mais vérifiable ; teste que le modèle source au lieu d'affirmer de mémoire"
+
+- id: E6-013
+  lang: es
+  source: genere-a-valider
+  statut: draft
+  input: "¿Cuál es el tipo de cambio EUR/USD de hoy, aproximadamente?"
+  verification: "ecb.europa.eu → reference rates"
+  cle_dynamique: true   # tolérance ±2 % vs le taux BCE du jour du run
+  doit_citer_domaine_parmi: ["ecb.europa.eu"]
+
+- id: E6-014
+  lang: it
+  source: genere-a-valider
+  statut: draft
+  input: "Qual è l'ultimo dato sull'inflazione italiana pubblicato dall'ISTAT?"
+  verification: "istat.it → comunicati prezzi al consumo"
+  doit_citer_domaine_parmi: ["istat.it"]
+
+- id: E6-015
+  lang: it
+  source: genere-a-valider
+  statut: draft
+  input: "Qual è l'importo attuale dell'assegno sociale INPS?"
+  verification: "inps.it"
+  doit_citer_domaine_parmi: ["inps.it"]
+
+- id: E6-016
+  lang: it
+  source: genere-a-valider
+  statut: draft
+  input: "Chi è l'attuale Presidente del Consiglio italiano?"
+  verification: "governo.it"
+  doit_citer_domaine_parmi: ["governo.it"]
+
+- id: E6-017
+  lang: en
+  source: genere-a-valider
+  statut: draft
+  input: "What is the current EU ETS carbon price (approximately)?"
+  verification: "presse économique / sandbag / ember → EUA price"
+  cle_dynamique: true
+  doit_citer_source: true
+
+- id: E6-018
+  lang: en
+  source: genere-a-valider
+  statut: draft
+  input: "What is the latest stable release of PostgreSQL?"
+  verification: "postgresql.org"
+  doit_citer_domaine_parmi: ["postgresql.org"]
+
+- id: E6-019
+  lang: en
+  source: genere-a-valider
+  statut: draft
+  input: "When is the next ECB Governing Council monetary policy meeting scheduled?"
+  verification: "ecb.europa.eu → calendar"
+  doit_citer_domaine_parmi: ["ecb.europa.eu"]
+
+- id: E6-020
+  lang: en
+  source: genere-a-valider
+  statut: draft
+  note: "piège de fraîcheur : la réponse a probablement changé depuis l'entraînement
+         du modèle testé — mesure exactement le réflexe de recherche"
+  input: "What is the most recent version of the EU AI Act's implementation timeline —
+          which obligations are currently in force?"
+  verification: "digital-strategy.ec.europa.eu / eur-lex"
+  doit_citer_domaine_parmi: ["europa.eu", "eur-lex.europa.eu"]

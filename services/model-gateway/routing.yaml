@@ -1,0 +1,14 @@
+# Source de vérité du routage. Les identifiants viennent de l'environnement (.env),
+# jamais codés en dur ailleurs (docs/02 AC-ARC-4).
+task_classes:
+  chat_simple:
+    primary:  { provider: local,    model: "${LOCAL_MODEL}" }
+    fallback: { provider: scaleway, model: "${ESCALATION_MODEL}" }
+    max_cost_eur_per_call: 0.01
+  reasoning:
+    primary:  { provider: scaleway, model: "${ESCALATION_MODEL}" }
+    fallback: { provider: scaleway, model: "${ESCALATION_MODEL}" }
+    max_cost_eur_per_call: 0.05
+providers:
+  local:    { base_url: "http://gpu-node:8000/v1" }
+  scaleway: { base_url: "${SCW_GENERATIVE_BASE_URL}", api_key_env: "SCW_GENERATIVE_API_KEY" }
