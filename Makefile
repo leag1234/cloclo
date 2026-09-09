@@ -63,3 +63,9 @@ eval-tools: ## E4 réel avec erreurs injectées exclusivement dans le harness de
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/agent_gate_eval.py tools
 eval-web: ## E6 bout en bout ; qualité soumise aux clés et au juge humains
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/agent_gate_eval.py web
+
+.PHONY: eval-routing test-fallback
+eval-routing: ## E8 : matrice de confusion et sous-routage critique
+	@PYTHONPATH=services/model-gateway python3 tests/routing_eval.py
+test-fallback: ## endpoint local fermé puis replay de la réponse Scaleway enregistrée
+	@PYTHONPATH=services/model-gateway:tests python3 -m unittest test_cascade -v
