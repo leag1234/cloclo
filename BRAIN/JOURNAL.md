@@ -78,3 +78,20 @@ Sans objet pour M0 : migrations, fournisseur, budgets LLM, GPU et bench de charg
 Limites : harness zéro cas explicite, full refusé ; inventaire cloud non vérifié.
 Aucune ressource créée/utilisée ; aucun GPU activé ; aucun nettoyage cloud requis.
 Publication BRAIN sur m0-impl, puis contrôle du nouveau run ; arrêt sans M1.
+
+## 2026-09-09 — préparation M1
+Source: AGENTS, MISSION, docs/13, docs/11 intégral et docs/14, puis BRAIN lus.
+Source: API GitHub pulls/2 confirme le merge humain de M0.
+CONTRADICTION: contrat M1 absent ; R-02 impose revue/merge avant implémentation.
+CONTRADICTION: verify-m1 protégé ne mesure ni TTFT/débit, ni second cycle,
+ni gateway ; CI sans appel M1 et sans credentials cloud. Détails dans contracts/m1.md.
+RISK: credentials et .env absents ; projet, coût réel, alarmes et scheduler non attestés.
+NOTICED BUT NOT TOUCHING: workflows, verify-*, CODEOWNERS et traces locales.
+Préparé : contrat de cycle de vie/gateway, schéma de preuve, plan de tests et
+questions bloquantes ; branche m1-contrats. Aucun code runtime ajouté.
+Aucun GPU créé/utilisé, coût additionnel 0 €/h ; inventaire distant non vérifiable.
+make verify-m1 non exécuté ; aucune mesure GPU ou validation M1 revendiquée.
+Prochaine opération : commit/push de la proposition et PR pour revue humaine.
+Arrêt R-10 sur prérequis explicites ; aucune boucle de trois essais artificiels.
+
+PR de contrats M1 ouverte : https://github.com/leag1234/cloclo/pull/3 ; merge humain uniquement.

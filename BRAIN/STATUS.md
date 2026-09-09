@@ -1,11 +1,11 @@
 # STATUS — état factuel courant
-- M0 validé par le job ci GitHub : https://github.com/leag1234/cloclo/actions/runs/34329362650
-- Commit vérifié : a31f901428b514b00a67080670566563b8837ee0 ; tous les steps verts.
-  Logs contrôlés : `== verify-m0 OK ==`, healthcheck HTTP réel inclus.
-- PR ouverte : https://github.com/leag1234/cloclo/pull/2 ; merge humain attendu.
-- Branche m0-impl ; aucune modification des workflows, verify-* ou CODEOWNERS.
-- Local : make verify-m0 et chemin CI terminés avec code 0 ; quatre tests ;
-  couverture serveur mesurée par trace --missing : 85,3 % (34 lignes).
-- Cloud : aucune ressource créée/utilisée, aucun GPU activé ; coût additionnel 0 €/h.
-  Inventaire distant non vérifié (pas d'outil inventory dans le dépôt).
-- Accès Actions HTTP 200 ; incident de jeton assumé par HUMAN_ANSWER.md.
+- M1 en préparation sur m1-contrats ; non réalisé, aucune preuve CI M1.
+- M0 : PR #2 mergée, confirmé via API GitHub ; preuve historique :
+  https://github.com/leag1234/cloclo/actions/runs/34329362650
+- Contrat et plan M1 proposés dans contracts/m1.md et m1-bench.schema.json.
+- Blocages : revue/merge préalable R-02, écarts du gate protégé, accès cloud absent.
+- Cloud : aucune ressource créée/utilisée dans cette session, coût additionnel 0 €/h.
+  Inventaire distant inconnu : credentials absents et inventory.sh non implémenté.
+- make verify-m1 non exécuté : le mode statique ne prouverait pas le jalon réel.
+
+PR de contrats M1 ouverte : https://github.com/leag1234/cloclo/pull/3 ; merge humain uniquement.
