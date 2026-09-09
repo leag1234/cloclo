@@ -21,12 +21,17 @@ un healthcheck `edge-bff` répond 200 ; le scan de secrets passe ; le grep anti-
 (docs/02 AC-ARC-4) ne trouve rien hors `services/model-gateway`.
 
 ## M1 — Infra GPU reproductible + gateway
-**But** : un nœud GPU naît et meurt par script ; le gateway sert un modèle.
-**Livrables** : `infra/gpu-up.sh` (crée l'instance ${GPU_INSTANCE_TYPE}, monte le volume
-de poids persistant, lance vLLM avec prefix caching), `infra/gpu-down.sh`, gateway
-(config `routing.yaml` : local + fallback Generative APIs Scaleway).
-**verify-m1** se valide SUR LA VM (accès GPU + creds Scaleway), PAS en CI GitHub qui n'a ni GPU ni secrets cloud. En CI : contrôle statique des scripts. Sur la VM : `make verify-m1` crée réellement le nœud, mesure TTFT/débit, archive le bench, détruit le nœud, et prouve la reproductibilité par 2 cycles < 20 min. La preuve de M1 est l'exécution réussie de `make verify-m1` sur la VM (log + benchs archivés sous BRAIN/bench/), PAS un run CI vert.
 
+**But** : prouver qu'un nœud GPU se crée par script, sert un modèle via
+vLLM, puis se détruit. Livrables : `infra/gpu-up.sh`, `infra/gpu-down.sh`,
+config `services/model-gateway/`.
+
+**verify-m1** se valide SUR LA VM (accès GPU + creds Scaleway), PAS en CI
+GitHub (ni GPU ni secrets). En CI : contrôle statique des scripts. Sur la VM,
+`make verify-m1` fait UN cycle : crée le nœud, vérifie que vLLM répond sur
+/v1/models, lance une inférence de contrôle, archive un bench simple sous
+BRAIN/bench/, détruit le nœud, le tout en moins de 20 min. La preuve de M1
+est l'exécution réussie de `make verify-m1` sur la VM. Voir contracts/m1.md.
 ## M2 — Ingestion + RAG
 **But** : RAG hybride avec citations résolvables.
 **Livrables** : ingestion (pdf/docx/md/html) → chunks + métadonnées + embeddings ;
