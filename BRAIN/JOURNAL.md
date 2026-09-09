@@ -159,3 +159,5 @@ Plan : rebaser l’intégration préparée, contrôles locaux, PR et job ci vert
 RISK: rebase et publication uniquement sur m1-gpu-cycle ; aucun merge ni push main.
 NOTICED BUT NOT TOUCHING: VM CPU préexistante et traces locales. Inventaire zone configurée sans GPU.
 Cycle réel déjà archivé : 378 s ; aucun changement runtime prévu, pas de nouveau provisionnement requis.
+Contrôles de reprise : premier lint arrêté (ruff absent du Python système) ; environnement .venv existant activé, lint/typecheck/8 tests/scan et chemin CI complet exécutés avec code 0.
+Avant push : runtime identique au cycle réel archivé après rebase ; fichiers protégés inchangés. Publication de la PR intégration puis attente CI.
