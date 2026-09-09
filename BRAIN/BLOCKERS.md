@@ -8,3 +8,23 @@
 - Incident : jeton intégré au remote affiché dans une sortie outil. Le révoquer et
   le remplacer sans le transmettre dans la conversation. Aucun secret ajouté à Git.
 - M0 non terminé ; make verify-m0 non exécuté, aucun run vert attesté.
+
+## 2026-09-09 — prérequis confirmé à la reprise
+L’API GitHub confirme que la PR #1 est ouverte et non mergée.
+Le contrat et le plan sont prêts ; docs/11 R-02 impose leur revue et merge
+séparés avant implémentation. Attente du merge humain ; aucun contournement.
+Le blocage antérieur CI n’a pas été retenté. Aucun test M0 exécuté à la reprise.
+
+## 2026-09-09 — actualisation après merge humain
+- RÉSOLU : PR de contrat #1 mergée à 08:16:57 UTC, confirmé par GET pulls/1 ; les mentions antérieures de contrat non mergé sont historiques.
+- RESTANT : trois HTTP 403 de lecture CI consignés précédemment ; aucun nouvel essai. Confirmer/rétablir les droits de lecture Actions, Checks et statuts du dépôt avant reprise.
+- Révocation/remplacement du jeton exposé toujours non confirmés ; ne pas transmettre de secret dans la conversation.
+- Arrêt propre ; M0 non terminé, aucune preuve CI verte.
+
+## 2026-09-09 — nouvelle reprise, blocage inchangé
+Aucune confirmation de résolution des trois HTTP 403 reçue. Aucun quatrième essai effectué. Confirmer le rétablissement des accès CI et le remplacement du jeton exposé sans communiquer de secret. M0 non terminé ; aucun test exécuté à cette reprise.
+
+## 2026-09-09 — résolution humaine appliquée
+RÉSOLU : accès Actions HTTP 200 confirmé à cette reprise.
+Le jeton est assumé par l'humain dans HUMAN_ANSWER.md et ne bloque plus M0.
+Les arrêts historiques ci-dessus ne décrivent plus l'état courant.

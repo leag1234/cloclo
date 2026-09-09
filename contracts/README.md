@@ -21,3 +21,19 @@ Les nouveaux tests seront montrés en échec avant ajout du serveur.
 
 Périmètre exclu : M1+, infra GPU, nouvelle UI, appels LLM, workflows et verify-*.
 Coût cloud supplémentaire : 0 €/h. Aucune dépendance ajoutée par cette PR.
+
+## Implémentation M0
+`make verify-m0` possède un serveur temporaire sur un port libre, transmet BFF_URL
+au script protégé puis ferme le serveur même si la vérification échoue.
+En CI, `make test` appelle aussi ce gate (garde ATLAS_VERIFY_M0 anti-récursion).
+`make eval-smoke` rapporte explicitement zéro cas exécuté ; `make eval` échoue
+jusqu'à l'implémentation des exécuteurs. Les jeux dorés restent inchangés.
+
+Aucune dépendance runtime ajoutée. Dépendances de développement : Ruff 0.12.12
+(MIT, lint/format) et mypy 1.17.1 (MIT, typage strict), versions figées dans
+requirements-dev.txt. La stdlib suffit au HTTP et aux tests mais ne remplace
+ni le lint ni le typage strict REQ-ENG-003. Ces outils maintenus, installés
+seulement en dev/CI, n'augmentent pas l'image runtime ; wheels de quelques Mo.
+Les cibles qualité portent sur le code M0 et les services ; le générateur
+FLORES préexistant est hors périmètre. Installation : environnement virtuel,
+puis `pip install -r requirements-dev.txt`.
