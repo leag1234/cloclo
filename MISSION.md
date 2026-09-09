@@ -81,3 +81,10 @@ Protections budget CONFIRMÉES et ACTIVES : alertes Scaleway à 50% et 80% de 80
 verify-m1.sh (destruction en fin de test quoi qu'il arrive) et par l'appel explicite
 à gpu-down.sh. Type GPU : sélection automatique par gpu-up.sh (L40S-1-48G en priorité, disponible). L'agent est AUTORISÉ à créer un GPU
 facturé pour exécuter make verify-m1. Cette confirmation ne doit plus être redemandée.
+
+### M2 — Moteur de génération confirmé
+Pour l'étape de GÉNÉRATION du RAG (rédaction des réponses avec citations), utilise le
+modèle L via Scaleway Generative APIs (ESCALATION_MODEL, déjà configuré dans .env,
+endpoint SCW_GENERATIVE_BASE_URL). Le plafond budget est ACTIF et confirmé. Le petit
+modèle CPU sert UNIQUEMENT aux embeddings/reranking, pas à la génération. Tu es autorisé
+à appeler Generative APIs pour générer et produire des citations fiables.
