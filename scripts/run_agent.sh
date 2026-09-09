@@ -25,6 +25,9 @@ Définition de terminé pour ${MILESTONE} :
   2. tu pushes une branche + ouvres une PR, et le job CI 'ci' est VERT sur GitHub, puis
   3. tu mets à jour BRAIN/JOURNAL.md, BRAIN/STATUS.md, BRAIN/TASK.md.
 Tu NE modifies PAS .github/workflows ni scripts/verify-*.sh (protégés).
+INTERDIT ABSOLU : ne pousse JAMAIS sur main. Tu travailles uniquement sur des branches
+nommees (mN-sujet), tu ouvres une PR, tu attends le job CI 'ci' VERT. Le merge sur main
+est fait par l'humain, jamais par toi. Un push direct sur main invalide le jalon.
 Si tu es bloqué après 3 tentatives sur le même problème : écris dans BRAIN/BLOCKERS.md
 et arrête-toi proprement. Ne prétends jamais qu'un test passe sans preuve CI.
 

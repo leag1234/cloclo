@@ -14,6 +14,7 @@ lien vers un run CI vert.
 
 ## Interdits absolus (PR rejetée / faute grave)
 - Modifier `.github/workflows/`, `scripts/verify-*.sh`, `CODEOWNERS` (protégés).
+- Pousser sur main : JAMAIS. Uniquement branches + PR, merge humain.
 - Affaiblir une assertion pour faire passer un test.
 - Prétendre avoir exécuté ce qui ne l'a pas été.
 - Mettre un secret dans le dépôt, un log, ou un prompt.
