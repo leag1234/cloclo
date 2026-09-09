@@ -53,3 +53,13 @@ ingest: ## ingérer le corpus via gateway dans Postgres/pgvector
 .PHONY: eval-retrieval
 eval-retrieval: ## évaluer E1 et résoudre les citations de réponses générées
 	@python3 -m services.retrieval.evaluate
+
+.PHONY: test-web-security test-budgets eval-tools eval-web
+test-web-security: ## contrôles SSRF, robots, corps HTTP et plafonds
+	@PYTHONPATH=.:tests python3 -m unittest test_web_security test_web_transport test_tool_runtime test_budgets.BudgetTests.test_fetch_limit -v
+test-budgets: ## quatre budgets durs et arrêt des appels en cours
+	@PYTHONPATH=.:tests python3 -m unittest test_budgets -v
+eval-tools: ## E4 réel avec erreurs injectées exclusivement dans le harness de test
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/agent_gate_eval.py tools
+eval-web: ## E6 bout en bout ; qualité soumise aux clés et au juge humains
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/agent_gate_eval.py web
