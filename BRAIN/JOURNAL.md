@@ -117,3 +117,38 @@ NOTICED BUT NOT TOUCHING: VM CPU et volume système préexistants, traces locale
 Plan concret préparé dans infra/m1-plan.md pour revue préalable docs/11 §9.2 ; branche m1-infra-gateway. Aucun code runtime changé, aucun test exécuté, aucun provisionnement.
 Aucune nouvelle dépendance, coût additionnel 0 EUR/h. M1 non terminé.
 PR de préparation ouverte : https://github.com/leag1234/cloclo/pull/4 ; push uniquement m1-infra-gateway, aucun merge. git diff --check exécuté sans erreur. Cette PR documentaire ne constitue pas une preuve M1.
+
+## 2026-09-09 — réalisation M1 autorisée après merge du plan
+Source: API GitHub confirme PR #3 et #4 mergées ; MISSION confirme budget et extinction.
+CONTRADICTION: anciens scripts utilisent SSH et ne montent pas les poids ; correction selon POC-A1.
+RISK: nettoyage masque les erreurs ; test rouge constaté (retour 0 sur fournisseur en échec).
+NOTICED BUT NOT TOUCHING: VM CPU préexistante, traces non suivies, fichiers protégés.
+Source: aide CLI Scaleway, documentation officielle identify-devices, cloud-init et vLLM 0.10.2.
+Plan appliqué sur m1-gpu-cycle : orchestration stdlib Python, bootstrap cloud-init, tests sans réseau.
+ASSUMPTION: estimation haute stockage 0,00013 EUR/Go/h et IP 0,005 EUR/h ; coût réel facture à revoir au checkpoint.
+Avant création : GPU L40S 1,469916 + 280 Go 0,0364 + IP 0,005 = 1,511316 EUR/h HT.
+Poids conservés 200 Go = 0,026 EUR/h ; aucune ressource encore créée. Plafond GPU 1,47 EUR/h.
+Premier cycle arrêté avant serveur (décodage security_group CLI) ; groupe supprimé, poids 200 Go conservés.
+Source: CLI 2.62.0 server get expose Volumes/public_ips ; server list conserve volumes indexés.
+Correction testée avec ces formats ; image SBS fr-par-2 épinglée par catalogue marketplace.
+Le volume créé dans cet essai et jamais attaché est marqué atlas-unformatted pour son premier formatage conditionnel.
+CONTRADICTION: LOCAL_MODEL injecté pointe vers des poids BF16, docs/13 impose FP8 pour le GPU 48 Go.
+Source: config.json du dépôt de poids et de sa variante FP8 vérifiées ; quant_method=fp8 sur cette dernière.
+Deuxième essai interrompu sans validation avant fin readiness ; nettoyage via trap puis contrôle explicite.
+RISK: aucun accès SSH utilisable (clé privée absente) ; prochain bootstrap autorisera une clé dédiée locale pour diagnostics en lecture seule.
+Deuxième essai nettoyé : GPU/IP/racine absents ; poids 200 Go conservés.
+Variante FP8 et révision épinglée dans services/model-gateway/local.env ; clé de diagnostic locale hors dépôt.
+Avant troisième lancement : même coût plafond 1,511316 EUR/h ; contrôles locaux relancés après correction.
+Livraison découpée selon REQ-ENG-008 et le plan mergé : PR moteur GPU/tests (<400 lignes), puis intégration après merge humain.
+Aucune dérogation à la limite reçue. Travail complet conservé sur m1-gpu-cycle ; première PR sur m1-gpu-core.
+Avant commit/push : contrôles locaux du sous-ensemble exécutés ; aucun fichier protégé changé. GPU du troisième essai toujours actif sous le vérificateur.
+Troisième cycle réel make verify-m1 terminé avec code 0 : 378 s, /v1/models HTTP 200,
+64 tokens en 1,97 s (~32,5 tok/s), bench BRAIN/bench/m1-20260909T104731Z.json.
+Destruction intégrée puis gpu-down explicite réussies ; inventaire toutes zones : aucun GPU.
+Reste uniquement la VM CPU et son disque/IP préexistants, plus poids 200 Go disponibles (0,026 EUR/h estimés).
+Source: PR #5 https://github.com/leag1234/cloclo/pull/5 ; run https://github.com/leag1234/cloclo/actions/runs/34342197303,
+job ci success sur 3ec1570. Preuve CI du moteur/tests uniquement, pas de la seconde PR d'intégration.
+DoD : tests locaux/typage/lint/scan et chemin CI statique contrôlés ; couverture module 85,4 % avant simplification de l'inventaire.
+Limites : fallback configuré mais non activé (M4), aucune mesure TTFT revendiquée ; un seul cycle réussi.
+M1 NON TERMINÉ : règle <400 lignes appliquée (PR #5 : 394), intégration préparée sur m1-gpu-cycle,
+publication de sa PR après merge humain #5 selon le plan. Aucun merge agent, aucun push main, aucun fichier protégé modifié.

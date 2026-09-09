@@ -19,6 +19,20 @@ def load_gpu() -> ModuleType:
 
 
 class GPUContract(unittest.TestCase):
+    def test_down_propagates_provider_error(self) -> None:
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as directory:
+            executable = Path(directory) / "scw"
+            executable.write_text("#!/bin/sh\nexit 9\n")
+            executable.chmod(0o755)
+            result = subprocess.run(
+                ["bash", "infra/gpu-down.sh"],
+                env={**os.environ, "PATH": directory + ":" + os.environ["PATH"]},
+                capture_output=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+
     def test_lifecycle(self) -> None:
         gpu = load_gpu()
         with tempfile.TemporaryDirectory() as directory, contextlib.chdir(directory):

@@ -48,3 +48,11 @@ RÉSOLU : MISSION et contrat minimal sont alignés, l'arbitrage TTFT/deux cycles
 Préconditions actuelles : plan infra/m1-plan.md à revoir selon docs/11 §9.2 ; confirmation des alertes budget et du scheduler demandée avant lancement.
 RISK: API catalogue annonce shortage pour le GPU configuré ; aucune tentative de création, aucun blocage technique à trois échecs revendiqué.
 Inventaire projet toutes zones réussi : aucun GPU ; aucune ressource créée ni supprimée.
+
+## 2026-09-09 — M1 : état après cycle réel
+Anciens prérequis résolus : contrat et plan mergés, budget autorisé par MISSION,
+accès cloud/CI fonctionnels, cycle réel terminé en 378 s et GPU détruit.
+Aucun problème technique n'a atteint trois échecs dans cette réalisation.
+Attente de livraison : merge humain de PR #5 (moteur/tests, ci vert), puis PR d'intégration
+selon le découpage <400 lignes imposé par docs/11 REQ-ENG-008 et le plan mergé.
+M1 ne peut pas encore être déclaré terminé : CI de l'intégration non exécutée.

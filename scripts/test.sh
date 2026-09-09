@@ -6,3 +6,8 @@ python3 -m unittest discover -s tests -v
 if [[ "${GITHUB_ACTIONS:-}" == true && "${ATLAS_VERIFY_M0:-}" != 1 ]]; then
   make verify-m0
 fi
+
+# CI has no GPU credentials: run the protected static M1 contract.
+if [[ "${GITHUB_ACTIONS:-}" == true ]]; then
+  env -u SCW_ACCESS_KEY -u SCW_SECRET_KEY make verify-m1
+fi
