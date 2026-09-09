@@ -45,3 +45,7 @@ verify-m6: ## durcissement + bench + rapport
 
 .PHONY: help lint typecheck test scan-secrets eval-smoke eval demo \
         verify-m0 verify-m1 verify-m2 verify-m3 verify-m4 verify-m5 verify-m6
+
+.PHONY: ingest
+ingest: ## ingérer le corpus via gateway dans Postgres/pgvector
+	@python3 -m services.retrieval.pipeline

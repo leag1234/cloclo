@@ -16,3 +16,11 @@ l'optimisation grande échelle. Aucun coût cloud ajouté. SLO final POC-P3 à
 mesurer avec le pipeline complet ; cet incrément ne valide pas M2.
 Tests : classement avec distracteurs, unicode, révision, entrées invalides,
 erreurs HTTP/timeout et réponses fournisseur invalides. Mocks limités aux tests.
+
+`make ingest` exige ATLAS_RETRIEVAL_DSN et un gateway démarré
+(ATLAS_GATEWAY_URL, défaut http://127.0.0.1:8010). Markdown : front matter
+avec doc_id/langue ; pdf/docx/html : fichier adjacent `<nom.ext>.json` avec
+ces deux champs. Aucune source symlink n'est acceptée. Identifiants SHA-256
+canoniques de source relative/empreinte/version de découpage/position.
+L'ingestion prépare et valide tous les embeddings avant la transaction ;
+un corpus vide est refusé pour prévenir une suppression accidentelle.
