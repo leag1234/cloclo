@@ -33,3 +33,14 @@ RAG <12 s sera mesurée au jalon performance. Plafond serverless confirmé dans
 MISSION ; aucun GPU créé, facturation à l'usage et non horaire.
 Source: https://www.scaleway.com/en/docs/generative-apis/api-cli/using-chat-api/
 Source: https://www.scaleway.com/en/docs/generative-apis/reference-content/supported-models/
+
+## Cascade M4
+POST /agent/complete route les tâches simples vers LOCAL_MODEL / LOCAL_API_BASE
+(produit par infra/gpu-up.sh dans BRAIN/gateway.env). Sans endpoint local,
+la bascule Scaleway prend le relais ; aucun GPU nécessaire au gate M4.
+Contrat : contracts/m4.md. Logs routing : classe, fournisseur, fallback ; sans texte.
+Runbook : injecter les variables M3 et locales, lancer le gateway puis le harness.
+Une panne locale consomme au plus 2 s avant L, dans la deadline M3. Prix L réservé
+avant appel ; erreurs L restent explicites. SLO de qualité locale à mesurer en M6.
+`make test-fallback` rejoue une réponse Scaleway enregistrée après panne locale
+réelle ; `make eval-routing` écrit BRAIN/eval/routing.json. UI bonus non livrée.

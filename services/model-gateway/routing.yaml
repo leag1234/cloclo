@@ -10,5 +10,5 @@ task_classes:
     fallback: { provider: scaleway, model: "${ESCALATION_MODEL}" }
     max_cost_eur_per_call: 0.05
 providers:
-  local:    { base_url: "http://gpu-node:8000/v1" }
+  local:    { base_url: "${LOCAL_API_BASE}" }
   scaleway: { base_url: "${SCW_GENERATIVE_BASE_URL}", api_key_env: "SCW_GENERATIVE_API_KEY" }
