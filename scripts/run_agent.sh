@@ -28,7 +28,7 @@ Définition de terminé pour ${MILESTONE} :
   3. ATTENDS que le job CI 'ci' soit VERT : interroge
      GET https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/commits/<sha>/check-runs
      ou /actions/runs, avec le header "Authorization: Bearer \${GITHUB_TOKEN}", en boucle
-     (max 20 essais, 15s d'intervalle), puis
+     (max 60 essais, 15s d'intervalle = 15 min ; la CI de ce repo peut être lente), puis
   4. SI ET SEULEMENT SI la CI est VERTE, MERGE toi-même la PR via :
      curl -X PUT -H "Authorization: Bearer \${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" \\
        https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/pulls/<N>/merge \\
