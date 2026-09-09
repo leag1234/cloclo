@@ -93,3 +93,5 @@ Aucun GPU créé/utilisé, coût additionnel 0 €/h ; inventaire distant non v�
 make verify-m1 non exécuté ; aucune mesure GPU ou validation M1 revendiquée.
 Prochaine opération : commit/push de la proposition et PR pour revue humaine.
 Arrêt R-10 sur prérequis explicites ; aucune boucle de trois essais artificiels.
+
+PR de contrats M1 ouverte : https://github.com/leag1234/cloclo/pull/3 ; merge humain uniquement.

@@ -7,3 +7,5 @@
 - Cloud : aucune ressource créée/utilisée dans cette session, coût additionnel 0 €/h.
   Inventaire distant inconnu : credentials absents et inventory.sh non implémenté.
 - make verify-m1 non exécuté : le mode statique ne prouverait pas le jalon réel.
+
+PR de contrats M1 ouverte : https://github.com/leag1234/cloclo/pull/3 ; merge humain uniquement.

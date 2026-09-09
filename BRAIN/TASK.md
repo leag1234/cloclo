@@ -5,3 +5,5 @@ Prochain pas humain : revoir/merger les contrats et trancher les écarts du gate
 protégé ; fournir les accès projet cloud avec budget et extinction attestés.
 Après levée : implémenter par incréments testés puis verify-m1 réel local et CI.
 M1 non terminé ; aucun mandat pour M2.
+
+PR de contrats M1 ouverte : https://github.com/leag1234/cloclo/pull/3 ; merge humain uniquement.
