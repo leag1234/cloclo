@@ -66,3 +66,15 @@ Validation et PR en cours ; aucun nouveau run M0 vert encore attesté.
 Validation locale : make verify-m0 et chemin GITHUB_ACTIONS=true make test
 terminés avec code 0 ; quatre tests. Contrôles protégés inchangés.
 Prochaine opération : commit/push uniquement m0-impl et ouverture PR autorisés.
+
+## 2026-09-09 — M0 validé en CI
+Source: https://github.com/leag1234/cloclo/actions/runs/34329362650, job ci success sur a31f901.
+Logs téléchargés et contrôlés : verify-m0 OK, healthcheck réel inclus ; tous les
+steps verts. PR https://github.com/leag1234/cloclo/pull/2 ouverte, non mergée.
+Couverture locale serveur 85,3 % via trace --count --missing ; quatre tests.
+DoD M0 : contrat approuvé implémenté, HTTP/404/arrêt testés, gates bloquants,
+logs structurés sans entrée utilisateur, documentation et coût mis à jour.
+Sans objet pour M0 : migrations, fournisseur, budgets LLM, GPU et bench de charge.
+Limites : harness zéro cas explicite, full refusé ; inventaire cloud non vérifié.
+Aucune ressource créée/utilisée ; aucun GPU activé ; aucun nettoyage cloud requis.
+Publication BRAIN sur m0-impl, puis contrôle du nouveau run ; arrêt sans M1.

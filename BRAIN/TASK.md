@@ -1,5 +1,5 @@
-# TASK — M0 uniquement
-Contrat et plan PR #1 mergés ; blocage CI levé par HUMAN_ANSWER.md.
-Implémenter et vérifier edge-bff, harness vide, outils bloquants et squelettes.
-Prochain pas : make verify-m0 local, push m0-impl, PR puis attendre ci vert.
-Fichiers protégés inchangés ; merge humain ; arrêt après M0.
+# TASK — M0 terminé, arrêt
+PR : https://github.com/leag1234/cloclo/pull/2 — merge réservé à l'humain.
+Preuve : https://github.com/leag1234/cloclo/actions/runs/34329362650 (ci success), logs verify-m0 OK vérifiés.
+Dernière opération : publication de cet état BRAIN puis contrôle de la CI résultante.
+Prochain pas humain : revue/merge ; aucun mandat M1, ne pas l'entamer.
