@@ -24,3 +24,8 @@ ces deux champs. Aucune source symlink n'est acceptée. Identifiants SHA-256
 canoniques de source relative/empreinte/version de découpage/position.
 L'ingestion prépare et valide tous les embeddings avant la transaction ;
 un corpus vide est refusé pour prévenir une suppression accidentelle.
+
+`services.retrieval.answer.answer` appelle /answer au gateway puis résout chaque
+référence dans le Store. Toute citation inconnue, dupliquée, absente du texte,
+hors des passages récupérés, ou modifiée depuis le retrieval est rejetée.
+Les cassettes multilingues et le refus ont été enregistrés via le fournisseur réel.
