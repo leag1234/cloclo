@@ -25,10 +25,7 @@ un healthcheck `edge-bff` répond 200 ; le scan de secrets passe ; le grep anti-
 **Livrables** : `infra/gpu-up.sh` (crée l'instance ${GPU_INSTANCE_TYPE}, monte le volume
 de poids persistant, lance vLLM avec prefix caching), `infra/gpu-down.sh`, gateway
 (config `routing.yaml` : local + fallback Generative APIs Scaleway).
-**verify-m1** vérifie : `infra/gpu-up.sh` crée le nœud DEPUIS ZÉRO ; `curl` gateway
-`/v1/models` → 200 ; un bench TTFT/tok-s est produit et archivé sous `BRAIN/bench/` ;
-`infra/gpu-down.sh` détruit instance+IP ; **re-création complète chronométrée < 20 min**.
-> Marqueur budget : chaque création écrit le coût/h dans BRAIN/STATUS.md (docs/14).
+**verify-m1** se valide SUR LA VM (accès GPU + creds Scaleway), PAS en CI GitHub qui n'a ni GPU ni secrets cloud. En CI : contrôle statique des scripts. Sur la VM : `make verify-m1` crée réellement le nœud, mesure TTFT/débit, archive le bench, détruit le nœud, et prouve la reproductibilité par 2 cycles < 20 min. La preuve de M1 est l'exécution réussie de `make verify-m1` sur la VM (log + benchs archivés sous BRAIN/bench/), PAS un run CI vert.
 
 ## M2 — Ingestion + RAG
 **But** : RAG hybride avec citations résolvables.
