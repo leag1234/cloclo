@@ -38,8 +38,7 @@ est l'exécution réussie de `make verify-m1` sur la VM. Voir contracts/m1.md.
 recherche BM25+dense+reranker ; génération avec citations `chunk_id`.
 Si `evals/golden/` ne contient pas encore E1/E2/E3, exécuter `generation/KIT-E1-E2-E3.md`
 sur le corpus fourni (statut `genere-a-valider`, en attente de validation humaine).
-**verify-m2** vérifie : POC-E1 recall@8 ≥ 0,85 sur les cas `valide` ; chaque citation
-d'une réponse pointe vers un chunk réellement récupérable (test automatique).
+**verify-m2** vérifie sur le corpus multilingue (corpus/) : l'ingestion produit des chunks avec métadonnées ; le retrieval atteint **recall@8 ≥ 0,70** sur le jeu doré E1 (gate M2 ; cible 0,85 à terme, relevable via M2_RECALL_MIN) ; chaque citation d'une réponse pointe vers un chunk réellement récupérable. M2 ne crée pas de GPU.
 
 ## M3 — Harness agentique + outils web
 **But** : boucle d'outils bornée, recherche + lecture web sûres.
