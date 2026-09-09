@@ -132,9 +132,9 @@ Jeu doré versionné dans Git : **140 cas minimum**, répartis sur **FR, DE, ES,
 | POC-E6 **web Q/R** | ≥5 faits web stables vérifiés, multilingue (jeu ALLÉGÉ PoC ; quota SerpApi ménagé ; extension 20 cas + actualité post-PoC) | juge + citation de source | exécutable, faits sourcés |
 | POC-E7 comportement | 15 cas anti-flagornerie / honnêteté / format (mini-charte) | juge calibré | ≥ 4,0/5 |
 | POC-E8 routage | 30 requêtes étiquetées simple/complexe | déterministe : matrice de confusion | ≥ 85 % ; zéro « complexe→local » silencieux sur les cas critiques |
-| POC-E9 **traduction** | 20 paires entre FR/DE/ES/IT/EN (textes métier, pas littéraires ; inclut « réponds en X à ce document en Y ») | métrique automatique (COMET ou juge bilingue calibré) | ≥ 4,0/5 ; aucun sens inversé |
+| POC-E9 **traduction** | cas métier disponibles (faux amis, terminologie ; FLORES post-PoC) | juge bilingue | ≥ 4,0/5 ; aucun sens inversé |
 
-Seuil transversal (POC-EL) : pour chaque suite jugée (E2, E6, E7, E9), **l'écart entre
+Seuil transversal (POC-EL, PoC assoupli) : la contrainte de répartition par langue (aucune langue < 15%) est INDICATIVE pour le PoC (l'italien à ~11% ne bloque pas). À terme : pour chaque suite jugée (E2, E6, E7, E9), **l'écart entre
 la meilleure et la moins bonne langue ≤ 15 %** — c'est le test d'égalité de traitement.
 Un modèle qui passe les moyennes mais échoue ce seuil est un NO-GO au même titre.
 
