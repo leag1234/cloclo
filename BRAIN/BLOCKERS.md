@@ -38,3 +38,13 @@ Les arrêts historiques ci-dessus ne décrivent plus l'état courant.
   dédié et attester budget/alarme/scheduler avant création. Aucun secret demandé ici.
 Aucune tentative de provisionnement ; blocage de spécification, pas trois échecs
 techniques. Aucun fichier protégé modifié, M1 non terminé.
+
+## 2026-09-09 — actualisation M1 sur main 2862662
+Contrat minimal désormais présent ; variables cloud présentes. Ces anciens motifs ne bloquent plus à eux seuls.
+Blocage de spécification R-10 : MISSION impose TTFT/deux cycles, contracts/m1.md les exclut et verify-m1 protégé applique un cycle minimal. L’humain doit préciser le périmètre applicable. Aucun essai cloud effectué ; pas de boucle de tentatives artificielle.
+
+## 2026-09-09 — actualisation M1 après aebb3e1
+RÉSOLU : MISSION et contrat minimal sont alignés, l'arbitrage TTFT/deux cycles n'est plus requis.
+Préconditions actuelles : plan infra/m1-plan.md à revoir selon docs/11 §9.2 ; confirmation des alertes budget et du scheduler demandée avant lancement.
+RISK: API catalogue annonce shortage pour le GPU configuré ; aucune tentative de création, aucun blocage technique à trois échecs revendiqué.
+Inventaire projet toutes zones réussi : aucun GPU ; aucune ressource créée ni supprimée.

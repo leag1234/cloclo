@@ -95,3 +95,24 @@ Prochaine opération : commit/push de la proposition et PR pour revue humaine.
 Arrêt R-10 sur prérequis explicites ; aucune boucle de trois essais artificiels.
 
 PR de contrats M1 ouverte : https://github.com/leag1234/cloclo/pull/3 ; merge humain uniquement.
+
+## 2026-09-09 — reprise M1, état actualisé
+Source: AGENTS.md, MISSION.md, docs/13, docs/11 (règles absolues), docs/14 et BRAIN relus ; contrats, vérificateur et historique local consultés.
+Source: main local 2862662 contient le contrat M1 minimal et le vérificateur modifiés par l’humain ; les variables SCW_ACCESS_KEY, SCW_SECRET_KEY, SCW_DEFAULT_PROJECT_ID et GPU_INSTANCE_TYPE sont présentes (valeurs non affichées).
+CONTRADICTION: MISSION.md M1 exige TTFT et deux cycles ; contracts/m1.md exclut explicitement TTFT et second cycle de M1, et le vérificateur protégé ne réalise qu’un cycle. Arbitrage humain requis par docs/11 R-10.
+RISK: ne pas lancer de ressource facturée avant résolution du périmètre et vérification des coûts, budget et extinction.
+NOTICED BUT NOT TOUCHING: fichiers protégés et traces locales non suivies ; ancien HUMAN_ANSWER.md concerne M0 seulement.
+Les blocages historiques « contrat absent » et « variables cloud absentes » ne décrivent plus cette reprise. Présence des variables ne prouve ni validité des accès ni inventaire distant.
+Aucun code runtime modifié, aucun test exécuté, aucun push ni merge ; aucune ressource cloud créée/utilisée. Inventaire distant inconnu. M1 non terminé.
+Prochain pas : arbitrer contrat minimal (un cycle, débit approximatif) versus MISSION (TTFT, deux cycles), puis reprendre l’implémentation, verification locale réelle, PR et job ci vert selon le mandat utilisateur.
+
+## 2026-09-09 — M1, résolution du périmètre et préparation concrète
+Source: AGENTS, MISSION, docs/13, docs/11 intégral et docs/14 puis BRAIN relus.
+Source: aebb3e1 aligne MISSION sur contracts/m1.md : ancien conflit TTFT/deux cycles résolu.
+CONTRADICTION: l'état BRAIN de la reprise décrivait encore le conflit antérieur ; actualisé selon MISSION et le contrat minimal. Mandat appliqué : GPU réel local puis job ci vert.
+Source: aide CLI scw instance server create/terminate/list et block volume create/list consultée ; API catalogue et inventaire bornés au projet dédié.
+RISK: catalogue GPU L40S-1-48G fr-par-2 à 1,469916 EUR/h HT, availability=shortage ; aucun essai de création. Coûts stockage/IP à compléter avant création.
+RISK: alertes indépendantes et scheduler non attestés ; question envoyée à l'humain avant lancement facturé.
+NOTICED BUT NOT TOUCHING: VM CPU et volume système préexistants, traces locales non suivies, fichiers protégés. Aucun GPU dans l'inventaire toutes zones du projet.
+Plan concret préparé dans infra/m1-plan.md pour revue préalable docs/11 §9.2 ; branche m1-infra-gateway. Aucun code runtime changé, aucun test exécuté, aucun provisionnement.
+Aucune nouvelle dépendance, coût additionnel 0 EUR/h. M1 non terminé.
