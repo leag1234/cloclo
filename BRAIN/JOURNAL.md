@@ -15,3 +15,8 @@ ASSUMPTION: aucune ressource cloud active selon STATUS initial ; pas d'inventair
 cloud disponible dans le dépôt, aucun provisionnement effectué dans cette session.
 Aucun test applicatif exécuté ; aucune preuve CI M0 à ce stade.
 Prochaine étape : PR des contrats, revue et merge humains requis par R-02.
+PR des contrats ouverte : https://github.com/leag1234/cloclo/pull/1 ; push uniquement
+sur m0-contrats. JSON validé syntaxiquement, sans prétendre à une validation M0.
+Lecture CI : trois HTTP 403 (actions/runs, check-runs, status) ; arrêt et BLOCKERS.md.
+Prochaine action humaine : merger le contrat après revue et remplacer le jeton avec
+les droits de lecture CI. Aucun fichier protégé modifié, aucun GPU créé/utilisé.
