@@ -1,11 +1,13 @@
 """Local HTTP boundary for the CPU retrieval models (contracts/m2-gateway)."""
 
+import asyncio
 import json
 import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from gateway_cpu import CPUModels, EMBEDDING_REVISION
 from generation import Generator
+from agent_provider import AgentProvider
 
 
 def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
@@ -66,6 +68,12 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                             for key, value in zip(ids, scores, strict=True)
                         ]
                     }
+                elif self.path == "/agent/config":
+                    if request:
+                        raise ValueError("invalid_input")
+                    response = AgentProvider().configuration()
+                elif self.path == "/agent/complete":
+                    response = asyncio.run(AgentProvider().complete(request))
                 elif self.path == "/answer":
                     response = Generator()(request)
                 else:
