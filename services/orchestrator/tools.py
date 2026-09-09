@@ -1,0 +1,215 @@
+"""Strict tool arguments; all untrusted results cross one explicit envelope."""
+
+import asyncio
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from decimal import Decimal
+from pathlib import Path
+from typing import Literal
+
+import aiohttp
+import trafilatura
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from services.orchestrator.cache import Cache
+from services.orchestrator.calculator import calculate
+from services.orchestrator.loop import Call, Message, Reservation
+from services.orchestrator.web import MAX_BYTES, Web, validate_url
+
+
+class Arguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+
+class Calculator(Arguments):
+    expr: str = Field(min_length=1, max_length=512)
+
+
+class Search(Arguments):
+    query: str = Field(min_length=1, max_length=4000, pattern=r"\S")
+    n: int = Field(default=5, ge=1, le=5)
+    lang: Literal["fr", "de", "es", "it", "en"]
+    news: bool = False
+
+
+class Fetch(Arguments):
+    url: str = Field(min_length=1, max_length=4096)
+
+
+class Rag(Arguments):
+    query: str = Field(min_length=1, max_length=4000, pattern=r"\S")
+
+
+SCHEMAS: dict[str, type[Arguments]] = {
+    "calculator": Calculator,
+    "web_search": Search,
+    "web_fetch": Fetch,
+    "rag_search": Rag,
+}
+
+
+def declarations() -> list[Message]:
+    descriptions = json.loads(Path("prompts/tools.json").read_text())
+    if set(descriptions) != set(SCHEMAS) or not all(
+        isinstance(v, str) for v in descriptions.values()
+    ):
+        raise ValueError("invalid_tool_descriptions")
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": name,
+                "description": descriptions[name],
+                "parameters": schema.model_json_schema(),
+            },
+        }
+        for name, schema in SCHEMAS.items()
+    ]
+
+
+class Runtime:
+    def __init__(self, cache: Cache, search_cost: Decimal) -> None:
+        self.cache, self.search_cost = cache, search_cost
+        Reservation(0, search_cost)
+        self.web = Web()
+
+    def estimate(self, call: Call) -> Reservation:
+        return Reservation(
+            0, self.search_cost if call.name == "web_search" else Decimal(0)
+        )
+
+    async def search(self, request: Search, timeout: float) -> Message:
+        key = self.cache.key(["search", 4096, request.model_dump()])
+        cached = self.cache.get(key)
+        if cached is not None:
+            return cached
+        self.cache.reserve_search()
+        country, domain = {
+            "fr": ("fr", "google.fr"),
+            "de": ("de", "google.de"),
+            "es": ("es", "google.es"),
+            "it": ("it", "google.it"),
+            "en": ("uk", "google.co.uk"),
+        }[request.lang]
+        params = {
+            "engine": "google",
+            "q": request.query,
+            "hl": request.lang,
+            "gl": country,
+            "google_domain": domain,
+            "api_key": os.environ["SERPAPI_KEY"],
+        }
+        if request.news:
+            params["tbm"] = "nws"
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=timeout), trust_env=False
+        ) as session:
+            async with session.get(
+                "https://serpapi.com/search.json", params=params, allow_redirects=False
+            ) as response:
+                if response.status != 200:
+                    raise ValueError("search_unavailable")
+                body = bytearray()
+                async for piece in response.content.iter_chunked(16384):
+                    body.extend(piece)
+                    if len(body) > MAX_BYTES:
+                        raise ValueError("response_too_large")
+                data = json.loads(body)
+        if not isinstance(data, dict) or data.get("error"):
+            raise ValueError("search_unavailable")
+        results = data.get("news_results" if request.news else "organic_results", [])
+        if not isinstance(results, list):
+            raise ValueError("invalid_search_response")
+        items: list[Message] = []
+        for item in results[: request.n]:
+            if not isinstance(item, dict) or not isinstance(item.get("link"), str):
+                raise ValueError("invalid_search_response")
+            items.append(
+                {
+                    k: str(item.get(k, ""))[: 4096 if k == "link" else 300]
+                    for k in ("title", "link", "snippet", "date")
+                }
+            )
+        output: Message = {
+            "results": items,
+            "consulted_at": datetime.now(timezone.utc).isoformat(),
+        }
+        self.cache.put(key, output, 3600)
+        return output
+
+    async def fetch(self, request: Fetch, timeout: float) -> Message:
+        validate_url(request.url)
+        key = self.cache.key(["fetch", 2000, request.url])
+        cached = self.cache.get(key)
+        if cached is not None:
+            return cached
+        url, body = await self.web.fetch(request.url, timeout)
+        text = await asyncio.to_thread(
+            trafilatura.extract, body, url=url, include_comments=False
+        )
+        if not text:
+            raise ValueError("extraction_empty")
+        # UTF-8 byte bound is conservative for byte-based model tokenizers.
+        prefix = text.encode()[:2000].decode("utf-8", errors="ignore")
+        handle = self.cache.key(["continuation", url, text]) if prefix != text else ""
+        if handle:
+            self.cache.put(handle, {"text": text[len(prefix) :], "url": url}, 86400)
+        output: Message = {
+            "url": url,
+            "consulted_at": datetime.now(timezone.utc).isoformat(),
+            "text": prefix,
+            "handle": handle,
+            "truncated": bool(handle),
+        }
+        self.cache.put(key, output, 86400)
+        return output
+
+    async def execute(self, call: Call, timeout: float) -> Message:
+        try:
+            schema = SCHEMAS.get(call.name)
+            if schema is None:
+                raise ValueError("unknown_tool")
+            request = schema.model_validate_json(call.arguments)
+            if isinstance(request, Calculator):
+                return {"value": calculate(request.expr)}
+            async with asyncio.timeout(timeout):
+                if isinstance(request, Search):
+                    result = await self.search(request, timeout)
+                elif isinstance(request, Fetch):
+                    result = await self.fetch(request, timeout)
+                else:
+                    process = await asyncio.create_subprocess_exec(
+                        sys.executable,
+                        "-m",
+                        "services.retrieval.tool",
+                        stdin=asyncio.subprocess.PIPE,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.DEVNULL,
+                    )
+                    try:
+                        body, _ = await process.communicate(call.arguments.encode())
+                        if process.returncode or len(body) > 300000:
+                            raise ValueError("retrieval_unavailable")
+                        result = json.loads(body)
+                        if not isinstance(result, dict):
+                            raise ValueError("invalid_retrieval_response")
+                    finally:
+                        if process.returncode is None:
+                            process.kill()
+                            await process.wait()
+            return {"trust": "untrusted", "data": result}
+        except ValidationError:
+            return {
+                "error": "invalid_arguments",
+                "schema": SCHEMAS[call.name].model_json_schema(),
+            }
+        except TimeoutError:
+            return {"error": "timeout"}
+        except (aiohttp.ClientError, KeyError):
+            return {"error": "provider_unavailable"}
+        except ValueError as exc:
+            return {
+                "error": str(exc) if len(str(exc)) < 80 else "invalid_provider_response"
+            }
