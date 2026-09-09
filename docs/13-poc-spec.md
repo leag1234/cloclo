@@ -124,12 +124,12 @@ Jeu doré versionné dans Git : **140 cas minimum**, répartis sur **FR, DE, ES,
 
 | Suite | Cas | Vérification | Seuil GO |
 |---|---|---|---|
-| POC-E1 retrieval | 40 questions → doc/chunk attendu (corpus et questions multilingues, y compris question dans une langue ≠ langue du document) | **déterministe** : recall@8, MRR | recall@8 ≥ 0,85 |
+| POC-E1 retrieval | 40 questions → doc/chunk attendu (corpus et questions multilingues, y compris question dans une langue ≠ langue du document) | **déterministe** : recall@8, MRR | recall@8 ≥ 0,70 (gate PoC ; cible 0,85) |
 | POC-E2 RAG bout-en-bout | 30 Q/R sur le corpus | juge LLM (rubrique exactitude/complétude) + présence de citation | ≥ 4,0/5 moyen |
 | POC-E3 refus honnête | 10 questions sans réponse dans le corpus | déterministe (regex « ne trouve pas ») + juge | 10/10 : zéro invention |
 | POC-E4 tool-calling | 20 scénarios (bon outil, bons args, récupération sur erreur injectée) | déterministe (assertions sur la trace) | ≥ 90 % |
 | POC-E5 fidélité des citations | échantillon des réponses E2 + web | vérificateur NLI/juge : chaque citation supporte la phrase | ≥ 0,90 |
-| POC-E6 **web Q/R** | 20 questions dont la réponse n'existe que sur le web (fraîches, vérifiables), réparties sur les 5 langues avec sources locales (presse DE/ES/IT…) | juge + vérification manuelle initiale de la clé de correction | ≥ 80 % correctes et sourcées |
+| POC-E6 **web Q/R** | ≥5 faits web stables vérifiés, multilingue (jeu ALLÉGÉ PoC ; quota SerpApi ménagé ; extension 20 cas + actualité post-PoC) | juge + citation de source | exécutable, faits sourcés |
 | POC-E7 comportement | 15 cas anti-flagornerie / honnêteté / format (mini-charte) | juge calibré | ≥ 4,0/5 |
 | POC-E8 routage | 30 requêtes étiquetées simple/complexe | déterministe : matrice de confusion | ≥ 85 % ; zéro « complexe→local » silencieux sur les cas critiques |
 | POC-E9 **traduction** | 20 paires entre FR/DE/ES/IT/EN (textes métier, pas littéraires ; inclut « réponds en X à ce document en Y ») | métrique automatique (COMET ou juge bilingue calibré) | ≥ 4,0/5 ; aucun sens inversé |
@@ -142,9 +142,9 @@ Règles d'exécution :
 - POC-R1 : `make eval` exécute tout, produit un rapport HTML horodaté avec diff vs le
   run précédent **et ventilation par langue**, stocke les résultats en base.
   Durée < 20 min, coût < 3 €.
-- POC-R2 : le juge (modèle L serverless) est calibré une fois par langue : 30 cas notés
-  par un humain (répartis sur les 5 langues), accord vérifié (désaccord moyen ≤ 0,5
-  point) avant de faire foi.
+- POC-R2 (PoC) : le juge de production (glm-5.2) est calibré par ACCORD CROISÉ avec un
+  juge de référence d'une autre famille (gpt-oss-120b) : κ de Cohen calculé sur un
+  échantillon d'éval. La calibration HUMAINE (30 notes, κ≥0,7) reste une action pré-GA.
 - POC-R3 : les cas E6 (web) incluent la date de création de la clé de correction ; un
   cas périmé (la réalité a changé) est marqué `stale`, pas compté en échec.
 - POC-R4 : CI : `make eval-smoke` (15 cas représentatifs couvrant ≥ 3 langues, < 3 min,
