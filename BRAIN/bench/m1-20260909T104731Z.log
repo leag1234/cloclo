@@ -1,0 +1,13 @@
+== verify-m1 ==
+  → création du nœud GPU…
+[gpu-up] L40S-1-48G at 1.469916 EUR/h excluding storage/IP
+[gpu-up] cloud-init submitted; readiness checked by verify-m1
+  ✓ nœud créé (IP 51.159.119.227)
+  → attente de vLLM (max 12 min)…
+  ✓ vLLM répond sur /v1/models
+  → inférence de contrôle…
+  ✓ inférence OK — 64 tokens en 1.97s (~32.5 tok/s), bench: BRAIN/bench/m1-20260909T104731Z.json
+  → destruction du nœud…
+[gpu-down] owned GPU, root disk and IP removed; weights retained
+  ✓ cycle complet en 378s (< 20 min)
+== verify-m1 OK (GPU créé, modèle servi, GPU détruit) ==

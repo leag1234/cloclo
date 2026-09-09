@@ -7,3 +7,6 @@ __pycache__/
 node_modules/
 .venv/
 reports/*.html
+BRAIN/gpu_ip.txt
+BRAIN/gpu.lock
+BRAIN/gateway.env
