@@ -56,3 +56,6 @@ Aucun problème technique n'a atteint trois échecs dans cette réalisation.
 Attente de livraison : merge humain de PR #5 (moteur/tests, ci vert), puis PR d'intégration
 selon le découpage <400 lignes imposé par docs/11 REQ-ENG-008 et le plan mergé.
 M1 ne peut pas encore être déclaré terminé : CI de l'intégration non exécutée.
+
+## 2026-09-09 — livraison M1 résolue
+PR #5 mergée par humain ; intégration PR #6 ouverte, job ci vert (run 34349650451). Aucun blocage technique restant. Merge et checkpoint infra/budget humains.

@@ -161,3 +161,11 @@ NOTICED BUT NOT TOUCHING: VM CPU préexistante et traces locales. Inventaire zon
 Cycle réel déjà archivé : 378 s ; aucun changement runtime prévu, pas de nouveau provisionnement requis.
 Contrôles de reprise : premier lint arrêté (ruff absent du Python système) ; environnement .venv existant activé, lint/typecheck/8 tests/scan et chemin CI complet exécutés avec code 0.
 Avant push : runtime identique au cycle réel archivé après rebase ; fichiers protégés inchangés. Publication de la PR intégration puis attente CI.
+
+## 2026-09-09 — M1 livré, CI intégration verte
+Source: https://github.com/leag1234/cloclo/actions/runs/34349650451 ; job ci completed/success, commit 8a7bd529. PR #6 : https://github.com/leag1234/cloclo/pull/6.
+Le push initial a été rejeté après rebase (non-fast-forward) ; historique distant contrôlé, identique hors BRAIN, puis conservé sans écrasement. Push réussi uniquement sur m1-gpu-cycle.
+Preuves cumulées : cycle réel local archivé en 378 s (64 tokens, 1,97 s, 32,5 tok/s), lint/typecheck/8 tests/scan et gate statique CI verts. Aucun runtime changé depuis le cycle réel.
+Nettoyage de clôture : gpu-down explicite réussi ; inventaire projet dans les neuf zones sans GPU, seule VM CPU préexistante. Poids persistants conservés selon contrat (~0,026 EUR/h HT).
+DoD : contrat et plan mergés, livraison <400 lignes, tests ajoutés, docs et coût renseignés, fichiers protégés inchangés. Limites contractuelles : pas de TTFT, fallback réservé à M4.
+État final mis à jour après CI verte ; prochain pas : vérifier le run du commit documentaire, puis arrêt M1. Merge/checkpoint humains, aucun M2.
