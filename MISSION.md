@@ -88,3 +88,13 @@ modèle L via Scaleway Generative APIs (ESCALATION_MODEL, déjà configuré dans
 endpoint SCW_GENERATIVE_BASE_URL). Le plafond budget est ACTIF et confirmé. Le petit
 modèle CPU sert UNIQUEMENT aux embeddings/reranking, pas à la génération. Tu es autorisé
 à appeler Generative APIs pour générer et produire des citations fiables.
+
+### M3 — Autorisation de reprise (diagnostic provider_error)
+Les erreurs provider_error sur E4-004/013/018 viennent probablement d'une réponse
+tronquée (limite de tokens de sortie trop basse) quand le contexte est long (page web
+fetchée). Tu es AUTORISÉ à : (1) augmenter la limite de tokens de sortie du gateway
+(ex. 512 -> 2048), (2) tronquer/résumer les contenus web volumineux AVANT de les
+passer au modèle (respect du plafond de contexte, docs/03 REQ-MOD-004), (3) relancer
+les essais E4/E6 autant que nécessaire dans la limite du budget par requête (0,05 €).
+Le function-calling Scaleway est supporté (doc officielle vérifiée). Continue jusqu'à
+E4 >= 90% puis merge. Ne baisse pas le seuil E4, ne modifie pas les clés de correction.
