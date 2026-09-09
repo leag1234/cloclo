@@ -39,6 +39,7 @@ def parse_answer(text: str, request: AnswerRequest) -> dict[str, object]:
     numbers = list(dict.fromkeys(int(n) for n in re.findall(r"\[(\d+)\]", text)))
     if (
         not text.strip()
+        or len(text) > 32000
         or not numbers
         or any(n < 1 or n > len(request.passages) for n in numbers)
     ):

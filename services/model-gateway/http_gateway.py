@@ -1,6 +1,7 @@
 """Local HTTP boundary for the CPU retrieval models (contracts/m2-gateway)."""
 
 import json
+import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from gateway_cpu import CPUModels, EMBEDDING_REVISION
@@ -107,5 +108,6 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     with serve(CPUModels()) as server:
         server.serve_forever()

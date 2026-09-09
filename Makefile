@@ -49,3 +49,7 @@ verify-m6: ## durcissement + bench + rapport
 .PHONY: ingest
 ingest: ## ingérer le corpus via gateway dans Postgres/pgvector
 	@python3 -m services.retrieval.pipeline
+
+.PHONY: eval-retrieval
+eval-retrieval: ## évaluer E1 et résoudre les citations de réponses générées
+	@python3 -m services.retrieval.evaluate
