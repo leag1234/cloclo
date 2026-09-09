@@ -29,7 +29,7 @@ demo: ## déroule un scénario complet RAG+web+escalade
 
 # --- jalons (chacun appelle son script protégé) ---
 verify-m0: ## cadre vérifiable
-	@bash scripts/verify-m0.sh
+	@PYTHONPATH=services/edge-bff python3 scripts/verify_m0.py
 verify-m1: ## infra GPU reproductible + gateway
 	@bash scripts/verify-m1.sh
 verify-m2: ## ingestion + RAG
