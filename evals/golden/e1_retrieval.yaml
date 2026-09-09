@@ -1,0 +1,51 @@
+# E1 — Retrieval : la question doit ramener le bon document/passage.
+# Vérification déterministe : le chunk attendu (doc_id + extrait) est-il dans le top-k ?
+# recall@8 : le bon passage figure-t-il dans les 8 premiers résultats.
+# Champs : id, lang (langue de la question), doc_id_attendu, passage_attendu (extrait
+# discriminant qui doit apparaître dans le chunk récupéré), cross_lingue (bool).
+
+# ---- questions dans la langue du document ----
+- { id: E1-01, lang: fr, doc_id_attendu: rh-teletravail, passage_attendu: "trois jours par semaine", cross_lingue: false }
+- { id: E1-02, lang: fr, doc_id_attendu: rh-teletravail, passage_attendu: "vingt jours par année civile", cross_lingue: false }
+- { id: E1-03, lang: fr, doc_id_attendu: rh-teletravail, passage_attendu: "dix euros par mois", cross_lingue: false }
+- { id: E1-04, lang: de, doc_id_attendu: dienstleistungsvertrag, passage_attendu: "drei Monaten", cross_lingue: false }
+- { id: E1-05, lang: de, doc_id_attendu: dienstleistungsvertrag, passage_attendu: "1.200 Euro pro Tagewerk", cross_lingue: false }
+- { id: E1-06, lang: de, doc_id_attendu: dienstleistungsvertrag, passage_attendu: "fünf Jahre", cross_lingue: false }
+- { id: E1-07, lang: en, doc_id_attendu: q3-financial-report, passage_attendu: "48.3 million euros", cross_lingue: false }
+- { id: E1-08, lang: en, doc_id_attendu: q3-financial-report, passage_attendu: "62 million euros", cross_lingue: false }
+- { id: E1-09, lang: en, doc_id_attendu: q3-financial-report, passage_attendu: "38 percent", cross_lingue: false }
+- { id: E1-10, lang: es, doc_id_attendu: runbook-incidente-db, passage_attendu: "treinta minutos", cross_lingue: false }
+- { id: E1-11, lang: es, doc_id_attendu: runbook-incidente-db, passage_attendu: "idle in transaction", cross_lingue: false }
+- { id: E1-12, lang: es, doc_id_attendu: runbook-incidente-db, passage_attendu: "pg_terminate_backend", cross_lingue: false }
+- { id: E1-13, lang: it, doc_id_attendu: scheda-ipertensione, passage_attendu: "140 mmHg", cross_lingue: false }
+- { id: E1-14, lang: it, doc_id_attendu: scheda-ipertensione, passage_attendu: "cinque grammi al giorno", cross_lingue: false }
+- { id: E1-15, lang: it, doc_id_attendu: scheda-ipertensione, passage_attendu: "180/120 mmHg", cross_lingue: false }
+- { id: E1-16, lang: en, doc_id_attendu: sleep-study-summary, passage_attendu: "14 percent higher", cross_lingue: false }
+- { id: E1-17, lang: en, doc_id_attendu: sleep-study-summary, passage_attendu: "312 healthy adults", cross_lingue: false }
+- { id: E1-18, lang: en, doc_id_attendu: sleep-study-summary, passage_attendu: "cannot establish causation", cross_lingue: false }
+- { id: E1-19, lang: fr, doc_id_attendu: fiche-produit-aquapur, passage_attendu: "349 euros", cross_lingue: false }
+- { id: E1-20, lang: fr, doc_id_attendu: fiche-produit-aquapur, passage_attendu: "deux litres par minute", cross_lingue: false }
+- { id: E1-21, lang: fr, doc_id_attendu: fiche-produit-aquapur, passage_attendu: "six mois", cross_lingue: false }
+- { id: E1-22, lang: ar, doc_id_attendu: shipping-procedure, passage_attendu: "خمسين وحدة", cross_lingue: false }
+- { id: E1-23, lang: ar, doc_id_attendu: shipping-procedure, passage_attendu: "ساعتين", cross_lingue: false }
+- { id: E1-24, lang: ar, doc_id_attendu: shipping-procedure, passage_attendu: "ثلاثة أيام عمل", cross_lingue: false }
+- { id: E1-25, lang: zh, doc_id_attendu: marketing-campaign-plan, passage_attendu: "八十万元", cross_lingue: false }
+- { id: E1-26, lang: zh, doc_id_attendu: marketing-campaign-plan, passage_attendu: "一万台", cross_lingue: false }
+- { id: E1-27, lang: zh, doc_id_attendu: marketing-campaign-plan, passage_attendu: "百分之五十", cross_lingue: false }
+- { id: E1-28, lang: de, doc_id_attendu: dsgvo-hinweis, passage_attendu: "72 Stunden", cross_lingue: false }
+- { id: E1-29, lang: de, doc_id_attendu: dsgvo-hinweis, passage_attendu: "20 Millionen Euro", cross_lingue: false }
+- { id: E1-30, lang: de, doc_id_attendu: dsgvo-hinweis, passage_attendu: "sechs Monaten", cross_lingue: false }
+
+# ---- questions CROSS-LINGUES (question dans une langue != langue du document) ----
+- { id: E1-31, lang: fr, doc_id_attendu: dienstleistungsvertrag, passage_attendu: "drei Monaten", cross_lingue: true, note: "question FR sur contrat DE : délai de résiliation" }
+- { id: E1-32, lang: en, doc_id_attendu: rh-teletravail, passage_attendu: "trois jours", cross_lingue: true, note: "question EN sur doc FR : jours de télétravail" }
+- { id: E1-33, lang: fr, doc_id_attendu: q3-financial-report, passage_attendu: "48.3 million", cross_lingue: true, note: "question FR sur rapport EN : chiffre d'affaires" }
+- { id: E1-34, lang: en, doc_id_attendu: scheda-ipertensione, passage_attendu: "140 mmHg", cross_lingue: true, note: "question EN sur fiche IT : seuil hypertension" }
+- { id: E1-35, lang: fr, doc_id_attendu: dsgvo-hinweis, passage_attendu: "72 Stunden", cross_lingue: true, note: "question FR sur note DE : délai notification RGPD" }
+- { id: E1-36, lang: en, doc_id_attendu: shipping-procedure, passage_attendu: "خمسين وحدة", cross_lingue: true, note: "question EN sur doc AR : seuil de réappro" }
+- { id: E1-37, lang: fr, doc_id_attendu: marketing-campaign-plan, passage_attendu: "八十万元", cross_lingue: true, note: "question FR sur doc ZH : budget campagne" }
+- { id: E1-38, lang: es, doc_id_attendu: fiche-produit-aquapur, passage_attendu: "349 euros", cross_lingue: true, note: "question ES sur fiche FR : prix produit" }
+
+# ---- questions MULTI-DOCUMENTS (désambiguïsation : "quel délai/prix ?" selon contexte) ----
+- { id: E1-39, lang: fr, doc_id_attendu: rh-teletravail, passage_attendu: "un mois", cross_lingue: false, note: "délai de préavis télétravail — ne pas confondre avec préavis contrat DE (3 mois)" }
+- { id: E1-40, lang: es, doc_id_attendu: runbook-incidente-db, passage_attendu: "cuarenta y ocho horas", cross_lingue: false, note: "délai rapport post-incident — ne pas confondre avec délai RGPD 72h" }
