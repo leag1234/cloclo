@@ -75,3 +75,10 @@ RAG + web + escalade sans erreur ; `reports/GO-NOGO.md` généré avec les chiff
 ### Checkpoints humains (hors de ta responsabilité, l'humain les fait)
 Après M1 (infra/budget), après M3 (10 requêtes à la main), après M5 (calibration juge),
 après M6 (décision). Entre ces points, tu avances seul et consignes dans BRAIN/.
+
+### M1 — Confirmation des protections (levée du prérequis AUTO-2 / POC-I1/I2)
+Protections budget CONFIRMÉES et ACTIVES : alertes Scaleway à 50% et 80% de 800€
+(SMS + email), vérifiées en console. Extinction du GPU garantie par le trap de
+verify-m1.sh (destruction en fin de test quoi qu'il arrive) et par l'appel explicite
+à gpu-down.sh. Type GPU : RENDER-S (disponible). L'agent est AUTORISÉ à créer un GPU
+facturé pour exécuter make verify-m1. Cette confirmation ne doit plus être redemandée.
