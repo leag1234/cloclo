@@ -1,0 +1,229 @@
+"""POC-P6: reserve worst-case usage before starting cancellable I/O."""
+
+import asyncio
+import json
+import logging
+import time
+from collections import Counter
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from decimal import Decimal
+from typing import Literal, Protocol
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class Query(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    question: str = Field(min_length=1, max_length=32000, pattern=r"\S")
+    lang: Literal["fr", "de", "es", "it", "en"]
+
+
+@dataclass(frozen=True)
+class Limits:
+    tokens: int = 16384
+    tool_calls: int = 10
+    wall_clock: float = 120
+    cost: Decimal = Decimal("0.05")
+
+    def __post_init__(self) -> None:
+        if not (
+            0 <= self.tokens <= 16384
+            and 0 <= self.tool_calls <= 10
+            and 0 <= self.wall_clock <= 120
+            and 0 <= self.cost <= Decimal("0.05")
+        ):
+            raise ValueError("invalid_limits")
+
+
+@dataclass(frozen=True)
+class Reservation:
+    tokens: int
+    cost: Decimal
+
+    def __post_init__(self) -> None:
+        if self.tokens < 0 or not self.cost.is_finite() or self.cost < 0:
+            raise ValueError("invalid_reservation")
+
+
+@dataclass(frozen=True)
+class Call:
+    id: str
+    name: str
+    arguments: str
+
+
+@dataclass(frozen=True)
+class Turn:
+    text: str
+    calls: tuple[Call, ...] = ()
+    usage: Reservation | None = None
+
+
+@dataclass
+class Result:
+    text: str = ""
+    state: str = "model"
+    reason: str = ""
+    tokens: int = 0
+    cost: Decimal = Decimal(0)
+    tool_calls: int = 0
+    trace: list[dict[str, object]] = field(default_factory=list)
+
+
+Message = dict[str, object]
+
+
+class Model(Protocol):
+    def estimate(self, messages: list[Message]) -> Reservation: ...
+    async def complete(self, messages: list[Message], timeout: float) -> Turn: ...
+
+
+class Tools(Protocol):
+    def estimate(self, call: Call) -> Reservation: ...
+    async def execute(self, call: Call, timeout: float) -> Message: ...
+
+
+class Stop(Exception):
+    pass
+
+
+async def run(
+    query: Query,
+    model: Model,
+    tools: Tools,
+    system: str,
+    limits: Limits = Limits(),
+    clock: Callable[[], float] = time.monotonic,
+) -> Result:
+    result = Result()
+    deadline = clock() + limits.wall_clock
+    messages: list[Message] = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": json.dumps(query.model_dump(), ensure_ascii=False)},
+    ]
+    counts: Counter[str] = Counter()
+    recent: list[tuple[str, str]] = []
+
+    def remaining() -> float:
+        seconds = deadline - clock()
+        if seconds <= 0:
+            raise Stop("wall_clock")
+        return seconds
+
+    def reserve(usage: Reservation) -> None:
+        remaining()
+        if result.tokens + usage.tokens > limits.tokens:
+            raise Stop("tokens")
+        if result.cost + usage.cost > limits.cost:
+            raise Stop("cost")
+        result.tokens += usage.tokens
+        result.cost += usage.cost
+
+    async def invoke(operation: Awaitable[Turn] | Awaitable[Message]) -> Turn | Message:
+        try:
+            async with asyncio.timeout(remaining()):
+                value = await operation
+            remaining()
+            return value
+        except TimeoutError:
+            raise Stop("wall_clock") from None
+
+    try:
+        while True:
+            result.state = "model"
+            reserved = model.estimate(messages)
+            reserve(reserved)
+            turn = await invoke(model.complete(messages, remaining()))
+            if not isinstance(turn, Turn):
+                raise ValueError("invalid_model_response")
+            if turn.usage is not None:
+                if (
+                    turn.usage.tokens > reserved.tokens
+                    or turn.usage.cost > reserved.cost
+                ):
+                    raise ValueError("provider_usage_exceeds_reservation")
+                result.tokens -= reserved.tokens - turn.usage.tokens
+                result.cost -= reserved.cost - turn.usage.cost
+            if not turn.calls:
+                if not turn.text.strip():
+                    raise ValueError("empty_model_response")
+                result.text, result.state = turn.text, "done"
+                return result
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": turn.text,
+                    "tool_calls": [
+                        {
+                            "id": c.id,
+                            "type": "function",
+                            "function": {"name": c.name, "arguments": c.arguments},
+                        }
+                        for c in turn.calls
+                    ],
+                }
+            )
+            for call in turn.calls:
+                result.state = "tool"
+                remaining()
+                if result.tool_calls >= limits.tool_calls:
+                    raise Stop("tool_calls")
+                if call.name == "web_search" and counts[call.name] >= 3:
+                    raise Stop("search_limit")
+                if call.name == "web_fetch" and counts[call.name] >= 8:
+                    raise Stop("fetch_limit")
+                try:
+                    canonical = json.dumps(json.loads(call.arguments), sort_keys=True)
+                except json.JSONDecodeError:
+                    canonical = call.arguments
+                recent.append((call.name, canonical))
+                if len(recent) >= 3 and recent[-1] == recent[-2] == recent[-3]:
+                    raise Stop("loop_detected")
+                reserve(tools.estimate(call))
+                result.tool_calls += 1
+                counts[call.name] += 1
+                output = await invoke(tools.execute(call, min(15, remaining())))
+                if not isinstance(output, dict):
+                    raise ValueError("invalid_tool_response")
+                event: Message = {
+                    "tool": call.name,
+                    "arguments": call.arguments,
+                    "output": output,
+                }
+                result.trace.append(event)
+                logging.getLogger(__name__).info(
+                    json.dumps(
+                        {
+                            "event": "tool_finished",
+                            "tool": call.name,
+                            "count": result.tool_calls,
+                        }
+                    )
+                )
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": call.id,
+                        "content": json.dumps(output, ensure_ascii=False),
+                    }
+                )
+    except Stop as exc:
+        result.reason = str(exc)
+    except (ValueError, RuntimeError, OSError):
+        result.reason = "provider_error"
+    result.state = "stopped"
+    result.text = (
+        f"Arrêt explicite : {result.reason}. Outils exécutés : {result.tool_calls}."
+    )
+    logging.getLogger(__name__).info(
+        json.dumps(
+            {
+                "event": "request_stopped",
+                "reason": result.reason,
+                "tokens_reserved": result.tokens,
+                "cost_reserved": str(result.cost),
+            }
+        )
+    )
+    return result
