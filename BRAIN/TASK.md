@@ -1,7 +1,7 @@
-# TASK — M1, plan de réalisation
-Mandat : M1 uniquement ; cycle local réel puis branche + PR et job ci vert ; merge humain.
-L'ancien conflit MISSION/contrat est résolu par aebb3e1 : un cycle minimal.
-Plan concret : infra/m1-plan.md, prêt pour revue préalable docs/11 §9.2.
-Prochain pas : revue du plan et réponse sur alertes 50/80 % et scheduler ; puis tests rouges et implémentation par incréments.
-Avant lancement : chiffrer stockage/IP, réexaminer shortage du GPU configuré sans créer de ressource alternative hors mandat.
-Aucun mandat M2. Fichiers protégés intouchables. Aucun GPU créé ou actif dans l'inventaire projet.
+# TASK — M2, contrats avant code
+Mandat M2 uniquement, branche + PR, merge humain, arrêt après CI verte.
+Préparé : contracts/m2.md et m2-report.schema.json, plan et AC de retrieval/citations.
+Prochain pas : revue/merge humains du contrat et du plan (docs/11 R-02, §9.2),
+confirmation de la preuve M1 et du traitement des questions E1 absentes.
+Ensuite : tests rouges, ingestion/RAG, make verify-m2 local, PR et job ci vert.
+Fichiers protégés intouchables ; aucun GPU à créer pour M2.

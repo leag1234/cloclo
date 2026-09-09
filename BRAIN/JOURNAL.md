@@ -117,3 +117,16 @@ NOTICED BUT NOT TOUCHING: VM CPU et volume système préexistants, traces locale
 Plan concret préparé dans infra/m1-plan.md pour revue préalable docs/11 §9.2 ; branche m1-infra-gateway. Aucun code runtime changé, aucun test exécuté, aucun provisionnement.
 Aucune nouvelle dépendance, coût additionnel 0 EUR/h. M1 non terminé.
 PR de préparation ouverte : https://github.com/leag1234/cloclo/pull/4 ; push uniquement m1-infra-gateway, aucun merge. git diff --check exécuté sans erreur. Cette PR documentaire ne constitue pas une preuve M1.
+
+## 2026-09-09 — préparation M2
+Source: AGENTS, MISSION, docs/13, docs/11 intégral et docs/14, puis BRAIN relus.
+Source: API GitHub PR #5 merged=true ; sa description exclut la preuve complète M1.
+CONTRADICTION: contrat M2 absent, docs/11 R-02 impose revue/merge avant code.
+CONTRADICTION: gate progressif 0,70 versus cible docs/13 0,85, documentés dans le plan.
+RISK: E1 contient 40 clés sans question input ; interdiction de rechercher avec les clés.
+NOTICED BUT NOT TOUCHING: fichiers protégés, traces non suivies et ressources CPU existantes.
+ASSUMPTION: aucune validation humaine des jeux n'est inférée de leur présence ; les drafts restent indicatifs.
+Préparé contrat de rapport JSON et plan ingestion/BM25/dense/reranker/citations.
+Avant publication : branche m2-contrats, aucun code applicatif changé ni test M2 exécuté.
+Inventaire borné au projet fr-par-2 : CPU seule ; aucune ressource créée, coût additionnel 0 EUR/h.
+Arrêt prévu sur prérequis R-02, pas de trois tentatives artificielles.

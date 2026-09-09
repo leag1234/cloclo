@@ -1,11 +1,8 @@
 # STATUS — état factuel courant
-- M1 non réalisé ; branche m1-infra-gateway, plan infra/m1-plan.md prêt pour revue.
-- MISSION aebb3e1 alignée sur le contrat minimal : ancien blocage TTFT/deux cycles résolu.
-- M0 : preuve historique https://github.com/leag1234/cloclo/actions/runs/34329362650
-- Aucun test M1 exécuté, aucune preuve GPU, aucun run CI M1 vérifié.
-- Inventaire API du projet dédié toutes zones, 2026-09-09 : une VM CPU BASIC3-X4C-16G running en fr-par-2 et son volume système de 50 Go ; aucun GPU.
-- Coût des ressources CPU préexistantes non établi ; aucune ressource créée dans cette session, coût additionnel 0 €/h.
-- GPU prévu L40S-1-48G en fr-par-2 : catalogue 1,469916 €/h HT hors volumes/IP ; availability=shortage. Aucun lancement effectué.
-- Coût total de lancement à compléter avec volumes et IP avant toute création.
-- Attente : revue du plan docs/11 §9.2 et confirmation alertes budget/scheduler demandée à l'humain.
-- PR de préparation (pas de validation M1) : https://github.com/leag1234/cloclo/pull/4
+- Mandat courant M2 ; préparation sur m2-contrats, implémentation non commencée.
+- Contrat et plan : contracts/m2.md et m2-report.schema.json ; revue/merge requis.
+- M1 : PR #5 mergée, mais description exclut la validation complète M1 ; preuve du cycle à confirmer.
+- Dernier run main observé vert : https://github.com/leag1234/cloclo/actions/runs/34352318228 ; ne constitue pas une preuve M2.
+- make verify-m2 non exécuté ; aucune mesure retrieval ni preuve CI M2.
+- Inventaire projet fr-par-2 le 2026-09-09 : VM CPU BASIC3-X4C-16G running, aucun GPU dans cette zone ; autres zones non vérifiées dans cette session.
+- Aucune ressource créée/utilisée pour les modèles ; coût additionnel 0 EUR/h. Coût CPU préexistant non établi.

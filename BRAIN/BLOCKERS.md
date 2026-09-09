@@ -48,3 +48,9 @@ RÉSOLU : MISSION et contrat minimal sont alignés, l'arbitrage TTFT/deux cycles
 Préconditions actuelles : plan infra/m1-plan.md à revoir selon docs/11 §9.2 ; confirmation des alertes budget et du scheduler demandée avant lancement.
 RISK: API catalogue annonce shortage pour le GPU configuré ; aucune tentative de création, aucun blocage technique à trois échecs revendiqué.
 Inventaire projet toutes zones réussi : aucun GPU ; aucune ressource créée ni supprimée.
+
+## 2026-09-09 — M2, prérequis de spécification
+- Contrat/plan M2 proposés dans contracts/m2.md : revue et merge séparés requis par R-02.
+- E1 sans questions input : compléter les brouillons sans exploiter les clés comme requêtes.
+- Preuve complète M1 non retrouvée ; PR #5 précise ne pas valider M1.
+- Gate 0,70 et cible 0,85 documentés pour revue. Aucun échec technique répété revendiqué.
