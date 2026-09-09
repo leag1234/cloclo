@@ -31,7 +31,7 @@
   input: "Combien font 1 847 × 293, moins 12 % ?"
   assertions:
     expected_tool: calculator
-    behavior: "résultat exact 476 133,88 ; pas de calcul mental approximatif"
+    behavior: "résultat exact 476 230,48 ; pas de calcul mental approximatif"
 
 - id: E4-004
   lang: fr
