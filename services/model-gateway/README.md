@@ -18,3 +18,18 @@ Runbook : garder loopback, client timeout 30 s ; erreurs 400/413/502/504 explici
 Les entrées longues subissent la troncature des tokenizers (128/512 tokens).
 Logs embeddings/rerank : cardinalité et durée, aucun texte ; coût cloud ajouté nul.
 SLO RAG/dashboard non attestés avant intégration ; /answer reste à implémenter.
+
+## Génération M2
+POST /answer suit contracts/m2-gateway.schema.json. Configuration injectée :
+SCW_GENERATIVE_BASE_URL (HTTPS), SCW_GENERATIVE_API_KEY, ESCALATION_MODEL.
+Le modèle L Scaleway reçoit des sources délimitées comme données non fiables,
+avec prompts/rag.txt versionné. Délai fournisseur 25 s, 1024 tokens maximum,
+reasoning_effort none, aucun retry automatique. Les références numériques du
+modèle sont résolues vers les chunk_id fournis ; absence/invention est rejetée.
+HTTP 400 entrée invalide, 413 contexte dépassé, 502 fournisseur/citation invalide,
+504 timeout. Logs sans texte ni clé : durée et nombre de citations.
+SLO opérationnel : réponse ou erreur bornée au délai fournisseur ; la cible
+RAG <12 s sera mesurée au jalon performance. Plafond serverless confirmé dans
+MISSION ; aucun GPU créé, facturation à l'usage et non horaire.
+Source: https://www.scaleway.com/en/docs/generative-apis/api-cli/using-chat-api/
+Source: https://www.scaleway.com/en/docs/generative-apis/reference-content/supported-models/
