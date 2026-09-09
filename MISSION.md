@@ -108,3 +108,10 @@ testé Qwen — l'indépendance des 3 familles est respectée). Utilise l'endpoi
 déjà configuré (SCW_GENERATIVE_BASE_URL, même clé). Calcule le κ de Cohen entre les
 notes de glm-5.2 et celles de gpt-oss-120b sur l'échantillon d'éval. Aucun accès externe
 ni juge humain requis pour le PoC ; la calibration humaine reste pré-GA.
+
+### M5 — E9 traduction sans FLORES (PoC)
+Le téléchargement de FLORES-200 échoue (miroir indisponible/authentification). Pour le
+PoC, la suite E9 utilise UNIQUEMENT les cas déjà présents dans evals/golden/e9_traduction.yaml
+(cas métier écrits et validés, faux amis + terminologie). N'exécute PAS fetch_flores.py,
+ne bloque pas sur FLORES. L'extension FLORES-200 est une action post-PoC. E9 est évalué
+sur les cas 'valide' disponibles.
