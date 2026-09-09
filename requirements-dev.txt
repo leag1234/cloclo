@@ -1,2 +1,5 @@
 ruff==0.12.12
 mypy==1.17.1
+pypdf==6.0.0
+python-docx==1.2.0
+lxml-stubs==0.5.1
