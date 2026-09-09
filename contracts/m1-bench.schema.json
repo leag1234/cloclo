@@ -1,18 +1,13 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Preuve réelle M1",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "M1 bench (PoC minimal)",
   "type": "object",
-  "additionalProperties": false,
-  "required": ["timestamp", "commit", "provider", "ttft_s", "decode_tokens_per_s", "output_tokens", "recreation_s", "persistent_volume_reused", "cleanup_verified"],
+  "required": ["ip", "total_s", "output_tokens", "tokens_per_s", "ts"],
   "properties": {
-    "timestamp": {"type": "string", "format": "date-time"},
-    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
-    "provider": {"const": "local"},
-    "ttft_s": {"type": "number", "exclusiveMinimum": 0},
-    "decode_tokens_per_s": {"type": "number", "exclusiveMinimum": 0},
-    "output_tokens": {"type": "integer", "minimum": 2},
-    "recreation_s": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1200},
-    "persistent_volume_reused": {"const": true},
-    "cleanup_verified": {"const": true}
+    "ip":            { "type": "string" },
+    "total_s":       { "type": "number" },
+    "output_tokens": { "type": "integer" },
+    "tokens_per_s":  { "type": "number" },
+    "ts":            { "type": "string" }
   }
 }
