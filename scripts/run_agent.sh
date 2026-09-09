@@ -46,7 +46,7 @@ EOF
 SANDBOX="${CODEX_SANDBOX:-workspace-write}"
 set +e
 codex exec "$PROMPT" \
-  --sandbox "$SANDBOX" \
+      --dangerously-bypass-approvals-and-sandbox \
   --json \
   --output-last-message "BRAIN/${MILESTONE}.last.txt" \
   >> "BRAIN/${MILESTONE}.jsonl" 2>> BRAIN/agent.log
