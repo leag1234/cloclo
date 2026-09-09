@@ -7,7 +7,7 @@
 - id: E9-001
   direction: fr->de
   source: genere-a-valider
-  statut: draft
+  statut: valide
   input_text: "Le contrat est résiliable moyennant un préavis de trois mois, sauf
                manquement grave, auquel cas la résiliation prend effet immédiatement."
   points_de_controle:
@@ -19,7 +19,7 @@
 - id: E9-002
   direction: de->fr
   source: genere-a-valider
-  statut: draft
+  statut: valide
   input_text: "Die Rückstellungen für drohende Verluste wurden im Jahresabschluss
                erfolgswirksam aufgelöst."
   points_de_controle:
@@ -31,7 +31,7 @@
 - id: E9-003
   direction: es->it
   source: genere-a-valider
-  statut: draft
+  statut: valide
   input_text: "La empresa está constipada de deudas y pretende renegociar el plazo
                con sus acreedores antes del vencimiento."
   points_de_controle:
@@ -43,7 +43,7 @@
 - id: E9-004
   direction: it->en
   source: genere-a-valider
-  statut: draft
+  statut: valide
   input_text: "Il fornitore non è tenuto a rispondere dei danni indiretti, salvo dolo
                o colpa grave."
   points_de_controle:
@@ -54,7 +54,7 @@
 - id: E9-005
   direction: en->es
   source: genere-a-valider
-  statut: draft
+  statut: valide
   type: instruction_cross_lingue
   input_text: "Réponds en espagnol : summarize in two sentences the following English
                paragraph. 'The board approved the merger subject to regulatory clearance.
