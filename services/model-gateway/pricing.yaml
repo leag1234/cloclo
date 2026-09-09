@@ -1,0 +1,16 @@
+# Tarifs des modèles pour le calcul du budget dur (max_cost_eur).
+# Source : catalogue Scaleway Generative APIs, consulté le 2026-09-09.
+# L'API /models n'expose pas les prix ; valeurs issues de la page tarifs Scaleway.
+# Prix en euros par million de tokens (HT).
+models:
+  qwen3.5-397b-a17b:      # ESCALATION_MODEL
+    input_eur_per_mtok: 0.60
+    output_eur_per_mtok: 3.60
+  glm-5.2:                # JUDGE_MODEL
+    input_eur_per_mtok: 1.80
+    output_eur_per_mtok: 5.50
+  local:                  # Qwen3-30B servi sur GPU L40S loué
+    input_eur_per_mtok: 0.0
+    output_eur_per_mtok: 0.0
+    note: "coût au token nul ; le GPU est facturé à l'heure, hors budget par requête"
+source: "Scaleway Generative APIs pricing, consulté 2026-09-09"
