@@ -179,4 +179,4 @@ d'évals + 3–4 jours de H100 en fin de PoC) + VM ~30 € + serverless L (escal
   (< 10 min, poids sur volume persistant).
 
 
-> **Clarification M5 (PoC)** : la calibration du juge en M5 est une calibration CROISÉE inter-modèles (juge production glm-5.2 vs juge de référence d'une autre famille, Claude), pas une calibration humaine. La calibration humaine (30 notes, κ≥0,7) reste une action **pré-GA**, non bloquante pour le PoC. Voir verify-m5.
+> **Clarification M5 (PoC)** : la calibration du juge en M5 est une calibration CROISÉE inter-modèles (juge production glm-5.2 vs juge de référence gpt-oss-120b, famille distincte du juge glm-5.2 ET du système testé Qwen), pas une calibration humaine. La calibration humaine (30 notes, κ≥0,7) reste une action **pré-GA**, non bloquante pour le PoC. Voir verify-m5.
