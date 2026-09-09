@@ -53,7 +53,9 @@ POC-E6 exécutable de bout en bout.
 **Livrables** : classifieur de routage, escalade vers Generative APIs Scaleway, UI
 (Open WebUI/LibreChat) connectée au gateway.
 **verify-m4** vérifie : POC-E8 ≥ 85 %, zéro sous-routage sur les cas critiques ;
-panne GPU simulée (`infra/gpu-down.sh` en plein trafic) → l'UI répond encore via fallback.
+fallback : si le modèle local est injoignable (panne simulée en coupant l'endpoint
+local, SANS créer de GPU payant), le gateway bascule sur l'escalade Scaleway et répond
+quand même. L'UI (Open WebUI/LibreChat) est un PLUS visuel, NON bloquant pour ce gate PoC.
 
 ## M5 — Évals complètes + télémétrie
 **But** : mesurer, comparer, tracer.
