@@ -44,3 +44,7 @@ Une panne locale consomme au plus 2 s avant L, dans la deadline M3. Prix L rése
 avant appel ; erreurs L restent explicites. SLO de qualité locale à mesurer en M6.
 `make test-fallback` rejoue une réponse Scaleway enregistrée après panne locale
 réelle ; `make eval-routing` écrit BRAIN/eval/routing.json. UI bonus non livrée.
+
+M7 : /agent/complete accepte local_enabled=false pour une escalade directe sans
+sonde GPU. observe=true ajoute provider (local/escalade) et route (simple/complexe)
+à la réponse. Les anciens clients conservent leur format et leur cascade M4.
