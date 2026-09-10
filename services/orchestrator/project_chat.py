@@ -88,7 +88,7 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
     started = time.monotonic()
     project = request.project_id
     base = retrieval_url() + f"/projects/{project}"
-    question = request.messages[-1].content
+    question = request.messages[-1].text
     context = Context.model_validate(
         await GatewayModel.post(
             base + "/context",

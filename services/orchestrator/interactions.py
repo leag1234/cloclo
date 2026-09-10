@@ -30,6 +30,8 @@ class Interaction:
     cout_eur: float = 0.0
     erreurs: list[str] = field(default_factory=list)
     state: str = "received"
+    task_type: str = "text"
+    images: list[dict[str, int | str]] = field(default_factory=list)
 
 
 def write_interaction(item: Interaction, directory: Path) -> None:
@@ -41,6 +43,7 @@ def write_interaction(item: Interaction, directory: Path) -> None:
 
     def scrub(value: object) -> object:
         if isinstance(value, str):
+            value = re.sub(r"data:image/[^,\s]+,[A-Za-z0-9+/=]+", "[IMAGE]", value)
             for secret in secrets:
                 value = value.replace(secret, "[REDACTED]")
             return re.sub(
