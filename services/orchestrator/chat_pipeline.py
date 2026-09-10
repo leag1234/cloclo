@@ -120,6 +120,11 @@ class ChatTools(Runtime):
 
 
 async def process(request: ChatRequest, item: Interaction) -> None:
+    if request.project_id is not None:
+        from services.orchestrator.project_chat import process_project
+
+        await process_project(request, item)
+        return
     started = time.monotonic()
     model = await GatewayModel.connect(
         os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010")
