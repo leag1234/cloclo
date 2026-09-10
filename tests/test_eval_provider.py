@@ -170,3 +170,35 @@ class ProviderTests(unittest.TestCase):
                     provider.complete(
                         "system", [{"role": "user", "content": "bonjour"}]
                     )
+
+    def test_judge_requests_text_json_without_strict_format(self) -> None:
+        import io
+        from unittest.mock import patch
+        from eval_provider import EvalProvider
+
+        with patch.dict(
+            "os.environ",
+            {"ESCALATION_MODEL": "test-system", "JUDGE_MODEL": "test-judge"},
+        ):
+            provider = EvalProvider()
+        provider.prices["test-judge"] = {
+            "input_eur_per_mtok": 2,
+            "output_eur_per_mtok": 4,
+        }
+        with patch.dict(
+            "os.environ",
+            {
+                "SCW_GENERATIVE_BASE_URL": "https://example.invalid/v1",
+                "SCW_GENERATIVE_API_KEY": "test-only",
+            },
+        ):
+            with patch(
+                "eval_provider.urlopen",
+                return_value=io.BytesIO(
+                    b"".join(line for _, line in StreamTests().stream())
+                ),
+            ) as send:
+                provider.complete(
+                    "production", [{"role": "user", "content": "Grade this answer"}]
+                )
+        self.assertNotIn("response_format", json.loads(send.call_args.args[0].data))
