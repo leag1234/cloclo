@@ -11,6 +11,7 @@ import aiohttp
 from pydantic import BaseModel, Field
 
 from services.orchestrator.cache import Cache
+from services.orchestrator.content import select_passages as select_content
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.loop import Call, Limits, Message, Query, run
@@ -33,13 +34,17 @@ class Passages(BaseModel):
     passages: list[Passage] = Field(max_length=8)
 
 
-def select_passages(passages: list[Passage]) -> list[dict[str, str]]:
+def select_passages(passages: list[Passage], query: str = "") -> list[dict[str, str]]:
     selected: list[dict[str, str]] = []
     for passage in sorted(passages, key=lambda p: p.score, reverse=True):
         candidate = {
             "chunk_id": passage.chunk_id,
             "source": passage.source,
-            "text": passage.text,
+            "text": (
+                "\n".join(p.text for p in select_content(passage.text, query, 1199))
+                if query and len(passage.text.encode()) > 4096
+                else passage.text
+            ),
         }
         if len(json.dumps([*selected, candidate], ensure_ascii=False).encode()) <= 4096:
             selected.append(candidate)
@@ -87,10 +92,11 @@ async def render_citations(item: Interaction) -> None:
 
 
 class ChatTools(Runtime):
-    def __init__(self, item: Interaction) -> None:
+    def __init__(self, item: Interaction, question: str = "") -> None:
         super().__init__(
             Cache(Path(os.environ.get("ATLAS_WEB_CACHE", "BRAIN/web-cache.sqlite"))),
             Decimal(0),
+            question,
         )
         self.item = item
 
@@ -112,7 +118,7 @@ class ChatTools(Runtime):
             self.item.chunks_recuperes.extend(passages)
             return {
                 "trust": "untrusted",
-                "data": {"passages": select_passages(result.passages)},
+                "data": {"passages": select_passages(result.passages, request.query)},
             }
         except (ValueError, RuntimeError, TimeoutError):
             self.item.erreurs.append("retrieval_unavailable")
@@ -135,7 +141,7 @@ async def process(request: ChatRequest, item: Interaction) -> None:
     model.observing = True
     model.local_enabled = os.environ.get("GPU_LOCAL", "0") == "1"
     item.cout_eur = 0.05  # Conservative upper bound until the loop returns its ledger.
-    tools = ChatTools(item)
+    tools = ChatTools(item, request.messages[-1].content)
     try:
         result = await run(
             Query(question=request.messages[-1].content, lang=request.lang),

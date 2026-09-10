@@ -64,7 +64,7 @@ class ProjectTools(ChatTools):
             self.item.chunks_recuperes.extend(passages)
             return {
                 "trust": "untrusted",
-                "data": {"passages": select_passages(result.passages)},
+                "data": {"passages": select_passages(result.passages, request.query)},
             }
         finally:
             self.item.latence_ms["retrieval"] += (time.monotonic() - started) * 1000
