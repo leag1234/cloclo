@@ -70,6 +70,8 @@ source ». La mémoire est inspectable et corrigeable par l'utilisateur.
 **Validation** : une info donnée dans une conversation d'un projet est réutilisée dans
 une autre conversation du même projet ; l'effacement de la mémoire est effectif ;
 isolation entre projets (pas de fuite de contexte d'un projet à l'autre).
+Le chat projet réserve la configuration serverless M8 et sélectionne les passages
+scopés sous le même budget de contexte ; les huit résultats restent observables.
 
 ### M10 — Grandes entrées gérées par synthèse
 **But** : absorber les grandes entrées (pages web volumineuses, longs documents)
