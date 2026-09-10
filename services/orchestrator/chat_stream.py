@@ -75,6 +75,15 @@ def response(
                 if event["phase"] != "generating":
                     await content(pending)
                     pending = ""
+                if event["phase"] == "intermediate":
+                    await queue.put(
+                        {
+                            "delta": {
+                                "content": "\n\n*Étape intermédiaire terminée : appel d’outil.*\n\n"
+                            },
+                            "atlas": {"turn": turn, "phase": "intermediate"},
+                        }
+                    )
                 if event["phase"] == "generating":
                     citation_numbers.clear()
                 turn = int(str(event["turn"]))

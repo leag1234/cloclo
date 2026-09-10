@@ -27,10 +27,12 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
             self.send_header("Connection", "close")
             self.end_headers()
             self.close_connection = True
+            self.connection.setblocking(False)
 
-            def send(event: dict[str, object]) -> None:
-                self.wfile.write(("data: " + json.dumps(event) + "\n\n").encode())
-                self.wfile.flush()
+            async def send(event: dict[str, object]) -> None:
+                await asyncio.get_running_loop().sock_sendall(
+                    self.connection, ("data: " + json.dumps(event) + "\n\n").encode()
+                )
 
             async def relay() -> None:
                 from contextlib import aclosing
@@ -40,7 +42,7 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                         provider.stream(validated.model_dump())
                     ) as events:
                         async for event in events:
-                            send(event)
+                            await send(event)
 
                 task = asyncio.create_task(produce())
                 try:
@@ -55,15 +57,20 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                         task.cancel()
                     await asyncio.gather(task, return_exceptions=True)
 
+            async def bounded_relay() -> None:
+                try:
+                    async with asyncio.timeout(validated.timeout):
+                        await relay()
+                except (ValueError, RuntimeError, TimeoutError, OSError):
+                    async with asyncio.timeout(0.1):
+                        await send({"error": "provider_error"})
+
             try:
-                asyncio.run(relay())
+                asyncio.run(bounded_relay())
             except (BrokenPipeError, ConnectionResetError):
                 return
             except (ValueError, RuntimeError, TimeoutError, OSError):
-                try:
-                    send({"error": "provider_error"})
-                except (BrokenPipeError, ConnectionResetError):
-                    return
+                return
 
         def do_POST(self) -> None:
             try:
