@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from services.orchestrator.cache import Cache
 from services.orchestrator.calculator import calculate
+from services.orchestrator.content import select_passages
 from services.orchestrator.loop import Call, Message, Reservation
 from services.orchestrator.web import MAX_BYTES, Web, validate_url
 
@@ -36,6 +37,7 @@ class Search(Arguments):
 
 class Fetch(Arguments):
     url: str = Field(min_length=1, max_length=4096)
+    query: str = Field(default="", max_length=32000)
 
 
 class Rag(Arguments):
@@ -70,10 +72,11 @@ def declarations() -> list[Message]:
 
 
 class Runtime:
-    def __init__(self, cache: Cache, search_cost: Decimal) -> None:
+    def __init__(self, cache: Cache, search_cost: Decimal, question: str = "") -> None:
         self.cache, self.search_cost = cache, search_cost
         Reservation(0, search_cost)
         self.web = Web()
+        self.question = question
 
     def estimate(self, call: Call) -> Reservation:
         return Reservation(
@@ -141,30 +144,49 @@ class Runtime:
 
     async def fetch(self, request: Fetch, timeout: float) -> Message:
         validate_url(request.url)
-        key = self.cache.key(["fetch", 2000, request.url])
+        key = self.cache.key(["fetch-full", request.url])
         cached = self.cache.get(key)
-        if cached is not None:
-            return cached
-        url, body = await self.web.fetch(request.url, timeout)
-        text = await asyncio.to_thread(
-            trafilatura.extract, body, url=url, include_comments=False
-        )
-        if not text:
-            raise ValueError("extraction_empty")
-        # UTF-8 byte bound is conservative for byte-based model tokenizers.
+        if cached is None:
+            url, body = await self.web.fetch(request.url, timeout)
+            text = await asyncio.to_thread(
+                trafilatura.extract, body, url=url, include_comments=False
+            )
+            if not text:
+                raise ValueError("extraction_empty")
+            cached = {
+                "url": url,
+                "text": text,
+                "consulted_at": datetime.now(timezone.utc).isoformat(),
+            }
+            self.cache.put(key, cached, 86400)
+        text, url = str(cached["text"]), str(cached["url"])
+        question = request.query or self.question
+        if question:
+            passages = select_passages(text, question, 1998)
+            handle = self.cache.key(["source", url, text])
+            self.cache.put(handle, {"text": text, "url": url}, 86400)
+            return {
+                "url": url,
+                "consulted_at": cached["consulted_at"],
+                "text": "\n".join(p.text for p in passages),
+                "passages": [{"start": p.start, "end": p.end} for p in passages],
+                "examined": passages[0].examined if passages else 0,
+                "handle": handle,
+                "selected": True,
+                "truncated": False,
+            }
+        # Retain the continuation contract for legacy callers without a question.
         prefix = text.encode()[:2000].decode("utf-8", errors="ignore")
         handle = self.cache.key(["continuation", url, text]) if prefix != text else ""
         if handle:
             self.cache.put(handle, {"text": text[len(prefix) :], "url": url}, 86400)
-        output: Message = {
+        return {
             "url": url,
-            "consulted_at": datetime.now(timezone.utc).isoformat(),
+            "consulted_at": cached["consulted_at"],
             "text": prefix,
             "handle": handle,
             "truncated": bool(handle),
         }
-        self.cache.put(key, output, 86400)
-        return output
 
     async def execute(self, call: Call, timeout: float) -> Message:
         try:

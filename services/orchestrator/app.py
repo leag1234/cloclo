@@ -44,7 +44,7 @@ async def query(request: Query) -> dict[str, object]:
     result = await run(
         request,
         model,
-        Runtime(cache(), Decimal(0)),
+        Runtime(cache(), Decimal(0), request.question),
         Path("prompts/agent.txt").read_text(),
         Limits(wall_clock=max(0, 120 - (time.monotonic() - started))),
     )
