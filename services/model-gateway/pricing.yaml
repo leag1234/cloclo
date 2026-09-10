@@ -12,6 +12,12 @@ models:
   gpt-oss-120b:           # cross-calibration reference, MISSION M5
     input_eur_per_mtok: 0.15
     output_eur_per_mtok: 0.60
+  pixtral-12b-2409:
+    input_eur_per_mtok: 0.20
+    output_eur_per_mtok: 0.20
+  qwen3-embedding-8b:
+    input_eur_per_mtok: 0.10
+    output_eur_per_mtok: 0.0
   local:                  # Qwen3-30B servi sur GPU L40S loué
     input_eur_per_mtok: 0.0
     output_eur_per_mtok: 0.0

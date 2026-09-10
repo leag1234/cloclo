@@ -166,3 +166,8 @@ Specs d'abord ; l'agent implémente sous contrat + CI ; `verify-mN` testé en am
 jalons mergés via PR à CI verte ; auto-merge autorisé à CI verte ; contradictions
 mineures tranchées en autonomie, sécurité/budget = arrêt. Logs d'interaction locaux
 uniquement (règle ci-dessus).
+
+M8 : le contrat `contracts/m8.md` précise le routage serverless. La politique dans
+le gateway valide tarifs et capacités avant transport et réserve primaire + fallback
+sous 0,05 EUR. Les fenêtres fournisseur sont bornées par ce budget applicatif ;
+les identifiants alternatifs nécessitent une entrée de capacités et de prix validée.
