@@ -1,0 +1,86 @@
+"""M7 citations must be retrieved and resolvable; usage stays factual."""
+
+import unittest
+from unittest.mock import AsyncMock, Mock, patch
+
+from services.orchestrator.chat_pipeline import render_citations
+from services.orchestrator.interactions import Interaction
+
+
+class CitationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_only_retrieved_unchanged_sources_become_links(self) -> None:
+        key = "a" * 64
+        passage = {
+            "chunk_id": key,
+            "doc_id": "doc",
+            "source": "doc.md",
+            "text": "preuve",
+            "score": 0.75,
+        }
+        item = Interaction(reponse="Preuve [" + key + "]", chunks_recuperes=[passage])
+        with patch(
+            "services.orchestrator.chat_pipeline.source",
+            new=AsyncMock(return_value=passage),
+        ):
+            await render_citations(item)
+        self.assertEqual(len(item.citations), 1)
+        self.assertIn("/sources/" + key, item.reponse)
+        self.assertEqual("preuve", item.citations[0]["text"])
+        item = Interaction(
+            reponse="Inventée [" + "b" * 64 + "]", chunks_recuperes=[passage]
+        )
+        with self.assertRaisesRegex(ValueError, "invalid_citation"):
+            await render_citations(item)
+        item = Interaction(reponse="Preuve `" + key + "`", chunks_recuperes=[passage])
+        with patch(
+            "services.orchestrator.chat_pipeline.source",
+            new=AsyncMock(return_value={**passage, "text": "changed"}),
+        ):
+            with self.assertRaisesRegex(ValueError, "citation_changed"):
+                await render_citations(item)
+
+        item = Interaction(reponse="Bonjour !")
+        await render_citations(item)
+        self.assertEqual(item.citations, [])
+
+    async def test_process_counters_and_conservative_error_cost(self) -> None:
+        import tempfile
+        from decimal import Decimal
+        from services.orchestrator.chat_pipeline import process
+        from services.orchestrator.chat_schema import ChatRequest
+        from services.orchestrator.loop import Result
+        from services.orchestrator.model import Observation
+
+        model = Mock(generation_ms=2.0)
+        model.input_tokens, model.output_tokens = 20, 10
+        model.observations = [Observation(provider="escalade", route="complexe")]
+        request = ChatRequest.model_validate(
+            {"messages": [{"role": "user", "content": "Bonjour"}]}
+        )
+        with (
+            tempfile.TemporaryDirectory() as root,
+            patch.dict("os.environ", {"ATLAS_WEB_CACHE": root + "/cache.sqlite"}),
+            patch(
+                "services.orchestrator.chat_pipeline.GatewayModel.connect",
+                new=AsyncMock(return_value=model),
+            ),
+        ):
+            for outcome in (
+                Result(text="bonjour", state="done", cost=Decimal("0.01")),
+                RuntimeError(),
+            ):
+                item = Interaction()
+                with patch(
+                    "services.orchestrator.chat_pipeline.run",
+                    new=AsyncMock(side_effect=[outcome]),
+                ):
+                    if isinstance(outcome, RuntimeError):
+                        with self.assertRaises(RuntimeError):
+                            await process(request, item)
+                        self.assertEqual(item.cout_eur, 0.05)
+                    else:
+                        await process(request, item)
+                        self.assertEqual(item.cout_eur, 0.01)
+                self.assertEqual(item.tokens, {"in": 20, "out": 10})
+                self.assertEqual(item.modele_utilise, "escalade")
+                self.assertFalse(model.local_enabled)

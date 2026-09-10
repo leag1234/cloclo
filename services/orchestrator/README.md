@@ -43,3 +43,7 @@ un prompt modifié ou des appels différents invalident les cassettes.
 Aucun mock n'est importé par le runtime. Les cassettes sont exclusivement sous tests/.
 E6 mesure ici l'exécutabilité avec URL/date ; pas de GO qualité sans revue des clés
 et calibration humaine du juge. La fidélité de chaque phrase relève du gate E5.
+
+M7 : chat_pipeline utilise les budgets du harness, retrieval HTTP et les citations
+résolues. interactions écrit les mesures reçues et codes d'arrêt en JSONL privé ;
+contrat complet et limites documentées dans contracts/m7.md.
