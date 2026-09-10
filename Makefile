@@ -75,3 +75,11 @@ report: ## rapport GO/NO-GO depuis les mesures archivées
 	@python3 -m evals.decision
 bench: ## micro-bench serverless borné, sans GPU
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/m6_bench.py
+
+.PHONY: serve test-ui verify-m7
+serve: ## UI locale, gateway CPU, retrieval et adaptateur ; GPU désactivé par défaut
+	@bash scripts/serve.sh
+test-ui: ## requête HTTP intégrée avec citation et journal, fournisseur enregistré
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/ui_gate.py
+verify-m7: ## vérificateur protégé UI et interactions
+	@bash scripts/ui_gate.sh
