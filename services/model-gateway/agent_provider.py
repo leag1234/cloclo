@@ -9,6 +9,7 @@ import os
 from decimal import Decimal
 from pathlib import Path
 from typing import Literal
+from collections.abc import AsyncGenerator
 
 import aiohttp
 import yaml
@@ -101,6 +102,15 @@ class AgentProvider:
             key: str(self.price[key])
             for key in ("input_eur_per_mtok", "output_eur_per_mtok")
         } | {"max_tokens": 2048}
+
+    async def stream(self, payload: object) -> AsyncGenerator[dict[str, object], None]:
+        from stream_transport import stream
+
+        from contextlib import aclosing
+
+        async with aclosing(stream(self, payload)) as events:
+            async for event in events:
+                yield event
 
     async def complete(self, payload: object) -> dict[str, object]:
         request = AgentRequest.model_validate(payload)
