@@ -89,3 +89,8 @@ test-serverless: ## sondes M8 réelles ou rejeu explicite, sans GPU
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/serverless_gate.py
 verify-m8: ## vérificateur protégé serverless
 	@bash scripts/verify-m8.sh
+.PHONY: test-memory verify-m9
+test-memory: ## tests intégrés de mémoire et projets sur données synthétiques
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/memory_gate.py
+verify-m9: ## mémoire persistée, isolation et effacement
+	@bash scripts/verify-m9.sh
