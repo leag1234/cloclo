@@ -34,33 +34,9 @@ def docker_run(name: str, image: str, options: list[str]) -> None:
 
 
 def webui(name: str, persistent: bool) -> None:
-    environment = {
-        "HOST": "127.0.0.1",
-        "PORT": "3000",
-        "WEBUI_AUTH": "False",
-        "ENABLE_OLLAMA_API": "False",
-        "ENABLE_EVALUATION_ARENA_MODELS": "False",
-        "ENABLE_AUTOCOMPLETE_GENERATION": "False",
-        "ENABLE_DIRECT_CONNECTIONS": "False",
-        "ENABLE_COMMUNITY_SHARING": "False",
-        "ENABLE_CODE_EXECUTION": "False",
-        "ENABLE_CODE_INTERPRETER": "False",
-        "ENABLE_TITLE_GENERATION": "False",
-        "ENABLE_TAGS_GENERATION": "False",
-        "ENABLE_FOLLOW_UP_GENERATION": "False",
-        "ENABLE_PERSISTENT_CONFIG": "False",
-        "OPENAI_API_BASE_URL": "http://127.0.0.1:8020/v1",
-        "OPENAI_API_KEY": "atlas-local",
-        "HF_HUB_OFFLINE": "1",
-        "RAG_EMBEDDING_MODEL_AUTO_UPDATE": "False",
-        "DO_NOT_TRACK": "true",
-        "SCARF_NO_ANALYTICS": "true",
-    }
-    options = ["--network", "host"]
+    options = ["--network", "host", "--env-file", "infra/chat-ui.env"]
     if persistent:
         options.extend(["-v", "atlas-chat-ui:/app/backend/data"])
-    for key, value in environment.items():
-        options.extend(["-e", key + "=" + value])
     docker_run(name, WEBUI_IMAGE, options)
 
 
@@ -159,9 +135,14 @@ def main() -> None:
     ):
         if not os.environ.get(key):
             raise RuntimeError("missing_configuration:" + key)
-    stop = threading.Event()
+    stopping = False
+
+    def stop_requested(signum: int, frame: object) -> None:
+        nonlocal stopping
+        stopping = True
+
     for sig in (signal.SIGINT, signal.SIGTERM):
-        signal.signal(sig, lambda *_: stop.set())
+        signal.signal(sig, stop_requested)
     with stack():
         launched = False
         try:
@@ -173,7 +154,8 @@ def main() -> None:
                 + os.environ.get("GPU_LOCAL", "0"),
                 flush=True,
             )
-            stop.wait()
+            while not stopping:
+                time.sleep(0.2)
         finally:
             if launched:
                 docker("stop", "atlas-chat-ui")

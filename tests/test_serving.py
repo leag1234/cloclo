@@ -9,6 +9,8 @@ from services.orchestrator.serving import main
 
 class ServingTests(unittest.TestCase):
     def test_main_cleanup_on_readiness_failure_and_normal_stop(self) -> None:
+        event = Mock()
+        event.set.side_effect = RuntimeError("signal handler must not acquire locks")
         with (
             patch.dict(
                 os.environ,
@@ -20,8 +22,11 @@ class ServingTests(unittest.TestCase):
             ),
             patch("services.orchestrator.serving.stack"),
             patch("services.orchestrator.serving.webui"),
-            patch("services.orchestrator.serving.signal.signal"),
-            patch("services.orchestrator.serving.threading.Event", return_value=Mock()),
+            patch(
+                "services.orchestrator.serving.signal.signal",
+                side_effect=lambda sig, handler: handler(sig, None),
+            ),
+            patch("services.orchestrator.serving.threading.Event", return_value=event),
             patch("services.orchestrator.serving.docker") as docker,
         ):
             for error in (None, RuntimeError("service_start_timeout")):
