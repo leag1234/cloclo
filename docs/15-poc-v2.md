@@ -171,3 +171,7 @@ M8 : le contrat `contracts/m8.md` précise le routage serverless. La politique d
 le gateway valide tarifs et capacités avant transport et réserve primaire + fallback
 sous 0,05 EUR. Les fenêtres fournisseur sont bornées par ce budget applicatif ;
 les identifiants alternatifs nécessitent une entrée de capacités et de prix validée.
+Le chemin chat sans GPU utilise cette politique et un seul fallback dans le délai
+initial. Le coût d'une tentative échouée sans usage reste réservé par le ledger ;
+les logs du gateway distinguent coût mesuré et réserve inconnue. Les clients M4
+explicitement locaux conservent leur comportement antérieur.

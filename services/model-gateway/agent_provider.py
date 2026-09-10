@@ -92,7 +92,11 @@ class AgentProvider:
             if not value.is_finite() or value < 0:
                 raise ValueError("invalid_price")
 
-    def configuration(self) -> dict[str, object]:
+    def configuration(self, local_enabled: bool = True) -> dict[str, object]:
+        if not local_enabled:
+            from serverless import ServerlessPolicy
+
+            return ServerlessPolicy().configuration()
         return {
             key: str(self.price[key])
             for key in ("input_eur_per_mtok", "output_eur_per_mtok")
@@ -100,6 +104,8 @@ class AgentProvider:
 
     async def complete(self, payload: object) -> dict[str, object]:
         request = AgentRequest.model_validate(payload)
+        if not request.local_enabled:
+            return await self.serverless_complete(request)
         endpoint = os.environ["SCW_GENERATIVE_BASE_URL"].rstrip("/")
         if not endpoint.startswith("https://"):
             raise ValueError("provider_configuration")
@@ -165,6 +171,78 @@ class AgentProvider:
                 remaining,
             )
             return observed(answer, "escalade")
+
+    async def serverless_complete(self, request: AgentRequest) -> dict[str, object]:
+        from serverless import ServerlessPolicy
+
+        policy = ServerlessPolicy()
+        plan = policy.reserve(request.messages, request.tools)
+        endpoint = os.environ["SCW_GENERATIVE_BASE_URL"].rstrip("/")
+        if not endpoint.startswith("https://"):
+            raise ValueError("provider_configuration")
+        started = monotonic()
+        unknown = Decimal(0)
+        for index, model in enumerate((plan.primary, plan.fallback)):
+            remaining = request.timeout - (monotonic() - started)
+            if remaining <= 0:
+                raise TimeoutError("timeout")
+            # Leave time for one fallback while keeping the original total deadline.
+            allotted = remaining * 0.7 if index == 0 else remaining
+            try:
+                async with asyncio.timeout(allotted):
+                    answer = await self._complete(
+                        request,
+                        endpoint,
+                        model,
+                        os.environ["SCW_GENERATIVE_API_KEY"],
+                        allotted,
+                    )
+            except (RuntimeError, TimeoutError):
+                unknown = plan.primary_bound + (
+                    plan.fallback_bound if index else Decimal(0)
+                )
+                logging.getLogger(__name__).info(
+                    json.dumps(
+                        {
+                            "event": "serverless_failure",
+                            "task_type": plan.task_type,
+                            "attempt": index + 1,
+                            "reserved_unknown_eur": str(unknown),
+                        }
+                    )
+                )
+                if index:
+                    raise
+                continue
+            usage = answer.get("usage")
+            if not isinstance(usage, dict):
+                raise RuntimeError("provider_response_invalid")
+            actual = policy.cost(
+                model, int(usage["prompt_tokens"]), int(usage["completion_tokens"])
+            )
+            logging.getLogger(__name__).info(
+                json.dumps(
+                    {
+                        "event": "serverless_usage",
+                        "task_type": plan.task_type,
+                        "fallback": bool(index),
+                        "tokens": usage,
+                        "cost_eur": str(actual),
+                        "reserved_unknown_eur": str(unknown),
+                    }
+                )
+            )
+            if request.observe:
+                answer["observation"] = {
+                    "provider": "escalade",
+                    "route": "simple"
+                    if classify(request.messages) == "chat_simple"
+                    else "complexe",
+                    "task_type": plan.task_type,
+                    "fallback": bool(index),
+                }
+            return answer
+        raise RuntimeError("provider_error")
 
     async def _complete(
         self, request: AgentRequest, endpoint: str, model: str, key: str, timeout: float

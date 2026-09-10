@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from agent_provider import AgentProvider
+from serverless_support import environment
 from services.orchestrator.model import Configuration, GatewayModel
 
 
@@ -19,7 +20,7 @@ class ChatGatewayTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict(
             "os.environ",
             {
-                "ESCALATION_MODEL": "local",
+                **environment(),
                 "LOCAL_MODEL": "test-only",
                 "LOCAL_API_BASE": "http://127.0.0.1:1/v1",
                 "SCW_GENERATIVE_BASE_URL": "https://example.invalid/v1",
@@ -28,17 +29,37 @@ class ChatGatewayTests(unittest.IsolatedAsyncioTestCase):
         ):
             provider = AgentProvider()
             with patch.object(
-                provider, "_complete", new=AsyncMock(return_value={"text": "bonjour"})
+                provider,
+                "_complete",
+                new=AsyncMock(
+                    return_value={
+                        "text": "bonjour",
+                        "usage": {"prompt_tokens": 10, "completion_tokens": 2},
+                    }
+                ),
             ) as call:
                 result = await provider.complete(payload)
                 self.assertEqual(call.call_count, 1)
                 self.assertEqual(call.call_args.args[1], "https://example.invalid/v1")
                 self.assertEqual(
-                    result["observation"], {"provider": "escalade", "route": "simple"}
+                    result["observation"],
+                    {
+                        "provider": "escalade",
+                        "route": "simple",
+                        "task_type": "text",
+                        "fallback": False,
+                    },
                 )
             payload["local_enabled"] = True
             with patch.object(
-                provider, "_complete", new=AsyncMock(return_value={"text": "bonjour"})
+                provider,
+                "_complete",
+                new=AsyncMock(
+                    return_value={
+                        "text": "bonjour",
+                        "usage": {"prompt_tokens": 10, "completion_tokens": 2},
+                    }
+                ),
             ):
                 result = await provider.complete(payload)
                 self.assertEqual(

@@ -122,7 +122,8 @@ class ChatTools(Runtime):
 async def process(request: ChatRequest, item: Interaction) -> None:
     started = time.monotonic()
     model = await GatewayModel.connect(
-        os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010")
+        os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"),
+        local_enabled=os.environ.get("GPU_LOCAL", "0") == "1",
     )
     model.observing = True
     model.local_enabled = os.environ.get("GPU_LOCAL", "0") == "1"
