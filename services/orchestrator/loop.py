@@ -99,11 +99,13 @@ async def run(
     system: str,
     limits: Limits = Limits(),
     clock: Callable[[], float] = time.monotonic,
+    history: list[Message] | None = None,
 ) -> Result:
     result = Result()
     deadline = clock() + limits.wall_clock
     messages: list[Message] = [
         {"role": "system", "content": system},
+        *(history or []),
         {"role": "user", "content": json.dumps(query.model_dump(), ensure_ascii=False)},
     ]
     counts: Counter[str] = Counter()

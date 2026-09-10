@@ -38,3 +38,7 @@ Le rapport BRAIN/eval/retrieval.json est indicatif : les jeux métier ne sont pa
 validés humainement et la fidélité sémantique E5 reste hors de ce gate.
 Le gate M2 est exécuté par make test en CI, avec PostgreSQL éphémère et les vrais
 moteurs CPU ; seul le fournisseur de génération est rejoué sous tests/.
+
+M7 : `services.retrieval.api:app` expose POST /search et GET /sources/{chunk_id}
+(contracts/m7.md). Seul ce service lit l'index. Le score publié est celui du
+reranker utilisé pour le classement ; la résolution n'expose pas les embeddings.

@@ -69,6 +69,8 @@ class AgentRequest(BaseModel):
     messages: list[dict[str, object]] = Field(min_length=1, max_length=100)
     tools: list[dict[str, object]] = Field(min_length=1, max_length=4)
     timeout: float = Field(gt=0, le=120)
+    local_enabled: bool = True
+    observe: bool = False
 
 
 class AgentProvider:
@@ -104,7 +106,19 @@ class AgentProvider:
         started = monotonic()
         route = classify(request.messages)
         fallback = False
-        if route == "chat_simple":
+
+        def observed(answer: dict[str, object], provider: str) -> dict[str, object]:
+            if request.observe:
+                return {
+                    **answer,
+                    "observation": {
+                        "provider": provider,
+                        "route": "simple" if route == "chat_simple" else "complexe",
+                    },
+                }
+            return answer
+
+        if route == "chat_simple" and request.local_enabled:
             try:
                 if "$" in self.local_model or "$" in self.local_endpoint:
                     raise RuntimeError("local_unconfigured")
@@ -126,7 +140,7 @@ class AgentProvider:
                         }
                     )
                 )
-                return answer
+                return observed(answer, "local")
             except (RuntimeError, TimeoutError):
                 fallback = True
         remaining = request.timeout - (monotonic() - started)
@@ -143,13 +157,14 @@ class AgentProvider:
             )
         )
         async with asyncio.timeout(remaining):
-            return await self._complete(
+            answer = await self._complete(
                 request,
                 endpoint,
                 self.model,
                 os.environ["SCW_GENERATIVE_API_KEY"],
                 remaining,
             )
+            return observed(answer, "escalade")
 
     async def _complete(
         self, request: AgentRequest, endpoint: str, model: str, key: str, timeout: float

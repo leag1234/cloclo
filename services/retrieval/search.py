@@ -99,6 +99,12 @@ def tokens(text: str) -> list[str]:
 def rank(
     question: str, chunks: list[Chunk], gateway: Gateway, k: int = 8
 ) -> list[Chunk]:
+    return [chunk for chunk, _ in rank_scored(question, chunks, gateway, k)]
+
+
+def rank_scored(
+    question: str, chunks: list[Chunk], gateway: Gateway, k: int = 8
+) -> list[tuple[Chunk, float]]:
     if not question.strip() or len(question) > 32000 or not 1 <= k <= 8:
         raise ValueError("invalid_query")
     if not chunks:
@@ -155,4 +161,4 @@ def rank(
             }
         )
     )
-    return result
+    return [(chunk, reranked[chunk.chunk_id]) for chunk in result]

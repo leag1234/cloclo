@@ -2,6 +2,8 @@
 
 import json
 from decimal import Decimal
+from time import monotonic
+from typing import Literal
 
 import aiohttp
 from pydantic import BaseModel, ConfigDict, Field
@@ -29,7 +31,14 @@ class WireUsage(BaseModel):
     completion_tokens: int = Field(ge=0, le=2048, strict=True)
 
 
+class Observation(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    provider: Literal["local", "escalade"]
+    route: Literal["simple", "complexe"]
+
+
 class WireTurn(BaseModel):
+    observation: Observation | None = None
     usage: WireUsage
     model_config = ConfigDict(extra="forbid", strict=True)
     text: str = Field(max_length=32000)
@@ -42,6 +51,12 @@ class GatewayModel:
         self.tools = declarations()
         self.prefix: list[Message] = []
         self.prompt_tokens = 0
+        self.input_tokens = 0
+        self.output_tokens = 0
+        self.observations: list[Observation] = []
+        self.local_enabled = True
+        self.observing = False
+        self.generation_ms = 0.0
 
     @staticmethod
     async def post(url: str, payload: Message, timeout: float) -> Message:
@@ -102,13 +117,26 @@ class GatewayModel:
         return Reservation(incoming + outgoing, cost)
 
     async def complete(self, messages: list[Message], timeout: float) -> Turn:
-        result = WireTurn.model_validate(
-            await self.post(
-                self.url + "/agent/complete",
-                {"messages": messages, "tools": self.tools, "timeout": timeout},
-                timeout,
+        payload: Message = {
+            "messages": messages,
+            "tools": self.tools,
+            "timeout": timeout,
+        }
+        if self.observing:
+            payload.update(local_enabled=self.local_enabled, observe=True)
+        started = monotonic()
+        try:
+            result = WireTurn.model_validate(
+                await self.post(self.url + "/agent/complete", payload, timeout)
             )
-        )
+        finally:
+            self.generation_ms += (monotonic() - started) * 1000
+        if self.observing and result.observation is None:
+            raise ValueError("missing_observation")
+        if result.observation is not None:
+            self.observations.append(result.observation)
+        self.input_tokens += result.usage.prompt_tokens
+        self.output_tokens += result.usage.completion_tokens
         usage = result.usage
         self.observe(messages, usage.prompt_tokens)
         cost = (
