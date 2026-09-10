@@ -1,5 +1,6 @@
 """M7 citations must be retrieved and resolvable; usage stays factual."""
 
+import json
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -84,3 +85,25 @@ class CitationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(item.tokens, {"in": 20, "out": 10})
                 self.assertEqual(item.modele_utilise, "escalade")
                 self.assertFalse(model.local_enabled)
+
+    def test_ranked_whole_passages_fit_context_budget(self) -> None:
+        from services.orchestrator.chat_pipeline import Passage, select_passages
+
+        passages = [
+            Passage(
+                chunk_id=f"{i:064x}",
+                doc_id=str(i),
+                source="doc.md",
+                text="é" * 500,
+                score=float(i),
+            )
+            for i in range(8)
+        ]
+        selected = select_passages(passages)
+        self.assertEqual(
+            [p["chunk_id"] for p in selected], [passages[i].chunk_id for i in (7, 6, 5)]
+        )
+        self.assertTrue(all(p["text"] == "é" * 500 for p in selected))
+        self.assertLessEqual(
+            len(json.dumps(selected, ensure_ascii=False).encode()), 4096
+        )

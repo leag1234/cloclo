@@ -9,6 +9,7 @@ from urllib.request import Request, urlopen
 from unittest.mock import patch
 
 from agent_provider import AgentProvider, AgentRequest
+from serverless_support import environment
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.serving import docker, stack, wait_http, webui
 
@@ -23,7 +24,7 @@ def main() -> None:
     )
     original = AgentProvider._complete
     if record:
-        archive["configuration"] = AgentProvider().configuration()
+        archive["configuration"] = AgentProvider().configuration(False)
 
     async def transport(
         self: AgentProvider,
@@ -34,7 +35,9 @@ def main() -> None:
         timeout: float,
     ) -> dict[str, object]:
         assert request.local_enabled is False
-        payload = {"messages": request.messages, "tools": request.tools}
+        payload = json.loads(
+            json.dumps({"messages": request.messages, "tools": request.tools})
+        )
         if record:
             response = await original(self, request, endpoint, model, key, timeout)
             archive["calls"].append({"request": payload, "response": response})
@@ -47,19 +50,11 @@ def main() -> None:
             raise ValueError("invalid_recording")
         return response
 
-    environment = (
-        {}
-        if record
-        else {
-            "ESCALATION_MODEL": "local",
-            "SCW_GENERATIVE_BASE_URL": "https://example.invalid/v1",
-            "SCW_GENERATIVE_API_KEY": "test-only",
-        }
-    )
+    provider_env = {} if record else environment()
     started = False
     try:
         with (
-            patch.dict(os.environ, {**environment, "GPU_LOCAL": "0"}),
+            patch.dict(os.environ, {**provider_env, "GPU_LOCAL": "0"}),
             patch.object(
                 AgentProvider, "configuration", return_value=archive["configuration"]
             ),
