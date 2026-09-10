@@ -70,6 +70,7 @@ class ProjectMemoryTests(unittest.TestCase):
 
     def test_private_file_permissions(self) -> None:
         self.assertEqual(self.path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.path.parent.stat().st_mode & 0o777, 0o700)
 
     def test_relevance_and_source_distinction(self) -> None:
         self.remember()

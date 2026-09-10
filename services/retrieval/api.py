@@ -9,7 +9,10 @@ from services.retrieval.search import Gateway, rank_scored
 from services.retrieval.store import Chunk, Store
 from services.retrieval.tool import Request
 
+from services.retrieval.project_api import router
+
 app = FastAPI(title="ATLAS retrieval")
+app.include_router(router)
 
 
 def store() -> Store:
