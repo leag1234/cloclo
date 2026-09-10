@@ -31,15 +31,20 @@ Toute violation de cette règle est un incident de sécurité (arrêt immédiat)
 
 ## Jalons
 
-### M8 — GPU local + cascade réelle
-**But** : servir le petit modèle en local sur GPU loué et activer le routage à deux
-niveaux (local ↔ escalade) en conditions réelles.
-**Livrables** : `infra/gpu.py up/down` réutilisé ; vLLM sert LOCAL_MODEL ; le gateway
-route effectivement simple→local / complexe→escalade ; le fallback (M4) reste actif.
-**Cible d'évaluation** : latence perçue nettement réduite sur les requêtes simples ;
-routage observable dans les logs (part local vs escalade).
-**Validation** : une requête simple répond via le local (< 5 s), une complexe via
-l'escalade ; bascule fallback si le local tombe ; coût GPU tracé.
+### M8 — Modèle serverless (choix et configuration)
+**Décision d'architecture (PoC v2)** : TOUT en serverless Scaleway Generative APIs.
+Pas de GPU local pour l'inférence texte : à faible volume, le serverless est moins cher
+(paiement au token, ~0,006 €/requête) et donne accès aux gros modèles que l'on ne peut
+pas héberger soi-même. Le GPU n'est loué que PONCTUELLEMENT pour la génération d'images
+(M13). L'auto-hébergement souverain est une décision de PRODUCTION à prendre après le
+PoC, selon le volume (rentable au-delà de ~50M tokens/mois) et le niveau de qualité requis.
+**Livrables** : configuration des modèles serverless : généraliste (qwen3.5-397b),
+code (glm-5.2 ou qwen3-coder), vision (pixtral-12b), embeddings (qwen3-embedding-8b) ;
+fenêtre de contexte et function-calling vérifiés ; le routeur M4 devient un routage
+par TYPE de tâche (texte/code/vision) entre modèles serverless, plus une cascade
+local/escalade. Le fallback M4 est conservé entre modèles serverless.
+**Validation** : chaque type de tâche est servi par le modèle prévu ; function calling
+et streaming fonctionnent sur le modèle principal ; coût par requête tracé.
 
 ### M9 — Mémoire + projets
 **But** : contexte consolidé et partagé entre conversations (manque n°1 pour l'usage réel).
@@ -118,8 +123,39 @@ portant sur son contenu.
 **Validation** : une requête « génère une image de X » produit une image cohérente,
 servie par le GPU local, sous budget.
 
+## Organisation en deux phases
+
+**Phase A — l'assistant** : M8 (serverless), M9 (mémoire/projets), M10 (synthèse),
+M11 (streaming/raisonnement), M12 (vision), M13 (génération d'images).
+→ **TEST INTERMÉDIAIRE** : l'utilisateur re-teste l'assistant complet ; analyse des
+journaux d'interaction (métriques agrégées, jamais le contenu) ; corrections.
+
+**Phase B — les intégrations** : M14 (client MCP), M15 (API OpenAI-compatible durcie).
+→ Test final.
+
+### M14 — Client MCP (agir sur les outils de l'entreprise)
+**But** : l'assistant se connecte à des serveurs MCP (GitLab, WordPress, etc.) et peut
+lire/agir dessus (lister/créer des issues, publier, rechercher…).
+**Livrables** : client MCP dans le harness d'outils (extension de M3) ; configuration
+des serveurs MCP autorisés ; les actions à effet de bord (créer, publier, modifier)
+passent par une confirmation utilisateur ; journalisation des actions.
+**Principe frontier** : l'assistant enchaîne lecture + action sur les outils comme un
+collaborateur, avec confirmation avant tout effet de bord.
+**Validation** : lecture d'une ressource GitLab via MCP ; création d'une issue après
+confirmation ; refus d'une action non confirmée ; aucun secret MCP exposé.
+
+### M15 — API OpenAI-compatible durcie (pour les développeurs)
+**But** : exposer l'assistant comme fournisseur de modèle utilisable par Codex, Claude
+Code et tout client OpenAI, afin que les développeurs le testent dans leurs outils.
+**Livrables** : durcissement de l'adaptateur M7 : authentification par clé API,
+multi-utilisateur (clés/quotas par dev), function-calling et streaming complets et
+conformes, grande fenêtre de contexte (les outils de dev envoient des dépôts entiers),
+modèle code par défaut. Documentation d'intégration Codex / Claude Code.
+**Validation** : Codex ET Claude Code configurés sur l'API réalisent une tâche de code
+de bout en bout ; une clé invalide est refusée ; quotas appliqués ; coût par clé tracé.
+
 ## Ce qui reste HORS périmètre (produit, plus tard)
-UI soignée/ergonomique, reconnaissance vocale de qualité, multi-utilisateur,
+UI soignée/ergonomique, reconnaissance vocale de qualité, multi-utilisateur de l'UI de chat,
 authentification/HTTPS/exposition publique, haute disponibilité, sécurité durcie
 production, observabilité SRE complète, calibration humaine du juge.
 
