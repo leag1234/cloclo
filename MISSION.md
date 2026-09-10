@@ -115,3 +115,16 @@ PoC, la suite E9 utilise UNIQUEMENT les cas déjà présents dans evals/golden/e
 (cas métier écrits et validés, faux amis + terminologie). N'exécute PAS fetch_flores.py,
 ne bloque pas sur FLORES. L'extension FLORES-200 est une action post-PoC. E9 est évalué
 sur les cas 'valide' disponibles.
+
+### M5 — Correctif calibration (transport JSON du juge)
+Le mode structured-output strict de Scaleway (response_format=json_object / json_schema)
+produit un JSON doublement encapsulé (préfixe `{"{"`) invalide. Tu es AUTORISÉ à :
+1. NE PAS utiliser le mode json_schema/json_object strict pour les appels juge ;
+   demander le JSON dans le prompt (sortie texte) et le parser côté client de façon
+   TOLÉRANTE (extraire le premier objet JSON valide {...} de la réponse, ignorer
+   l'enrobage éventuel). Ceci n'est PAS "réparer une note" : c'est du parsing de
+   transport, la note du juge n'est jamais modifiée.
+2. Relancer une série d'appels bornée (budget < 3 EUR) pour produire la calibration.
+3. Si un appel juge reste non parsable après extraction tolérante, l'exclure du calcul
+   du κ et le SIGNALER dans le rapport (calibration best-effort sur cas valides).
+Le juge de référence reste gpt-oss-120b (indépendance des familles préservée).
