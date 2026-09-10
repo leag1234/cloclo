@@ -10,13 +10,17 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from services.guardrails.input_filter import validate_input
 
 
 class Query(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     question: str = Field(min_length=1, max_length=32000, pattern=r"\S")
     lang: Literal["fr", "de", "es", "it", "en"]
+
+    _safe_question = field_validator("question")(validate_input)
 
 
 @dataclass(frozen=True)
