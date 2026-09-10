@@ -45,13 +45,17 @@ def select_passages(text: str, query: str, budget: int) -> list[SelectedPassage]
         name.rsplit(".", 1)[-1].casefold()
         for name in re.findall(r"\b(?:\w+\.)+\w+", query)
     }
-    scores = [
-        sum(
-            math.log1p(len(windows) / frequency[t]) * (4 if t in identifiers else 1)
-            for t in match
-        )
-        for match in matches
-    ]
+    scores = []
+    for (_, _, part), match in zip(windows, matches, strict=True):
+        score = 0.0
+        for term in match:
+            weight = 1.0
+            if term in identifiers:
+                # Keep the definition after its heading, not a heading at the cut.
+                position = part.casefold().find(term)
+                weight = 4 * (2 - position / len(part))
+            score += math.log1p(len(windows) / frequency[term]) * weight
+        scores.append(score)
     chosen: list[SelectedPassage] = []
     remaining = budget
     for index in sorted(range(len(windows)), key=lambda i: (-scores[i], i)):

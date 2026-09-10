@@ -52,6 +52,18 @@ class SelectionTests(unittest.TestCase):
         )
         self.assertIn("pending requests", "".join(p.text for p in selected))
 
+    def test_definition_after_heading_at_window_boundary(self) -> None:
+        text = "cancel uncancel count return. " * 26
+        text = (
+            text.ljust(776)
+            + "cancelling() Return pending requests: cancel less uncancel."
+        )
+        text += " unrelated" * 200
+        selected = select_passages(
+            text, "Task.cancelling() cancel uncancel count return", 1199
+        )
+        self.assertIn("cancel less uncancel", "".join(p.text for p in selected))
+
     def test_nonoverlap_determinism_and_examined(self) -> None:
         text = "Other information. " * 1000 + "Needle evidence."
         result = select_passages(text, "Needle", 2000)
