@@ -1,0 +1,144 @@
+"""Real HTTP/CPU/index/UI integration; provider replay exists only in tests."""
+
+import gzip
+import json
+import os
+from pathlib import Path
+from typing import Any
+from urllib.request import Request, urlopen
+from unittest.mock import patch
+
+from agent_provider import AgentProvider, AgentRequest
+from services.orchestrator.serving import docker, stack, wait_http, webui
+
+RECORDING = Path("tests/cassettes/chat.json.gz")
+
+
+def main() -> None:
+    record = os.environ.get("ATLAS_M7_MODE", "replay") == "record"
+    archive: dict[str, Any] = (
+        {"calls": []} if record else json.loads(gzip.decompress(RECORDING.read_bytes()))
+    )
+    original = AgentProvider._complete
+    if record:
+        archive["configuration"] = AgentProvider().configuration()
+
+    async def transport(
+        self: AgentProvider,
+        request: AgentRequest,
+        endpoint: str,
+        model: str,
+        key: str,
+        timeout: float,
+    ) -> dict[str, object]:
+        assert request.local_enabled is False
+        payload = {"messages": request.messages, "tools": request.tools}
+        if record:
+            response = await original(self, request, endpoint, model, key, timeout)
+            archive["calls"].append({"request": payload, "response": response})
+            return response
+        rows = [r for r in archive["calls"] if r["request"] == payload]
+        if len(rows) != 1:
+            raise RuntimeError("unrecorded_chat_request")
+        response = rows[0]["response"]
+        if not isinstance(response, dict):
+            raise ValueError("invalid_recording")
+        return response
+
+    environment = (
+        {}
+        if record
+        else {
+            "ESCALATION_MODEL": "local",
+            "SCW_GENERATIVE_BASE_URL": "https://example.invalid/v1",
+            "SCW_GENERATIVE_API_KEY": "test-only",
+        }
+    )
+    started = False
+    try:
+        with (
+            patch.dict(os.environ, {**environment, "GPU_LOCAL": "0"}),
+            patch.object(
+                AgentProvider, "configuration", return_value=archive["configuration"]
+            ),
+            patch.object(AgentProvider, "_complete", transport),
+            stack("atlas-m7-test", False),
+        ):
+            webui("atlas-m7-test-ui", False)
+            started = True
+            wait_http("http://127.0.0.1:3000")
+            payload = {
+                "model": "atlas",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "D'après la politique interne de télétravail, quel est l'objet du document et quels salariés sont concernés ? Cite le document.",
+                    }
+                ],
+            }
+            request = Request(
+                "http://127.0.0.1:8020/v1/chat/completions",
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json"},
+            )
+            with urlopen(request, timeout=125) as response:
+                result = json.load(response)
+            assert result["choices"][0]["message"]["content"]
+            rows = [
+                json.loads(line)
+                for path in Path("BRAIN/interactions").glob("*.jsonl")
+                for line in path.read_text().splitlines()
+            ]
+            selected = [row for row in rows if row["request_id"] == result["id"]]
+            assert len(selected) == 1
+            row = selected[0]
+            assert row["modele_utilise"] == "escalade"
+            assert row["route_decision"] in ("simple", "complexe")
+            assert row["citations"] and row["chunks_recuperes"] and not row["erreurs"]
+            assert 0 < row["cout_eur"] <= 0.05
+            assert row["tokens"]["in"] > 0 and row["tokens"]["out"] > 0
+            assert all(
+                row["latence_ms"][k] > 0 for k in ("retrieval", "generation", "total")
+            )
+            for citation in row["citations"]:
+                assert any(
+                    p["chunk_id"] == citation["chunk_id"]
+                    and isinstance(p["score"], float)
+                    for p in row["chunks_recuperes"]
+                )
+                with urlopen(
+                    "http://127.0.0.1:8020/sources/" + citation["chunk_id"], timeout=5
+                ) as source:
+                    assert source.status == 200
+            if not record:
+                request.data = json.dumps({**payload, "stream": True}).encode()
+                with urlopen(request, timeout=125) as response:
+                    streamed = response.read().decode()
+                assert "data: [DONE]" in streamed
+                assert row["citations"][0]["chunk_id"] in streamed
+            if record:
+                encoded = json.dumps(archive, ensure_ascii=False).encode()
+                assert not any(
+                    v.encode() in encoded
+                    for k, v in os.environ.items()
+                    if len(v) >= 8
+                    and any(s in k for s in ("KEY", "TOKEN", "SECRET", "PASSWORD"))
+                )
+                RECORDING.write_bytes(gzip.compress(encoded, mtime=0))
+            print(
+                json.dumps(
+                    {
+                        "mode": "record" if record else "replay",
+                        "request_id": result["id"],
+                        "citations": len(row["citations"]),
+                        "cost": row["cout_eur"],
+                    }
+                )
+            )
+    finally:
+        if started and os.environ.get("ATLAS_UI_GATE") != "1":
+            docker("stop", "atlas-m7-test-ui")
+
+
+if __name__ == "__main__":
+    main()

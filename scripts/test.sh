@@ -10,4 +10,5 @@ if [[ "${GITHUB_ACTIONS:-}" == true && "${ATLAS_VERIFY_M0:-}" != 1 ]]; then
   make verify-m4
   ATLAS_M5_MODE=replay make verify-m5
   ATLAS_M6_MODE=replay make verify-m6
+  ATLAS_M7_MODE=replay make verify-m7
 fi
