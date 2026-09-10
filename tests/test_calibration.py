@@ -43,3 +43,18 @@ class CalibrationTests(unittest.TestCase):
         for invalid in (pairs[:-1], pairs + [pairs[0]], pairs[:24]):
             with self.assertRaises(ValueError):
                 calibrate(invalid)
+
+    def test_best_effort_reports_exclusion_and_undefined_language(self) -> None:
+        from evals.calibration import best_effort
+
+        pairs = [
+            {"id": "a", "lang": "fr", "production": 5, "reference": 5},
+            {"id": "b", "lang": "en", "production": 4, "reference": 5},
+        ]
+        result = best_effort(pairs, [{"id": "c", "reason": "unparseable_grade"}])
+        self.assertEqual(result["sample_size"], 2)
+        self.assertEqual(result["kappa"], 0)
+        self.assertIsNone(result["par_langue"]["fr"]["kappa"])
+        self.assertEqual(result["excluded"][0]["id"], "c")
+        with self.assertRaises(ValueError):
+            best_effort(pairs + [pairs[0]], [])

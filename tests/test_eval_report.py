@@ -64,3 +64,14 @@ class ReportTests(unittest.TestCase):
                 self.assertEqual(
                     db.execute("select count(*) from runs").fetchone()[0], 2
                 )
+
+    def test_language_target_remains_visible_but_poc_is_indicative(self) -> None:
+        rows = [
+            dict(id=f"E{i}", suite=f"e{i}", lang="fr", score=1.0) for i in range(1, 10)
+        ]
+        rows.append(dict(id="e2-de", suite="e2", lang="de", score=0.8))
+        result = aggregate(rows)
+        self.assertFalse(result["quality_go"])
+        self.assertTrue(result["poc_passed"])
+        rows[-1]["score"] = 0.1
+        self.assertFalse(aggregate(rows)["poc_passed"])

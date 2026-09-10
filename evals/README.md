@@ -43,3 +43,17 @@ E1/E2/E3 (retrieval, RAG, refus) exigent **vos documents**. Deux voies :
 
 E4 : FR 6 / DE 4 / ES 4 / IT 3 / EN 3 · E6 : 4 par langue · E7 : FR 4 / DE 3 / ES 3 /
 IT 2 / EN 3 · E8 : 6 par langue · E9 : couvre les 10 directions principales via FLORES.
+
+## Exécution M5
+`make eval` exécute E1–E9 via le harness d'évaluation, persiste les résultats
+SQLite et écrit `BRAIN/eval/report.html`, `report.json`, `telemetry.csv/json`
+et `calibration.json`. Le HTML inclut historique/diff, langues, limites et
+couverture des mesures. Les jeux et leurs statuts sont conservés.
+Le mode `ATLAS_M5_MODE=record` reprend les appels déjà enregistrés et enregistre
+les manquants (budget de série <3 EUR). Le mode `replay`, réservé aux tests,
+exige une correspondance exacte des messages et interdit les appels modèle.
+`make eval-smoke` utilise quinze cas enregistrés, au moins trois langues.
+Les temps de rejeu ne constituent jamais des mesures d'inférence : seules les
+mesures fournisseur/client archivées avec chaque réponse alimentent le dashboard.
+CONTRADICTION résolue en autonomie: E9 = cinq cas validés sans FLORES ; répartition
+linguistique indicative PoC. Calibration croisée informative, humaine pré-GA.

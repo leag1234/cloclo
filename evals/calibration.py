@@ -47,3 +47,35 @@ def calibrate(pairs: list[dict[str, Any]]) -> dict[str, Any]:
         },
         "pairs": pairs,
     }
+
+
+def best_effort(
+    pairs: list[dict[str, Any]], excluded: list[dict[str, str]]
+) -> dict[str, Any]:
+    """MISSION PoC: report exclusions; an undefined subgroup is never perfect."""
+    ids = [p["id"] for p in pairs + excluded]
+    if len(set(ids)) != len(ids) or any(p["lang"] not in LANGUAGES for p in pairs):
+        raise ValueError("invalid_calibration_sample")
+    global_scores = agreement(
+        [p["production"] for p in pairs], [p["reference"] for p in pairs]
+    )
+    languages: dict[str, Any] = {}
+    for lang in sorted(LANGUAGES):
+        group = [p for p in pairs if p["lang"] == lang]
+        try:
+            scores: dict[str, Any] = agreement(
+                [p["production"] for p in group], [p["reference"] for p in group]
+            )
+        except ValueError as error:
+            if str(error) not in {"undefined_kappa", "unpaired_grades"}:
+                raise
+            scores = {"kappa": None, "reason": str(error)}
+        languages[lang] = scores | {"sample_size": len(group)}
+    return {
+        "type": "calibration croisée inter-modèles (PoC best-effort)",
+        "sample_size": len(pairs),
+        **global_scores,
+        "par_langue": languages,
+        "pairs": pairs,
+        "excluded": excluded,
+    }
