@@ -48,7 +48,7 @@ M7 : chat_pipeline utilise les budgets du harness, retrieval HTTP et les citatio
 résolues. interactions écrit les mesures reçues et codes d'arrêt en JSONL privé ;
 contrat complet et limites documentées dans contracts/m7.md.
 
-M12 : `images.py` définit les messages image validés du contrat `contracts/m12.md`.
+M12 : `packages/images.py` définit les messages image validés du contrat `contracts/m12.md`.
 PNG/JPEG sont décodés par Pillow après contrôle des dimensions ; URL distantes,
 formats non pris en charge et dépassements cumulés sont refusés. Cette première
 brique est commune aux futures frontières adaptateur/gateway vision.
