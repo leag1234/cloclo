@@ -104,3 +104,8 @@ test-streaming:
 	@PYTHONPATH=.:services/model-gateway ATLAS_STREAM_REPORT=BRAIN/eval/streaming.json python3 -m unittest discover -s tests -p 'test_stream*.py' 2>&1
 verify-m11:
 	@bash scripts/verify-m11.sh
+.PHONY: test-vision verify-m12
+test-vision: ## M12 : HTTP adaptateur/gateway, transport vision enregistré ou réel
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/vision_gate.py
+verify-m12: ## vérificateur protégé multimodal
+	@bash scripts/verify-m12.sh
