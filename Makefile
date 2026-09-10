@@ -69,3 +69,9 @@ eval-routing: ## E8 : matrice de confusion et sous-routage critique
 	@PYTHONPATH=services/model-gateway python3 tests/routing_eval.py
 test-fallback: ## endpoint local fermé puis replay de la réponse Scaleway enregistrée
 	@PYTHONPATH=services/model-gateway:tests python3 -m unittest test_cascade -v
+
+.PHONY: report bench
+report: ## rapport GO/NO-GO depuis les mesures archivées
+	@python3 -m evals.decision
+bench: ## micro-bench serverless borné, sans GPU
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/m6_bench.py

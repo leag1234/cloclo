@@ -57,6 +57,7 @@ class Routes(logging.Handler):
 
 async def live(cases: list[dict[str, Any]], url: str) -> None:
     logger = logging.getLogger("agent_provider")
+    previous_level = logger.level
     routes = Routes()
     logger.addHandler(routes)
     logger.setLevel(logging.INFO)
@@ -77,6 +78,7 @@ async def live(cases: list[dict[str, Any]], url: str) -> None:
             )
     finally:
         logger.removeHandler(routes)
+        logger.setLevel(previous_level)
 
 
 def archive_measurements() -> None:
