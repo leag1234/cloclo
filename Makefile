@@ -83,3 +83,9 @@ test-ui: ## requête HTTP intégrée avec citation et journal, fournisseur enreg
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/ui_gate.py 2>&1
 verify-m7: ## vérificateur protégé UI et interactions
 	@bash scripts/ui_gate.sh
+
+.PHONY: test-serverless verify-m8
+test-serverless: ## sondes M8 réelles ou rejeu explicite, sans GPU
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/serverless_gate.py
+verify-m8: ## vérificateur protégé serverless
+	@bash scripts/verify-m8.sh

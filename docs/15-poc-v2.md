@@ -174,3 +174,5 @@ les identifiants alternatifs nécessitent une entrée de capacités et de prix v
 Le chat sans GPU conserve le délai et la réserve en cas de fallback sans usage connu.
 Les logs distinguent coût mesuré et réserve inconnue. Le contexte RAG sélectionne
 les passages entiers les mieux classés sous 4 KiB ; retrieval@8 reste inchangé.
+Le gate `make verify-m8` et `reports/M8.md` documentent les sondes synthétiques et
+leurs limites, notamment les erreurs de couleur sur images entièrement uniformes.
