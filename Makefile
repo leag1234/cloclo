@@ -94,3 +94,8 @@ test-memory: ## tests intégrés de mémoire et projets sur données synthétiqu
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/memory_gate.py
 verify-m9: ## mémoire persistée, isolation et effacement
 	@bash scripts/verify-m9.sh
+.PHONY: test-large-input verify-m10
+test-large-input: ## grandes sources publiques : retrieval réel et fournisseur enregistré
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/large_input_gate.py 2>&1
+verify-m10: ## grandes entrées sourcées dans les budgets
+	@bash scripts/verify-m10.sh
