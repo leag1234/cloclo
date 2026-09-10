@@ -47,7 +47,7 @@ class HealthTests(unittest.TestCase):
 
 
 class ToolTests(unittest.TestCase):
-    def test_empty_smoke_and_unimplemented_full(self) -> None:
+    def test_representative_smoke_and_invalid_mode(self) -> None:
         smoke = subprocess.run(
             ["bash", "scripts/eval.sh", "--smoke"],
             cwd=ROOT,
@@ -55,8 +55,11 @@ class ToolTests(unittest.TestCase):
             text=True,
             check=True,
         )
-        self.assertEqual(json.loads(smoke.stdout)["executed_cases"], 0)
-        for mode in ("--full", "--invalid"):
+        report = json.loads(smoke.stdout)
+        self.assertEqual(report["executed_cases"], 15)
+        self.assertGreaterEqual(len(report["languages"]), 3)
+        self.assertEqual(report["live_calls"], 0)
+        for mode in ("--invalid",):
             result = subprocess.run(
                 ["bash", "scripts/eval.sh", mode], cwd=ROOT, capture_output=True
             )
