@@ -155,8 +155,6 @@ class EvalProvider:
             "stream_options": {"include_usage": True},
             "reasoning_effort": "none" if role == "system" else "low",
         }
-        if role != "system":
-            body["response_format"] = {"type": "json_object"}
         request = Request(
             endpoint + "/chat/completions",
             data=json.dumps(body).encode(),
@@ -169,7 +167,7 @@ class EvalProvider:
         events = []
         received = 0
         try:
-            with deadline(120), urlopen(request, timeout=25) as response:
+            with deadline(120), urlopen(request, timeout=120) as response:
                 while True:
                     line = response.readline(800001)
                     if not line:
