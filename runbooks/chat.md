@@ -14,3 +14,5 @@ et https://github.com/open-webui/open-webui/blob/v0.11.3/LICENSE .
 
 Arrêter serve avant `make verify-m7` : les tests utilisent les mêmes ports locaux.
 Pour le lancement en arrière-plan de l'agent, le PID de groupe est dans BRAIN/m7-serve.pid.
+Le champ execution distingue live, record (appel réel de test) et replay (sans dépense).
+Les anciennes lignes sans ce champ ont une provenance indéterminée : ne pas sommer leurs coûts.

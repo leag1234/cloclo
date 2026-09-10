@@ -12,6 +12,7 @@ from uuid import uuid4
 
 @dataclass
 class Interaction:
+    execution: str = "live"
     timestamp: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )

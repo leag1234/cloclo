@@ -9,6 +9,7 @@ from urllib.request import Request, urlopen
 from unittest.mock import patch
 
 from agent_provider import AgentProvider, AgentRequest
+from services.orchestrator.interactions import Interaction
 from services.orchestrator.serving import docker, stack, wait_http, webui
 
 RECORDING = Path("tests/cassettes/chat.json.gz")
@@ -16,6 +17,7 @@ RECORDING = Path("tests/cassettes/chat.json.gz")
 
 def main() -> None:
     record = os.environ.get("ATLAS_M7_MODE", "replay") == "record"
+    mode = "record" if record else "replay"
     archive: dict[str, Any] = (
         {"calls": []} if record else json.loads(gzip.decompress(RECORDING.read_bytes()))
     )
@@ -62,6 +64,10 @@ def main() -> None:
                 AgentProvider, "configuration", return_value=archive["configuration"]
             ),
             patch.object(AgentProvider, "_complete", transport),
+            patch(
+                "services.orchestrator.chat_api.Interaction",
+                side_effect=lambda: Interaction(execution=mode),
+            ),
             stack("atlas-m7-test", False),
         ):
             webui("atlas-m7-test-ui", False)
@@ -93,6 +99,7 @@ def main() -> None:
             assert len(selected) == 1
             row = selected[0]
             assert row["modele_utilise"] == "escalade"
+            assert row["execution"] == mode
             assert row["route_decision"] in ("simple", "complexe")
             assert row["citations"] and row["chunks_recuperes"] and not row["erreurs"]
             assert 0 < row["cout_eur"] <= 0.05
@@ -125,16 +132,7 @@ def main() -> None:
                     and any(s in k for s in ("KEY", "TOKEN", "SECRET", "PASSWORD"))
                 )
                 RECORDING.write_bytes(gzip.compress(encoded, mtime=0))
-            print(
-                json.dumps(
-                    {
-                        "mode": "record" if record else "replay",
-                        "request_id": result["id"],
-                        "citations": len(row["citations"]),
-                        "cost": row["cout_eur"],
-                    }
-                )
-            )
+            print("Source: UI gate", mode, result["id"], row["cout_eur"])
     finally:
         if started and os.environ.get("ATLAS_UI_GATE") != "1":
             docker("stop", "atlas-m7-test-ui")
