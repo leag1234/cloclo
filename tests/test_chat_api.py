@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from services.orchestrator.chat_api import app
 from services.orchestrator.chat_schema import ChatRequest
+from services.orchestrator.stream_client import sink_context
 from services.orchestrator.interactions import Interaction
 
 
@@ -18,6 +19,9 @@ class ChatAPITests(unittest.TestCase):
         async def respond(request: ChatRequest, item: Interaction) -> None:
             self.assertEqual(request.messages[-1].content, "Bonjour")
             item.reponse = "Réponse avec preuve"
+            sink = sink_context.get()
+            if sink is not None:
+                await sink({"delta": {"content": item.reponse}})
             item.state = "done"
             item.tokens = {"in": 20, "out": 5}
             item.modele_utilise = "escalade"

@@ -1,5 +1,7 @@
 """Real HTTP/CPU/index/UI integration; provider replay exists only in tests."""
 
+from collections.abc import AsyncIterator
+
 import gzip
 import json
 import os
@@ -10,6 +12,7 @@ from unittest.mock import patch
 
 from agent_provider import AgentProvider, AgentRequest
 from serverless_support import environment
+from stream_transport import StreamRequest
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.serving import docker, stack, wait_http, webui
 
@@ -50,6 +53,17 @@ def main() -> None:
             raise ValueError("invalid_recording")
         return response
 
+    async def recorded_stream(
+        self: AgentProvider, payload: object
+    ) -> AsyncIterator[dict[str, object]]:
+        # M7 protocol replay only; M11 independently proves live progression.
+        request = StreamRequest.model_validate(payload)
+        assert request.reasoning_effort == "none"
+        result = await self.complete(request.model_dump(exclude={"reasoning_effort"}))
+        if result.get("text"):
+            yield {"delta": {"content": result["text"]}}
+        yield {"result": result}
+
     provider_env = {} if record else environment()
     started = False
     try:
@@ -59,6 +73,7 @@ def main() -> None:
                 AgentProvider, "configuration", return_value=archive["configuration"]
             ),
             patch.object(AgentProvider, "_complete", transport),
+            patch.object(AgentProvider, "stream", recorded_stream),
             patch(
                 "services.orchestrator.chat_api.Interaction",
                 side_effect=lambda: Interaction(execution=mode),
