@@ -15,7 +15,10 @@ from services.orchestrator.chat_pipeline import process, source
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.interactions import Interaction, write_interaction
 
+from services.orchestrator.project_ui import router as project_router
+
 app = FastAPI(title="ATLAS chat")
+app.include_router(project_router)
 
 
 @app.get("/v1/models")
@@ -65,6 +68,8 @@ async def execute(
 
 @app.post("/v1/chat/completions")
 async def chat(request: Request) -> Response:
+    if request.headers.get("origin") not in (None, str(request.base_url).rstrip("/")):
+        return JSONResponse({"error": "origin_rejected"}, status_code=403)
     item, started = Interaction(), time.monotonic()
     status, code, payload = 200, "", None
     try:
