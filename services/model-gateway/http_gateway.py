@@ -69,9 +69,13 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                         ]
                     }
                 elif self.path == "/agent/config":
-                    if request:
+                    if set(request) - {"local_enabled"} or not isinstance(
+                        request.get("local_enabled", True), bool
+                    ):
                         raise ValueError("invalid_input")
-                    response = AgentProvider().configuration()
+                    response = AgentProvider().configuration(
+                        request.get("local_enabled", True)
+                    )
                 elif self.path == "/agent/complete":
                     response = asyncio.run(AgentProvider().complete(request))
                 elif self.path == "/answer":

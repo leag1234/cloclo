@@ -35,6 +35,8 @@ class Observation(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     provider: Literal["local", "escalade"]
     route: Literal["simple", "complexe"]
+    task_type: Literal["text", "code", "vision"] | None = None
+    fallback: bool = False
 
 
 class WireTurn(BaseModel):
@@ -82,8 +84,10 @@ class GatewayModel:
             raise RuntimeError("gateway_unavailable") from None
 
     @classmethod
-    async def connect(cls, url: str) -> "GatewayModel":
-        config = await cls.post(url.rstrip("/") + "/agent/config", {}, 5)
+    async def connect(cls, url: str, local_enabled: bool = True) -> "GatewayModel":
+        config = await cls.post(
+            url.rstrip("/") + "/agent/config", {"local_enabled": local_enabled}, 5
+        )
         return cls(url, Configuration.model_validate(config))
 
     def observe(self, messages: list[Message], prompt_tokens: int) -> None:
@@ -124,6 +128,7 @@ class GatewayModel:
         }
         if self.observing:
             payload.update(local_enabled=self.local_enabled, observe=True)
+        reserved = self.estimate(messages)
         started = monotonic()
         try:
             result = WireTurn.model_validate(
@@ -143,6 +148,9 @@ class GatewayModel:
             usage.prompt_tokens * self.configuration.input_eur_per_mtok
             + usage.completion_tokens * self.configuration.output_eur_per_mtok
         ) / 1_000_000
+        if result.observation is not None and result.observation.fallback:
+            # The primary may have been billed without returning usage. Retain the full reservation.
+            cost = reserved.cost
         return Turn(
             result.text,
             tuple(Call(c.id, c.name, c.arguments) for c in result.calls),

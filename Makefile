@@ -80,6 +80,6 @@ bench: ## micro-bench serverless borné, sans GPU
 serve: ## UI locale, gateway CPU, retrieval et adaptateur ; GPU désactivé par défaut
 	@bash scripts/serve.sh
 test-ui: ## requête HTTP intégrée avec citation et journal, fournisseur enregistré
-	@PYTHONPATH=.:tests:services/model-gateway python3 tests/ui_gate.py
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/ui_gate.py 2>&1
 verify-m7: ## vérificateur protégé UI et interactions
 	@bash scripts/ui_gate.sh

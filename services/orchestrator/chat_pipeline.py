@@ -33,6 +33,19 @@ class Passages(BaseModel):
     passages: list[Passage] = Field(max_length=8)
 
 
+def select_passages(passages: list[Passage]) -> list[dict[str, str]]:
+    selected: list[dict[str, str]] = []
+    for passage in sorted(passages, key=lambda p: p.score, reverse=True):
+        candidate = {
+            "chunk_id": passage.chunk_id,
+            "source": passage.source,
+            "text": passage.text,
+        }
+        if len(json.dumps([*selected, candidate], ensure_ascii=False).encode()) <= 4096:
+            selected.append(candidate)
+    return selected
+
+
 def retrieval_url() -> str:
     return os.environ.get("ATLAS_RETRIEVAL_URL", "http://127.0.0.1:8011").rstrip("/")
 
@@ -99,18 +112,7 @@ class ChatTools(Runtime):
             self.item.chunks_recuperes.extend(passages)
             return {
                 "trust": "untrusted",
-                "data": {
-                    "passages": [
-                        {
-                            "chunk_id": p.chunk_id,
-                            "source": p.source,
-                            "text": p.text.encode()[:1200].decode(
-                                "utf-8", errors="ignore"
-                            ),
-                        }
-                        for p in result.passages
-                    ]
-                },
+                "data": {"passages": select_passages(result.passages)},
             }
         except (ValueError, RuntimeError, TimeoutError):
             self.item.erreurs.append("retrieval_unavailable")
@@ -122,7 +124,8 @@ class ChatTools(Runtime):
 async def process(request: ChatRequest, item: Interaction) -> None:
     started = time.monotonic()
     model = await GatewayModel.connect(
-        os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010")
+        os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"),
+        local_enabled=os.environ.get("GPU_LOCAL", "0") == "1",
     )
     model.observing = True
     model.local_enabled = os.environ.get("GPU_LOCAL", "0") == "1"
