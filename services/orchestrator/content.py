@@ -40,8 +40,17 @@ def select_passages(text: str, query: str, budget: int) -> list[SelectedPassage]
         terms.intersection(re.findall(r"\w+", p.casefold())) for _, _, p in windows
     ]
     frequency = Counter(term for match in matches for term in match)
+    # A qualified identifier names the subject, unlike generic question words.
+    identifiers = {
+        name.rsplit(".", 1)[-1].casefold()
+        for name in re.findall(r"\b(?:\w+\.)+\w+", query)
+    }
     scores = [
-        sum(math.log1p(len(windows) / frequency[t]) for t in match) for match in matches
+        sum(
+            math.log1p(len(windows) / frequency[t]) * (4 if t in identifiers else 1)
+            for t in match
+        )
+        for match in matches
     ]
     chosen: list[SelectedPassage] = []
     remaining = budget

@@ -40,6 +40,18 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(result, select_passages("short text", "q", 100))
         self.assertTrue(select_passages("Other topic. " * 100, "absent", 100))
 
+    def test_qualified_identifier_outweighs_generic_question_words(self) -> None:
+        text = (
+            "Documentation source return affect count cancel uncancel. " * 300
+            + "\nTask.cancelling(): pending requests = cancel minus uncancel.\n"
+        )
+        selected = select_passages(
+            text,
+            "According to documentation what does Task.cancelling() return and how do cancel and uncancel affect count? Cite source.",
+            800,
+        )
+        self.assertIn("pending requests", "".join(p.text for p in selected))
+
     def test_nonoverlap_determinism_and_examined(self) -> None:
         text = "Other information. " * 1000 + "Needle evidence."
         result = select_passages(text, "Needle", 2000)
