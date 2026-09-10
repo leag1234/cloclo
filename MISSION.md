@@ -157,3 +157,5 @@ est joignable (HTTP 200 sur le port 3000). Sans GPU (escalade seule) par défaut
 
 **Hors périmètre** : authentification multi-utilisateur, HTTPS, exposition publique
 (le port reste sur la VM ; accès via SSH tunnel ou IP directe selon config réseau).
+
+## PoC v2 (M8→M13) — voir docs/15-poc-v2.md
