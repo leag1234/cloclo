@@ -12,7 +12,7 @@ from services.orchestrator.model import GatewayModel
 
 class LargeDocumentTests(unittest.IsolatedAsyncioTestCase):
     async def test_tail_of_document_passage_reaches_model(self) -> None:
-        text = "Routine information without the requested fact. " * 40
+        text = "Routine information without the requested fact. " * 400
         text += "\nZephyr warranty lasts 73 months."
         passage = {
             "chunk_id": "a" * 64,

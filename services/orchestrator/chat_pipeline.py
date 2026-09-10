@@ -40,8 +40,11 @@ def select_passages(passages: list[Passage], query: str = "") -> list[dict[str, 
         candidate = {
             "chunk_id": passage.chunk_id,
             "source": passage.source,
-            "text": ("\n".join(p.text for p in select_content(passage.text, query, 1199))
-                     if query and len(passage.text.encode()) > 4096 else passage.text),
+            "text": (
+                "\n".join(p.text for p in select_content(passage.text, query, 1199))
+                if query and len(passage.text.encode()) > 4096
+                else passage.text
+            ),
         }
         if len(json.dumps([*selected, candidate], ensure_ascii=False).encode()) <= 4096:
             selected.append(candidate)
