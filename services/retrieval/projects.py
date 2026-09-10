@@ -24,6 +24,7 @@ class Projects:
     def __init__(self, path: Path) -> None:
         self.path = path
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        path.parent.chmod(0o700)
         if path.is_symlink():
             raise ValueError("invalid_storage")
         fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
