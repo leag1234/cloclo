@@ -126,3 +126,13 @@ class Session:
             ],
         )
         return parse_grade(text)
+
+
+def matches_record(
+    record: dict[str, Any], role: str, messages: list[dict[str, str]], model: str | None
+) -> bool:
+    return bool(
+        record["role"] == role
+        and record["messages"] == messages
+        and (model is None or record["result"]["model"] == model)
+    )

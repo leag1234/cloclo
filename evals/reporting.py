@@ -1,6 +1,7 @@
 """POC-R1/F8: strict score aggregation and durable, escaped reports."""
 
 import csv
+from contextlib import closing
 import html
 import json
 import math
@@ -43,6 +44,8 @@ def aggregate(rows: list[dict[str, Any]], full: bool = True) -> dict[str, Any]:
             threshold=THRESHOLDS[suite],
             par_langue=languages,
             language_gap=spread,
+            poc_passed=score >= THRESHOLDS[suite]
+            and not any(r.get("critical_failure", False) for r in group),
             passed=score >= THRESHOLDS[suite]
             and not any(r.get("critical_failure", False) for r in group)
             and (suite not in {"e2", "e6", "e7", "e9"} or spread <= 0.15),
@@ -58,6 +61,7 @@ def aggregate(rows: list[dict[str, Any]], full: bool = True) -> dict[str, Any]:
             for lang in sorted({r["lang"] for r in rows})
         },
         quality_go=all(v["passed"] for v in results.values()),
+        poc_passed=all(v["poc_passed"] for v in results.values()),
         cases=rows,
     )
 
@@ -76,7 +80,7 @@ def publish(
         raise ValueError("invalid_telemetry")
     root.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).isoformat()
-    with sqlite3.connect(root / "runs.sqlite") as db:
+    with closing(sqlite3.connect(root / "runs.sqlite")) as db, db:
         db.execute(
             "CREATE TABLE IF NOT EXISTS runs (stamp TEXT PRIMARY KEY, report TEXT NOT NULL)"
         )
