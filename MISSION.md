@@ -128,3 +128,32 @@ produit un JSON doublement encapsulé (préfixe `{"{"`) invalide. Tu es AUTORIS�
 3. Si un appel juge reste non parsable après extraction tolérante, l'exclure du calcul
    du κ et le SIGNALER dans le rapport (calibration best-effort sur cas valides).
 Le juge de référence reste gpt-oss-120b (indépendance des familles préservée).
+
+## M7 — UI de test + observabilité des interactions
+**But** : rendre le système interrogeable via une UI de chat, avec un logging
+structuré et exploitable de CHAQUE interaction, pour analyser qualité/latence/routage.
+
+**Livrables** :
+- `make serve` : démarre tous les services nécessaires en une commande (gateway
+  http + retrieval + adaptateur), sans GPU par défaut (tout passe par l'escalade
+  Scaleway ; le GPU local est activé seulement si GPU_LOCAL=1).
+- **Adaptateur OpenAI-compatible** : expose `POST /v1/chat/completions` (protocole
+  OpenAI standard) et le route vers le pipeline interne (RAG /answer, recherche web,
+  ou escalade selon la nature de la requête). Permet de brancher n'importe quel
+  client OpenAI, dont Open WebUI.
+- **Open WebUI** en Docker, pointé sur l'adaptateur, accessible sur le port 3000 de
+  la VM. L'utilisateur ouvre http://<ip-vm>:3000 et discute avec le système.
+- **Logging structuré par interaction** : chaque requête produit une ligne JSON dans
+  `BRAIN/interactions/<date>.jsonl` avec AU MINIMUM : timestamp, question, réponse,
+  modèle_utilisé (local|escalade), route_decision (simple|complexe), latence_ms
+  (retrieval, génération, total), chunks_récupérés (doc_id + score), citations
+  (chunk_id résolus), tokens (in/out), coût_eur, erreurs/timeouts éventuels.
+  Aucun secret ni clé dans les logs.
+
+**verify-m7** vérifie : `make serve` démarre les services ; l'adaptateur répond à une
+requête `/v1/chat/completions` de bout en bout (réponse + citation) ; une ligne de log
+structurée est produite dans BRAIN/interactions/ avec les champs requis ; Open WebUI
+est joignable (HTTP 200 sur le port 3000). Sans GPU (escalade seule) par défaut.
+
+**Hors périmètre** : authentification multi-utilisateur, HTTPS, exposition publique
+(le port reste sur la VM ; accès via SSH tunnel ou IP directe selon config réseau).
