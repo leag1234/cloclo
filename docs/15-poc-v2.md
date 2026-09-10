@@ -99,6 +99,9 @@ réponses longues.
 Le transport SSE applique la politique serverless M8 avant I/O ; un fallback reste
 possible avant tout fragment visible, jamais après émission de contenu/réflexion.
 
+Le client relaie aussi les réponses de projet progressivement : seul le champ réponse
+est affiché ; le JSON de consolidation reste interne et la réponse finale est validée.
+
 ### M12 — Description d'image (multimodal entrée)
 **But** : le système voit et analyse les images envoyées.
 **Livrables** : routage des requêtes contenant une image vers un modèle vision

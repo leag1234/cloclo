@@ -20,6 +20,7 @@ class ChatRequest(BaseModel):
     project_id: str | None = None
     conversation_id: str | None = None
     stream: bool = False
+    reasoning_effort: Literal["none", "low"] = "none"
     lang: Literal["fr", "de", "es", "it", "en"] = "fr"
 
     @model_validator(mode="after")
