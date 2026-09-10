@@ -7,6 +7,9 @@ from decimal import Decimal
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query as Parameter
+from fastapi import Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from services.orchestrator.cache import Cache
@@ -15,6 +18,14 @@ from services.orchestrator.model import GatewayModel
 from services.orchestrator.tools import Runtime
 
 app = FastAPI(title="ATLAS-0 harness", version="0.1.0")
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(
+    request: Request, error: RequestValidationError
+) -> JSONResponse:
+    # Avoid echoing rejected input, including unencodable Unicode surrogates.
+    return JSONResponse({"detail": "invalid_request"}, status_code=422)
 
 
 def cache() -> Cache:
