@@ -129,3 +129,73 @@ Any new security objection regarding gpu.py/gpu-down must be PROPOSED in the rep
 
 ### M16 — Translation method (mandatory)
 Do NOT build a segmentation/numbered-transport pipeline for translation. Translate each file DIRECTLY: read the file, produce the English version, write it back, one file at a time. No invariant validation, no concurrent calls, no cache layer. If a file is large, translate it in a few sequential passes over its sections, still writing plain text. Keep markdown structure, code blocks, links and anchors intact. Files to translate, in this order: README.md (create), runbooks/*.md, AGENTS.md, MISSION.md, contracts/*.md, docs/*.md. Commit after each file or small group.
+
+## M17 — Integration: make existing capabilities actually usable (PRIORITY)
+
+**Why this milestone exists.** M8–M15 are all "done": unit tests pass, CI is green,
+every `verify-mN` succeeds. Yet a real user session found that **only one capability
+out of seven works end to end**. Every `verify-mN` validated *components in isolation*,
+never a *user journey* through the chat interface. A capability that answers a direct
+function call but is unreachable from the UI is NOT delivered.
+
+**New rule**: a milestone is "done" only when a **user journey through the public chat
+API** proves it. Component tests are necessary, never sufficient.
+
+### Defects found in the 2026-09-11 user session (all must be fixed)
+1. **Language drift** — reply in English while the conversation was in French, after an
+   image was sent. The vision path (likely also web and image paths) does not carry the
+   conversation-language rule from `prompts/chat.txt`.
+2. **Image generation fails** — "crée moi une image d'un chien qui danse…" →
+   `stream_error`; UI shows "Uh-oh! There was an issue with the response."
+3. **Projects unreachable** — M9 exists in the backend (`services/retrieval/project_api.py`)
+   but a user cannot create or use a project from Open WebUI.
+4. **Web search never returns a final answer** — UI shows two "Étape intermédiaire
+   terminée : appel d'outil" then nothing. Tools run; no answer is delivered.
+5. **Auxiliary Open WebUI functions always fail** — title/tags/follow-up return
+   `provider_error`/`cost`/`request_stopped` on every message. Either make them work
+   (dedicated light model + own budget) or disable them with an explicit note.
+   Silent permanent failure is not acceptable.
+6. **`make serve` is not idempotent** — fails when containers or a previous `serving.py`
+   process still exist. It must clean up its own resources first.
+
+### Deliverables
+- Fix defects 1–6.
+- `tests/journeys/`: automated **user journeys** that call the **public chat API**
+  (`POST /v1/chat/completions` on the adapter, exactly as the UI does) and assert on what
+  the *user* receives. Internal function calls do not count as journeys.
+- `make test-journeys` runs them and writes `BRAIN/eval/journeys.json`.
+- **Live vs CI**: journeys needing the web, a provider or a GPU (J4, J6) run **live on the
+  VM** and are **replayed from recorded cassettes in CI**. J4 must not create a GPU on
+  every run: record once, replay afterwards; a live J4 run is explicit (`JOURNEYS_LIVE=1`).
+- `make test-serve-idempotent` (J8) is a **separate** target, never part of the CI gate:
+  it restarts the stack and must not run while a user session is active.
+
+### Language criterion (explicit, so it cannot be gamed)
+A reply "matches" the question language when a language detector (e.g. `langdetect`,
+or a simple French/English function-word ratio) classifies the reply as the same
+language as the last user message, with ≥ 0.8 confidence. Code blocks are excluded
+from the check.
+
+### Projects: realistic UI path
+Open WebUI has no native "project" object. J5 is satisfied by ANY of these, as long as
+a user can do it from the UI without editing files: (a) a project exposed as a dedicated
+Open WebUI model with an attached knowledge base; (b) a chat command
+(`/project create <name>`, `/project use <name>`) handled by the adapter; (c) an Open
+WebUI tool/function. Document the chosen path in `runbooks/chat.md`.
+
+### Journeys that must pass
+J1 plain question → non-empty final answer, in the question's language.
+J2 corpus question → answer with ≥ 1 resolvable citation.
+J3 image sent → description, **in the conversation language**.
+J4 "génère une image de X" → an image is returned (live on VM; cassette in CI).
+J5 project → a fact stated in conversation A is used in conversation B of the same
+   project; a different project does NOT see it.
+J6 web question → tools run **and a final answer is delivered** (live on VM; cassette in CI).
+J7 auxiliary calls (title/tags/follow-up) → no error, or explicitly disabled + documented.
+J8 `make test-serve-idempotent` → second consecutive `make serve` succeeds (separate target).
+
+**Nice to have (not blocking)**: expose the configured models distinctly (generalist,
+code, vision) so Open WebUI's arena can compare them for the quality-evaluation phase.
+
+**Definition of done**: `make verify-m17` passes. The gate itself performs a real call
+to the public chat API and checks the reply; it does not trust the report alone.
