@@ -6,7 +6,7 @@ import random
 import unittest
 from PIL import Image
 from pydantic import ValidationError
-from services.orchestrator.images import VisionInput
+from packages.images import VisionInput
 from test_vision_schema import payload, picture
 
 

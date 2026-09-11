@@ -5,7 +5,7 @@ import io
 import unittest
 from PIL import Image
 from pydantic import ValidationError
-from services.orchestrator.images import VisionInput
+from packages.images import VisionInput
 
 
 def picture(fmt: str = "PNG", size: tuple[int, int] = (32, 32)) -> str:

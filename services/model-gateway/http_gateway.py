@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from gateway_cpu import CPUModels, EMBEDDING_REVISION
 from generation import Generator
 from agent_provider import AgentProvider
+from vision import VisionProvider
 
 
 def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
@@ -75,7 +76,8 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
         def do_POST(self) -> None:
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= 800000:
+                maximum = 6 * 1024 * 1024 if self.path == "/vision/complete" else 800000
+                if not 0 < length <= maximum:
                     raise ValueError("context_exceeded")
                 self.connection.settimeout(30)
                 request = json.loads(self.rfile.read(length))
@@ -136,6 +138,8 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                 elif self.path == "/agent/stream":
                     self.stream_response(request)
                     return
+                elif self.path == "/vision/complete":
+                    response = asyncio.run(VisionProvider().complete(request))
                 elif self.path == "/agent/complete":
                     response = asyncio.run(AgentProvider().complete(request))
                 elif self.path == "/answer":

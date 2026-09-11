@@ -48,3 +48,7 @@ réelle ; `make eval-routing` écrit BRAIN/eval/routing.json. UI bonus non livr�
 M7 : /agent/complete accepte local_enabled=false pour une escalade directe sans
 sonde GPU. observe=true ajoute provider (local/escalade) et route (simple/complexe)
 à la réponse. Les anciens clients conservent leur format et leur cascade M4.
+
+M12 : `/vision/complete` valide les images avec `packages/images.py`, réserve le
+budget avant inférence et utilise `vision.yaml` pour le modèle souverain et son
+tarif. Le transport n'effectue ni recherche d'URL image ni fallback texte.
