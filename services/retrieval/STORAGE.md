@@ -1,30 +1,30 @@
-# Index dérivé M2
+# Derived Index M2
 
-POC-F2 ; REQ-ENG-002/004/005/007. Contrat SQL approuvé dans PR #8.
-Le service retrieval est le seul propriétaire du schéma atlas_retrieval.
+POC-F2; REQ-ENG-002/004/005/007. SQL contract approved in PR #8.
+The retrieval service is the sole owner of the atlas_retrieval schema.
 
-Installer requirements-dev.txt, fournir ATLAS_RETRIEVAL_DSN hors dépôt,
-puis `python -m services.retrieval.store init` sur une base dédiée possédant
-pgvector. `sync` lit une liste JSON de chunks sur stdin ; `read` restitue l'index.
-Ne pas journaliser la sortie : elle contient les documents. Aucune donnée source
-n'est supprimée. Le CLI est administratif, jamais exposé à l'utilisateur final.
+Install requirements-dev.txt, provide ATLAS_RETRIEVAL_DSN outside the repository,
+then run `python -m services.retrieval.store init` on a dedicated database possessing
+pgvector. `sync` reads a JSON list of chunks from stdin; `read` returns the index.
+Do not log the output: it contains documents. No source data is deleted. The CLI is
+administrative and never exposed to the end user.
 
-Chaque sync remplace l'index entier dans une transaction : révision/dimension
-uniformes, vecteurs finis non nuls, métadonnées cohérentes, contraintes SQL.
-Un échec restaure l'index précédent. Les sources absentes sont supprimées.
-Le remplacement complet privilégie la simplicité pour le petit corpus PoC ;
-les identifiants stables conservent les citations lors d'une ingestion identique.
-La résolution inconnue lève KeyError ; erreurs SQL et de validation explicites.
+Each sync replaces the entire index within a transaction: uniform revision/dimension,
+finite non-null vectors, consistent metadata, SQL constraints.
+A failure restores the previous index. Missing sources are deleted.
+Full replacement favors simplicity for the small PoC corpus;
+stable identifiers preserve citations during identical ingestion.
+Unknown resolution raises KeyError; explicit SQL and validation errors.
 
-Retour arrière sur cette base dédiée : transaction `DROP SCHEMA atlas_retrieval
-CASCADE`, puis init et réingestion. Ne pas supprimer l'extension partagée vector.
-Migration aller/retour et rollback testés sur PostgreSQL/pgvector réel en conteneur
-éphémère ; le nettoyage est enregistré avant l'initialisation des tests.
-Le port de test est dynamique et lié uniquement à 127.0.0.1.
+Rollback on this dedicated database: transaction `DROP SCHEMA atlas_retrieval
+CASCADE`, then init and re-ingestion. Do not delete the shared vector extension.
+Forward/backward migration and rollback tested on real PostgreSQL/pgvector in an
+ephemeral container; cleanup is recorded before test initialization.
+The test port is dynamic and bound only to 127.0.0.1.
 
-Dépendances : psycopg[binary] 3.3.5 (LGPL-3.0, pilote typé ; alternative psql
-fragile pour transactions runtime), pydantic 2.13.5 (MIT, validation stricte ;
-alternative validation manuelle plus difficile à auditer). Versions compatibles
-avec Python 3.14 local et 3.12 CI. Aucun appel distant ni coût GPU.
-Observabilité : événement index_synced avec cardinalités, sans documents.
-SLO RAG et dashboard attendent l'intégration ; aucun résultat retrieval revendiqué.
+Dependencies: psycopg[binary] 3.3.5 (LGPL-3.0, typed driver; fragile psql
+alternative for runtime transactions), pydantic 2.13.5 (MIT, strict validation;
+manual validation alternative harder to audit). Versions compatible with
+local Python 3.14 and CI 3.12. No remote calls or GPU costs.
+Observability: index_synced event with cardinalities, without documents.
+RAG SLO and dashboard await integration; no retrieval results claimed.
