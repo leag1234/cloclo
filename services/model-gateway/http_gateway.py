@@ -11,6 +11,7 @@ from gateway_cpu import CPUModels, EMBEDDING_REVISION
 from generation import Generator
 from agent_provider import AgentProvider
 from vision import VisionProvider
+import imagegen
 
 
 def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
@@ -138,6 +139,8 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                 elif self.path == "/agent/stream":
                     self.stream_response(request)
                     return
+                elif self.path == "/images/generate":
+                    response = asyncio.run(imagegen.complete(request))
                 elif self.path == "/vision/complete":
                     response = asyncio.run(VisionProvider().complete(request))
                 elif self.path == "/agent/complete":
@@ -172,7 +175,10 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
             except TimeoutError:
                 status, response = 504, {"code": "timeout"}
             except RuntimeError as exc:
-                if self.path == "/vision/complete" and str(exc) == "cost_budget":
+                if (
+                    self.path in {"/vision/complete", "/images/generate"}
+                    and str(exc) == "cost_budget"
+                ):
                     status, response = 504, {"code": "cost_budget"}
                 else:
                     status, response = 502, {"code": "provider_error"}

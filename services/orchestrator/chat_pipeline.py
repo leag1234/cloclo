@@ -19,6 +19,8 @@ from services.orchestrator.model import GatewayModel
 from services.orchestrator.tools import Rag, Runtime
 from services.orchestrator.stream_client import sink_context
 from services.orchestrator.vision import process_vision
+from packages.imagegen import image_request
+from services.orchestrator.imagegen import process_image
 
 
 class Source(BaseModel):
@@ -130,6 +132,9 @@ class ChatTools(Runtime):
 
 
 async def process(request: ChatRequest, item: Interaction) -> None:
+    if image_request(request.messages[-1].text):
+        await process_image(request.messages[-1].text, item)
+        return
     if any(m.images for m in request.messages):
         await process_vision(request, item)
         return

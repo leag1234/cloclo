@@ -96,7 +96,7 @@ def response(
                 raise ValueError("invalid_delta")
             if "reasoning_content" in delta:
                 await queue.put(event)
-            if event.get("memory") is True or item.task_type == "vision":
+            if event.get("memory") is True or item.task_type in {"vision", "imagegen"}:
                 await queue.put({"delta": {"content": delta["content"]}})
                 return
             if "content" in delta:

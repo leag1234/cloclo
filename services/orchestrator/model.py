@@ -80,7 +80,7 @@ class GatewayModel:
                     url, json=payload, allow_redirects=False
                 ) as response:
                     if response.status != 200:
-                        if url.endswith("/vision/complete"):
+                        if url.endswith(("/vision/complete", "/images/generate")):
                             error = json.loads(await response.content.read(512))
                             codes = {
                                 "cost_budget": 504,
@@ -95,10 +95,11 @@ class GatewayModel:
                             if code in codes:
                                 raise GatewayError(code, codes[code])
                         raise RuntimeError("gateway_error")
+                    maximum = 2800000 if url.endswith("/images/generate") else 800000
                     data = bytearray()
                     async for piece in response.content.iter_chunked(16384):
                         data.extend(piece)
-                        if len(data) > 800000:
+                        if len(data) > maximum:
                             raise ValueError("gateway_response_limit")
             value: object = json.loads(data)
             if not isinstance(value, dict):
