@@ -115,6 +115,8 @@ souverain (pixtral-12b, Scaleway) ; intégration dans le gateway et l'UI (upload
 le contenu de l'image, pas « je ne traite pas les images ».
 **Validation** : description correcte d'une image de test ; réponse à une question
 portant sur son contenu.
+Implémentation et mesures : `contracts/m12.md`, `reports/M12.md` ; `make verify-m12`
+exerce le trajet HTTP avec transport enregistré en CI, renouvelable en mode record.
 
 ### M13 — Génération d'image (local sur GPU, souverain)
 **But** : produire des images à partir d'une description, **en local sur GPU**.
