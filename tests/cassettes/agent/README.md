@@ -45,3 +45,5 @@ LLM call is made by PR CI; make verify-m3 replays this full batch in CI.
 | E6-003 | done | — | 6493b15e07da924f5e73e3f3bc5a477aa6f803065943360a9a194c67b81ea174 |
 | E6-004 | done | — | bc72b84972655ee0737138638deb8ffa0de9bcd3fb73bcc4a1844a38f1830f4f |
 | E6-005 | done | — | b9568dec0fbed96debb30ff100edaa974fe53c5fae94cb9ae0c7c471c0150cac |
+
+M16 localization: `E4-020.json.gz` changes only the application-generated final stop text to English. Provider messages, tool traces, budgets and outcomes are unchanged. Original SHA-256 above; localized SHA-256: `7550614f77ab7cfef7b7a6908deef8c301f495d18bd4740b507685b01ee178ff`.
