@@ -52,3 +52,5 @@ sonde GPU. observe=true ajoute provider (local/escalade) et route (simple/comple
 M12 : `/vision/complete` valide les images avec `packages/images.py`, réserve le
 budget avant inférence et utilise `vision.yaml` pour le modèle souverain et son
 tarif. Le transport n'effectue ni recherche d'URL image ni fallback texte.
+
+M15 : dev_gateway prépare une requête code immuable et réserve octets UTF8 +512 et maximum sortant sous50000microEUR. Transport TLS unique, sans redirection ni reprise ; SSE borné2Mo et usage terminal obligatoire. Les tests rejouent de vrais deltas Scaleway (métadonnées fournisseur retirées), sans dépendance SDK externe.
