@@ -16,3 +16,7 @@ Stop serve before `make verify-m7`: tests use the same local ports.
 For background launch of the agent, the group PID is in BRAIN/m7-serve.pid.
 The execution field distinguishes live, record (real test call), and replay (no cost).
 Old lines without this field have an undetermined origin: do not sum their costs.
+
+Project image requests validate project/conversation scope before vision. Only
+server history and the current upload are forwarded. Descriptions are stored in
+the selected conversation without image bytes; resend images to inspect them again.
