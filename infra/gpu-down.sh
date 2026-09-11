@@ -68,11 +68,19 @@ echo "[gpu-down] suppression de $GPU_NAME ($ID)…"
 sleep "${GPU_DOWN_SETTLE:-5}"
 CHECK=$("$SCW" instance server list zone="$SCW_DEFAULT_ZONE" project-id="$SCW_DEFAULT_PROJECT_ID" -o json 2>/dev/null) \
   || die "vérification post-destruction IMPOSSIBLE (API injoignable) ; $ID peut être encore actif"
+# Parseur STRICT (même rigueur qu'à l'entrée) : toute forme inattendue -> BAD, jamais NO.
 STILL=$(printf '%s' "$CHECK" | TARGET="$ID" python3 -c '
 import sys, json, os
-try: data = json.load(sys.stdin)
-except Exception: print("BAD"); sys.exit(0)
-print("YES" if any(isinstance(s,dict) and s.get("id")==os.environ["TARGET"] for s in data) else "NO")
+try:
+    data = json.loads(sys.stdin.read())
+except Exception:
+    print("BAD"); sys.exit(0)
+if not isinstance(data, list):
+    print("BAD"); sys.exit(0)            # {} ou autre -> inventaire invalide
+for s in data:
+    if not isinstance(s, dict) or not isinstance(s.get("id"), str) or not s.get("id"):
+        print("BAD"); sys.exit(0)        # [{}] ou id manquant/null -> invalide
+print("YES" if any(s["id"] == os.environ["TARGET"] for s in data) else "NO")
 ')
 case "$STILL" in
   NO)  echo "[gpu-down] instance $ID supprimée et CONSTATÉE absente ; volume de poids conservé." ;;
