@@ -190,3 +190,9 @@ Les logs distinguent coût mesuré et réserve inconnue. Le contexte RAG sélect
 les passages entiers les mieux classés sous 4 KiB ; retrieval@8 reste inchangé.
 Le gate `make verify-m8` et `reports/M8.md` documentent les sondes synthétiques et
 leurs limites, notamment les erreurs de couleur sur images entièrement uniformes.
+
+M13 : le contrat `contracts/m13.md` définit la branche image du chat. Les demandes
+explicites FR/EN passent par `/images/generate` sur le gateway ; sortie PNG intégrée
+au Markdown/SSE et masquée dans les journaux. L’adresse GPU est configurée par
+`ATLAS_IMAGE_GPU_IP`, son tarif réel par `ATLAS_IMAGE_GPU_EUR_H` ; réservation
+90 secondes au plus 0,05 EUR. Le déploiement GPU fait l’objet d’un cycle séparé.
