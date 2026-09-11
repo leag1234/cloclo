@@ -119,3 +119,9 @@ verify-m13: ## gate protégé génération souveraine
 .PHONY: serve-imagegen
 serve-imagegen: ## active le GPU pour le chat durant dix minutes après chargement
 	@timeout 2400 bash infra/imagegen.sh serve 2>&1
+
+.PHONY: test-mcp verify-m14
+test-mcp: ## MCP réel ou rejeu explicite des échanges synthétiques enregistrés
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/mcp_gate.py
+verify-m14: ## lecture et écriture confirmée, gate protégé intact
+	@bash scripts/verify-m14.sh
