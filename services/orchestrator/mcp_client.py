@@ -48,7 +48,8 @@ def configuration() -> dict[str, Server]:
 def resolve(call: MCPCall) -> tuple[Server, Tool, dict[str, str], list[str]]:
     server = configuration()[call.server]
     tool = server.tools[call.tool]
-    secrets = [os.environ[name] for name in server.secret_env.values()]
+    credentials = {key: os.environ[name] for key, name in server.secret_env.items()}
+    secrets = list(credentials.values())
     if (
         any(not value for value in secrets)
         or len(call.model_dump_json().encode()) > 16384
@@ -64,10 +65,7 @@ def resolve(call: MCPCall) -> tuple[Server, Tool, dict[str, str], list[str]]:
         secret in call.model_dump_json() for secret in secrets
     ):
         raise ValueError("mcp_secret_argument")
-    env = {
-        **server.env,
-        **{key: os.environ[name] for key, name in server.secret_env.items()},
-    }
+    env = {**server.env, **credentials}
     return server, tool, env, secrets
 
 
@@ -76,6 +74,11 @@ def declaration() -> dict[str, object]:
         name: {tool: policy.model_dump() for tool, policy in server.tools.items()}
         for name, server in configuration().items()
     }
+    for server in configuration().values():
+        if any(
+            os.environ[name] in json.dumps(names) for name in server.secret_env.values()
+        ):
+            raise ValueError("mcp_secret_configuration")
     return {
         "type": "function",
         "function": {
@@ -118,7 +121,9 @@ async def execute(raw: str, timeout: float) -> dict[str, object]:
         call = candidate
         if tool.effect == "write":
             state = "confirmation_required"
-            return {"error": state}
+            from services.orchestrator.mcp_confirmation import prepare
+
+            return prepare(call)
         result = await invoke(
             server.command,
             server.args,
