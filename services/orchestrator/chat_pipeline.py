@@ -17,6 +17,7 @@ from services.orchestrator.interactions import Interaction
 from services.orchestrator.loop import Call, Limits, Message, Query, run
 from services.orchestrator.model import GatewayModel
 from services.orchestrator.tools import Rag, Runtime
+from services.orchestrator.stream_client import sink_context
 
 
 class Source(BaseModel):
@@ -139,6 +140,8 @@ async def process(request: ChatRequest, item: Interaction) -> None:
         local_enabled=os.environ.get("GPU_LOCAL", "0") == "1",
     )
     model.observing = True
+    model.sink = sink_context.get()
+    model.reasoning_effort = request.reasoning_effort
     model.local_enabled = os.environ.get("GPU_LOCAL", "0") == "1"
     item.cout_eur = 0.05  # Conservative upper bound until the loop returns its ledger.
     tools = ChatTools(item, request.messages[-1].content)

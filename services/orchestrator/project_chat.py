@@ -20,6 +20,8 @@ from services.orchestrator.interactions import Interaction
 from services.orchestrator.loop import Call, Limits, Message, Query, run
 from services.orchestrator.memory import consolidated
 from services.orchestrator.model import GatewayModel
+from services.orchestrator.stream_client import sink_context
+from services.orchestrator.project_stream import AnswerStream
 from services.orchestrator.tools import Rag
 
 
@@ -90,6 +92,21 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
         local_enabled=False,
     )
     model.local_enabled, model.observing = False, True
+    sink = sink_context.get()
+    answer_stream = AnswerStream(sink) if sink else None
+    model.sink = answer_stream
+    model.reasoning_effort = request.reasoning_effort
+    memory_prefix = (
+        (
+            "Mémoire du projet :\n"
+            + "\n".join("- " + f.text for f in context.facts)
+            + "\n\n"
+        )
+        if context.facts
+        else ""
+    )
+    if sink and memory_prefix:
+        await sink({"delta": {"content": memory_prefix}, "memory": True})
     model.tools = [
         t
         for t in model.tools
@@ -132,6 +149,8 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
         if result.state != "done":
             return
         answer, facts = consolidated(result.text, question)
+        if answer_stream and answer_stream.shown != answer:
+            raise ValueError("project_stream_changed")
         retrieved = {str(p["chunk_id"]): p for p in item.chunks_recuperes}
         keys = list(dict.fromkeys(re.findall(r"\b[a-f0-9]{64}\b", answer)))
         if not set(keys) <= retrieved.keys():
@@ -140,13 +159,7 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
         for key in keys:
             item.citations.append(Source.model_validate(retrieved[key]).model_dump())
             answer = answer.replace(key, f"[Source](/projects/{project}/sources/{key})")
-        if context.facts:
-            answer = (
-                "Mémoire du projet :\n"
-                + "\n".join("- " + f.text for f in context.facts)
-                + "\n\n"
-                + answer
-            )
+        answer = memory_prefix + answer
         await GatewayModel.post(
             base + "/turns",
             {

@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from services.orchestrator.loop import Call, Message, Reservation, Turn
 from services.orchestrator.tools import declarations
+from services.orchestrator.stream_client import Sink, receive
 
 
 class Configuration(BaseModel):
@@ -59,6 +60,9 @@ class GatewayModel:
         self.local_enabled = True
         self.observing = False
         self.generation_ms = 0.0
+        self.sink: Sink | None = None
+        self.reasoning_effort = "none"
+        self.stream_turn = 0
 
     @staticmethod
     async def post(url: str, payload: Message, timeout: float) -> Message:
@@ -131,9 +135,30 @@ class GatewayModel:
         reserved = self.estimate(messages)
         started = monotonic()
         try:
-            result = WireTurn.model_validate(
-                await self.post(self.url + "/agent/complete", payload, timeout)
-            )
+            if self.sink is None:
+                wire = await self.post(self.url + "/agent/complete", payload, timeout)
+            else:
+                payload["reasoning_effort"] = self.reasoning_effort
+                self.stream_turn += 1
+                await self.sink(
+                    {
+                        "turn": self.stream_turn,
+                        "phase": "generating",
+                        "reserved_eur": str(self.estimate(messages).cost),
+                        "max_output_tokens": self.configuration.max_tokens,
+                    }
+                )
+                wire = await receive(
+                    self.url + "/agent/stream", payload, timeout, self.sink
+                )
+            result = WireTurn.model_validate(wire)
+            if self.sink is not None:
+                await self.sink(
+                    {
+                        "turn": self.stream_turn,
+                        "phase": "intermediate" if result.calls else "final",
+                    }
+                )
         finally:
             self.generation_ms += (monotonic() - started) * 1000
         if self.observing and result.observation is None:
