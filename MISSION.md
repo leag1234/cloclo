@@ -199,3 +199,22 @@ code, vision) so Open WebUI's arena can compare them for the quality-evaluation 
 
 **Definition of done**: `make verify-m17` passes. The gate itself performs a real call
 to the public chat API and checks the reply; it does not trust the report alone.
+
+### M17 — Decision: project-scoped image history (2026-09-11)
+The leak you found is real and CORRECT to report: in `chat_pipeline.py`, any image in
+the history triggers `process_vision` BEFORE `process_project`, and `vision.py` forwards
+every client message to `/vision/complete` without project validation.
+
+DECISION: images must be **scoped to the current project**, not refused.
+- Resolve the project scope FIRST, then build the vision payload from messages belonging
+  to the current project only. Reorder `process_project` before `process_vision`.
+- `vision.py` must receive only in-scope messages; it must never receive history from
+  another project (or from outside any project when a project is active).
+- Journey J5 (`projects_isolated`) must cover this exact case: image in project Alpha,
+  switch to Beta, ask a question → no Alpha content reaches vision. Keep
+  `tests/test_project_vision_scope.py` as a permanent regression test.
+
+You are AUTHORISED and REQUIRED to fix this yourself: `chat_pipeline.py` and `vision.py`
+are your own, unprotected files. Finding a leak in your own code is not a reason to stop —
+it is the work. Only stop if a PROTECTED file would have to change, or if fixing it would
+require weakening isolation. Fix it, prove it with J5, then continue M17.
