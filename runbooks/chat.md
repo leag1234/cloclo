@@ -16,3 +16,8 @@ Stop serve before `make verify-m7`: tests use the same local ports.
 For background launch of the agent, the group PID is in BRAIN/m7-serve.pid.
 The execution field distinguishes live, record (real test call), and replay (no cost).
 Old lines without this field have an undetermined origin: do not sum their costs.
+
+`make test-serve-idempotent` starts `make serve` twice and checks readiness after
+the second start. Run only with no active user session. It is excluded from CI.
+The launcher gracefully replaces only its own processes and matching containers;
+persistent volumes are preserved, including during automatic-removal races.

@@ -147,3 +147,7 @@ test-devapi-clients: ## isolated native Codex/Claude, live provider and external
 .PHONY: verify-m16
 verify-m16: ## English localization and preservation of multilingual evaluation data
 	@bash scripts/verify-m16.sh
+
+.PHONY: test-serve-idempotent
+test-serve-idempotent: ## explicit disruptive J8, outside the CI gate
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/serve_idempotent.py
