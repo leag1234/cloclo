@@ -130,6 +130,12 @@ verify-m14: ## read and confirmed write, protected gate unchanged
 serve-devapi: ## local developer API, individual keys and quotas; no GPU
 	@bash scripts/serve-devapi.sh
 
+.PHONY: verify-m17 test-journeys
+verify-m17: ## integration journeys through the public chat API
+	@bash scripts/verify-m17.sh
+test-journeys: ## recorded external exchanges through the real HTTP stack
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/journey_server.py
+
 .PHONY: test-devapi verify-m15
 test-devapi: ## developer API: real local HTTP and recorded provider streams
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/devapi_gate.py
@@ -147,13 +153,3 @@ test-devapi-clients: ## isolated native Codex/Claude, live provider and external
 .PHONY: verify-m16
 verify-m16: ## English localization and preservation of multilingual evaluation data
 	@bash scripts/verify-m16.sh
-
-.PHONY: test-serve-idempotent
-test-serve-idempotent: ## explicit disruptive J8, outside the CI gate
-	@PYTHONPATH=.:tests:services/model-gateway python3 tests/serve_idempotent.py
-
-.PHONY: verify-m17 test-journeys
-verify-m17: ## integration journeys through the public chat API
-	@bash scripts/verify-m17.sh
-test-journeys: ## recorded external exchanges through the real HTTP stack
-	@PYTHONPATH=.:tests:services/model-gateway python3 tests/journey_server.py
