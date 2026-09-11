@@ -139,3 +139,7 @@ verify-m15: ## gate protégé auth/quotas/outils/streaming/contexte/coût
 .PHONY: test-devapi-e2e
 test-devapi-e2e: ## fournisseur réel : fonction puis réponse et contexte utile >=24KiB
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/devapi_live.py
+
+.PHONY: test-devapi-clients
+test-devapi-clients: ## Codex/Claude natifs isolés, fournisseur réel et assertions externes
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/devapi_clients.py
