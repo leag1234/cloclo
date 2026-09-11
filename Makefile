@@ -125,3 +125,7 @@ test-mcp: ## MCP réel ou rejeu explicite des échanges synthétiques enregistr�
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/mcp_gate.py
 verify-m14: ## lecture et écriture confirmée, gate protégé intact
 	@bash scripts/verify-m14.sh
+
+.PHONY: serve-devapi
+serve-devapi: ## API développeurs locale, clés et quotas individuels ; sans GPU
+	@bash scripts/serve-devapi.sh

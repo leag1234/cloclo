@@ -52,3 +52,10 @@ async def models() -> dict[str, object]:
 @app.get("/v1/usage")
 async def usage(request: Request) -> JSONResponse:
     return JSONResponse(request.state.store.usage(request.state.developer))
+
+
+@app.post("/v1/chat/completions")
+async def completions(request: Request) -> Response:
+    from services.orchestrator.dev_inference import chat
+
+    return await chat(request)
