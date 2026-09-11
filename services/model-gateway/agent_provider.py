@@ -68,7 +68,7 @@ class Completion(BaseModel):
 class AgentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     messages: list[dict[str, object]] = Field(min_length=1, max_length=100)
-    tools: list[dict[str, object]] = Field(min_length=1, max_length=4)
+    tools: list[dict[str, object]] = Field(min_length=1, max_length=5)
     timeout: float = Field(gt=0, le=120)
     local_enabled: bool = True
     observe: bool = False

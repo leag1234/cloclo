@@ -13,6 +13,7 @@ import aiohttp
 import trafilatura
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from services.orchestrator import mcp_client
 from services.orchestrator.cache import Cache
 from services.orchestrator.calculator import calculate
 from services.orchestrator.content import select_passages
@@ -58,7 +59,7 @@ def declarations() -> list[Message]:
         isinstance(v, str) for v in descriptions.values()
     ):
         raise ValueError("invalid_tool_descriptions")
-    return [
+    result: list[Message] = [
         {
             "type": "function",
             "function": {
@@ -69,6 +70,9 @@ def declarations() -> list[Message]:
         }
         for name, schema in SCHEMAS.items()
     ]
+    if os.environ.get("ATLAS_MCP_CONFIG"):
+        result.append(mcp_client.declaration())
+    return result
 
 
 class Runtime:
@@ -189,6 +193,8 @@ class Runtime:
         }
 
     async def execute(self, call: Call, timeout: float) -> Message:
+        if call.name == "mcp_call":
+            return await mcp_client.execute(call.arguments, timeout)
         try:
             schema = SCHEMAS.get(call.name)
             if schema is None:
