@@ -194,3 +194,29 @@ Le risque financier lié au GPU est BORNÉ et ACCEPTÉ par le propriétaire :
   protégé. L'audit préventif de scripts d'extinction n'en fait PAS partie.
 Toute nouvelle objection de sécurité sur gpu.py/gpu-down doit être PROPOSÉE dans le
 rapport, jamais utilisée pour bloquer. Provisionne.
+
+## M16 — English localization of the public repository (PRIORITY)
+**Context**: the repository is now PUBLIC. All documentation and code intended for
+external readers must be in English. This is a blocking presentation issue for an
+open-source project.
+
+**Scope — TO TRANSLATE into English**:
+- `README.md` — **to CREATE** (currently missing): project overview, architecture
+  summary, quickstart (install, `make serve`, tunnel, UI), milestones, licence note.
+  This is the first thing a visitor sees.
+- `docs/*.md` (~2200 lines), `contracts/*.md` (~940), `runbooks/*.md` (~150)
+- `MISSION.md`, `AGENTS.md`
+- All comments, docstrings, log and error messages in `services/`, `scripts/`,
+  `infra/`, `tests/` (~65 files contain French)
+
+**Scope — MUST NOT be translated (French is intentional there)**:
+- `corpus/` — the multilingual test corpus (7 languages) is the point of the test set
+- `evals/golden/` — questions in FR/DE/ES/IT/AR/ZH are deliberate
+- `BRAIN/` — local working journal, not tracked by git
+
+**Constraints**: translation only — do NOT change behaviour, identifiers used by other
+code, file names, or test semantics. Keep commit messages and future PR titles in English.
+
+**verify-m16** checks: README.md exists and is structured; no French function words in
+docs/contracts/runbooks/README/MISSION/AGENTS; no French in code comments/messages;
+and the multilingual corpus and golden sets are still intact (not translated away).
