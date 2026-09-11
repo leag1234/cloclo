@@ -168,3 +168,13 @@ supérieur au risque résiduel. L'incident est donc CLOS en tant que blocage : c
 pas une révocation, c'est une acceptation de risque explicite et tracée.
 Action reportée : rotation du jeton avant toute mise en production.
 L'agent NE DOIT PLUS bloquer sur ce point ni redemander de confirmation.
+
+### M13 — Budget GPU attesté (décision humaine, 2026-09-11)
+L'API de consommation Scaleway n'est pas lisible par le jeton IAM du projet ; le budget
+est donc ATTESTÉ ici par le propriétaire :
+- Budget mensuel global : 800 € ; consommation à ce jour : < 5 € ; marge disponible : > 795 €.
+- Plafond horaire GPU : GPU_MAX_EUR_H=2.00 €/h (le L40S est à ~1,47 €/h).
+- Plafond de dépense GPU pour M13 : **30 € maximum** pour l'ensemble du jalon.
+- Alertes budget Scaleway actives à 50 % et 80 % (SMS + e-mail).
+Tu es AUTORISÉ à créer un GPU pour M13 dans ces limites, à condition de l'éteindre après
+chaque test (trap déjà en place). N'interroge plus l'API billing : cette attestation fait foi.
