@@ -32,7 +32,7 @@ class AnswerRequest(BaseModel):
 def parse_answer(text: str, request: AnswerRequest) -> dict[str, object]:
     if text.strip() == "INSUFFICIENT":
         return {
-            "text": "Je ne trouve pas la réponse dans les sources.",
+            "text": "I cannot find the answer in the sources.",
             "citations": [],
             "refused": True,
         }

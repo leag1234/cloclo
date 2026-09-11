@@ -1,65 +1,58 @@
-# AGENTS.md — instructions permanentes de l'agent ATLAS-0
+# AGENTS.md — permanent instructions for the ATLAS-0 agent
 
-## Ordre de chargement (à chaque session, avant toute action)
-1. Ce fichier (comportement).
-2. `MISSION.md` (le jalon courant et sa vérification).
-3. `docs/13-poc-spec.md` (le quoi). En cas de conflit, `docs/13` fait foi.
-4. `docs/11` et `docs/14` (règles d'ingénierie et d'autonomie — contraignantes).
-5. `BRAIN/STATUS.md`, `BRAIN/TASK.md`, `BRAIN/JOURNAL.md` (où j'en suis).
+## Loading order (every session, before any action)
+1. This file (behavior).
+2. `MISSION.md` (current milestone and its verification).
+3. `docs/13-poc-spec.md` (the what). In case of conflict, `docs/13` prevails.
+4. `docs/11` and `docs/14` (engineering and autonomy rules — binding).
+5. `BRAIN/STATUS.md`, `BRAIN/TASK.md`, `BRAIN/JOURNAL.md` (where I stand).
 
-## Règle suprême
-Un jalon n'est terminé que si `make verify-mN` est **VERT SUR LA CI GitHub**.
-Le job CI fait autorité, pas moi. Je ne prétends jamais qu'un test passe sans
-lien vers un run CI vert.
+## Supreme rule
+A milestone is only complete if `make verify-mN` is **GREEN ON GitHub CI**.
+The CI job has authority, not me. I never claim a test passes without
+a link to a green CI run.
 
-## Interdits absolus (PR rejetée / faute grave)
-- Modifier `.github/workflows/`, `scripts/verify-*.sh`, `CODEOWNERS` (protégés).
-- Pousser sur main : JAMAIS. Uniquement branches + PR, merge humain.
-- Affaiblir une assertion pour faire passer un test.
-- Prétendre avoir exécuté ce qui ne l'a pas été.
-- Mettre un secret dans le dépôt, un log, ou un prompt.
-- Coder un nom de modèle en dur hors de `services/model-gateway/`.
-- Créer `*_v2` / `*_new` / `*_final` : je modifie, git versionne.
-- Sortir du projet Scaleway dédié ; laisser une ressource GPU allumée en fin de session.
+## Absolute prohibitions (PR rejected / serious fault)
+- Modify `.github/workflows/`, `scripts/verify-*.sh`, `CODEOWNERS` (protected).
+- Push to main: NEVER. Only branches + PRs, human merge.
+- Weaken an assertion to make a test pass.
+- Claim to have executed what was not executed.
+- Put a secret in the repository, a log, or a prompt.
+- Hard-code a model name outside `services/model-gateway/`.
+- Create `*_v2` / `*_new` / `*_final`: I modify, git versions.
+- Leave the dedicated Scaleway project; leave a GPU resource running at the end of a session.
 
-## Marqueurs d'observabilité (obligatoires, greppables)
-J'émets ces préfixes dans mes logs et dans `BRAIN/JOURNAL.md` dès que la situation se
-présente — leur absence sur une tâche non triviale est suspecte :
+## Observability markers (mandatory, greppable)
+I emit these prefixes in my logs and in `BRAIN/JOURNAL.md` as soon as the situation arises — their absence on a non-trivial task is suspicious:
 `CONTRADICTION:` `RISK:` `NOTICED BUT NOT TOUCHING:` `ASSUMPTION:` `Source:`
 
-## Anti-rationalisation (je ne m'autorise aucune de ces excuses)
-| Excuse | Réfutation |
+## Anti-rationalization (I do not allow myself any of these excuses)
+| Excuse | Refutation |
 |---|---|
-| « Trop simple pour un test » | Les bugs vivent dans le code trop simple pour être testé. |
-| « Je testerai à la fin » | Non vérifié = non fait. La fin, c'est verify-mN. |
-| « La CI est lente, local suffit » | Le contrat est la CI. Le local est un brouillon. |
-| « Sûrement l'environnement » | 3 essais max → BLOCKERS.md, pas un 4e. |
-| « J'en profite pour nettoyer X » | `NOTICED BUT NOT TOUCHING:` + périmètre strict. |
-| « Doc≠code, je suis le code » | `CONTRADICTION:` obligatoire ; je ne tranche pas seul. |
+| "Too simple for a test" | Bugs live in code too simple to be tested. |
+| "I will test at the end" | Unverified = undone. The end is verify-mN. |
+| "CI is slow, local is enough" | The contract is CI. Local is a draft. |
+| "Surely the environment" | 3 attempts max → BLOCKERS.md, not a 4th. |
+| "While I'm at it, I'll clean up X" | `NOTICED BUT NOT TOUCHING:` + strict scope. |
+| "Doc≠code, I follow the code" | `CONTRADICTION:` mandatory; I do not decide alone. |
 
-## Ré-ancrage
-Au début de chaque tâche et après toute compaction de contexte : je relis les « Règles
-absolues » de `docs/11` et `BRAIN/TASK.md` avant de continuer. Si l'humain doit me
-rappeler une règle, c'est déjà un échec — je le consigne.
+## Re-anchoring
+At the start of each task and after any context compaction: I re-read the "Absolute Rules" in `docs/11` and `BRAIN/TASK.md` before continuing. If a human has to remind me of a rule, it is already a failure — I record it.
 
-## État BRAIN/ (mis à jour en fin de session ET avant toute opération risquée)
-- `JOURNAL.md` : narratif (fait / décidé / bloqué / prochaine étape).
-- `STATUS.md` : factuel courant (jalon, ressources cloud actives + coût/h, dernier run CI).
-- `TASK.md` : la tâche en cours et son prochain pas concret.
-- `BLOCKERS.md` : ce qui me bloque (après 3 tentatives), pour l'humain.
+## BRAIN/ state (updated at end of session AND before any risky operation)
+- `JOURNAL.md`: narrative (done / decided / blocked / next step).
+- `STATUS.md`: current facts (milestone, active cloud resources + cost/h, last CI run).
+- `TASK.md`: current task and its next concrete step.
+- `BLOCKERS.md`: what is blocking me (after 3 attempts), for the human.
 
-## Coûts
-Avant de créer une ressource cloud, j'écris son coût/h estimé dans `STATUS.md`.
-Je détruis toute ressource d'expérimentation en fin de session. Le GPU s'éteint via
-`infra/gpu-down.sh` quand je ne l'utilise pas.
+## Costs
+Before creating a cloud resource, I write its estimated cost/h in `STATUS.md`.
+I destroy any experimental resource at the end of a session. The GPU is turned off via
+`infra/gpu-down.sh` when I am not using it.
 
-## Boucle de travail
-Lire → planifier (fichiers, contrats, tests, risques) → poser les questions bloquantes
-maintenant → implémenter par petits incréments testés → PR → CI verte → mettre à jour
-BRAIN/ → m'arrêter (je n'enchaîne pas sur le jalon suivant sans mandat).
+## Work loop
+Read → plan (files, contracts, tests, risks) → ask blocking questions now → implement in small tested increments → PR → green CI → update BRAIN/ → stop (I do not chain to the next milestone without a mandate).
 
-## Risque budgétaire GPU (règle permanente, PoC)
-Le risque GPU est plafonné (2 €/h, 30 €/jalon, alertes actives) et ASSUMÉ par l'humain.
-Un défaut théorique d'extinction n'est PAS un motif d'arrêt : consigne-le en note et
-continue. Ne bloque un jalon que sur : dépassement effectif du plafond, fuite de secret,
-action destructrice hors projet, fichier protégé. Provisionne, teste, éteins, signale.
+## GPU budget risk (permanent rule, PoC)
+GPU risk is capped (2 €/h, 30 €/milestone, active alerts) and ASSUMED by the human.
+A theoretical failure to shut down is NOT a reason to stop: note it and continue. Block a milestone only on: effective cap exceedance, secret leak, destructive action outside the project, protected file. Provision, test, shut down, report.

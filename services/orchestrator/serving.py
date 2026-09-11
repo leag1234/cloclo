@@ -150,7 +150,7 @@ def main() -> None:
             launched = True
             wait_http("http://127.0.0.1:3000")
             print(
-                "ATLAS prêt : http://localhost:3000 (tunnel SSH), GPU_LOCAL="
+                "ATLAS ready: http://localhost:3000 (SSH tunnel), GPU_LOCAL="
                 + os.environ.get("GPU_LOCAL", "0"),
                 flush=True,
             )

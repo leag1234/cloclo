@@ -1,56 +1,56 @@
 # model-gateway
 
-Responsable : `OWNERS`.
+Owner: `OWNERS`.
 
-M1 (REQ-INF-012/013) : moteur de provisionnement `python3 infra/gpu.py up/down`.
-Paramètres : projet/zone Scaleway, LOCAL_MODEL, GPU_CLIENT_IP, GPU_MAX_EUR_H.
-SLO, runbook et dashboard : non applicables avant activation du service
-au jalon correspondant dans MISSION.md.
+M1 (REQ-INF-012/013): provisioning engine `python3 infra/gpu.py up/down`.
+Parameters: Scaleway project/zone, LOCAL_MODEL, GPU_CLIENT_IP, GPU_MAX_EUR_H.
+SLO, runbook, and dashboard: not applicable before service activation
+at the corresponding milestone in MISSION.md.
 
-M2 / POC-F2-A3, REQ-ENG-004/007 : `python services/model-gateway/http_gateway.py`
-sert /embeddings et /rerank sur 127.0.0.1:8010 (schéma M2 approuvé).
-Installer requirements-dev.txt ; premier lancement télécharge les poids épinglés,
-ensuite cache local. CPU seulement, safetensors, aucun code distant autorisé.
-Moteurs : embeddings multilingues 384 dimensions et cross-encoder (Apache-2.0).
-Dépendances : sentence-transformers 6.0.1 (Apache-2.0), torch CPU 2.14.0 (BSD),
-plusieurs Go avec poids ; alternative ONNX plus légère, intégration distincte.
-Runbook : garder loopback, client timeout 30 s ; erreurs 400/413/502/504 explicites.
-Les entrées longues subissent la troncature des tokenizers (128/512 tokens).
-Logs embeddings/rerank : cardinalité et durée, aucun texte ; coût cloud ajouté nul.
-SLO RAG/dashboard non attestés avant intégration ; /answer reste à implémenter.
+M2 / POC-F2-A3, REQ-ENG-004/007: `python services/model-gateway/http_gateway.py`
+serves /embeddings and /rerank on 127.0.0.1:8010 (approved M2 schema).
+Install requirements-dev.txt; the first run downloads pinned weights,
+then uses local cache. CPU only, safetensors, no remote code allowed.
+Engines: multilingual embeddings 384 dimensions and cross-encoder (Apache-2.0).
+Dependencies: sentence-transformers 6.0.1 (Apache-2.0), torch CPU 2.14.0 (BSD),
+several GB with weights; lighter ONNX alternative, separate integration.
+Runbook: keep loopback, client timeout 30 s; explicit 400/413/502/504 errors.
+Long inputs undergo tokenizer truncation (128/512 tokens).
+Embeddings/rerank logs: cardinality and duration, no text; added cloud cost zero.
+RAG SLO/dashboard not attested before integration; /answer remains to be implemented.
 
-## Génération M2
-POST /answer suit contracts/m2-gateway.schema.json. Configuration injectée :
+## M2 Generation
+POST /answer follows contracts/m2-gateway.schema.json. Injected configuration:
 SCW_GENERATIVE_BASE_URL (HTTPS), SCW_GENERATIVE_API_KEY, ESCALATION_MODEL.
-Le modèle L Scaleway reçoit des sources délimitées comme données non fiables,
-avec prompts/rag.txt versionné. Délai fournisseur 25 s, 1024 tokens maximum,
-reasoning_effort none, aucun retry automatique. Les références numériques du
-modèle sont résolues vers les chunk_id fournis ; absence/invention est rejetée.
-HTTP 400 entrée invalide, 413 contexte dépassé, 502 fournisseur/citation invalide,
-504 timeout. Logs sans texte ni clé : durée et nombre de citations.
-SLO opérationnel : réponse ou erreur bornée au délai fournisseur ; la cible
-RAG <12 s sera mesurée au jalon performance. Plafond serverless confirmé dans
-MISSION ; aucun GPU créé, facturation à l'usage et non horaire.
+The Scaleway L model receives delimited sources as untrusted data,
+with versioned prompts/rag.txt. Provider timeout 25 s, 1024 tokens maximum,
+reasoning_effort none, no automatic retry. Numerical references from the
+model are resolved to the provided chunk_id; absence or invention is rejected.
+HTTP 400 invalid input, 413 context exceeded, 502 provider/citation invalid,
+504 timeout. Logs without text or keys: duration and number of citations.
+Operational SLO: response or error bounded by the provider timeout; the target
+RAG <12 s will be measured at the performance milestone. Serverless ceiling confirmed in
+MISSION; no GPU created, billing by usage and not hourly.
 Source: https://www.scaleway.com/en/docs/generative-apis/api-cli/using-chat-api/
 Source: https://www.scaleway.com/en/docs/generative-apis/reference-content/supported-models/
 
-## Cascade M4
-POST /agent/complete route les tâches simples vers LOCAL_MODEL / LOCAL_API_BASE
-(produit par infra/gpu-up.sh dans BRAIN/gateway.env). Sans endpoint local,
-la bascule Scaleway prend le relais ; aucun GPU nécessaire au gate M4.
-Contrat : contracts/m4.md. Logs routing : classe, fournisseur, fallback ; sans texte.
-Runbook : injecter les variables M3 et locales, lancer le gateway puis le harness.
-Une panne locale consomme au plus 2 s avant L, dans la deadline M3. Prix L réservé
-avant appel ; erreurs L restent explicites. SLO de qualité locale à mesurer en M6.
-`make test-fallback` rejoue une réponse Scaleway enregistrée après panne locale
-réelle ; `make eval-routing` écrit BRAIN/eval/routing.json. UI bonus non livrée.
+## M4 Cascade
+POST /agent/complete routes simple tasks to LOCAL_MODEL / LOCAL_API_BASE
+(produced by infra/gpu-up.sh in BRAIN/gateway.env). Without a local endpoint,
+the Scaleway fallback takes over; no GPU required at the M4 gate.
+Contract: contracts/m4.md. Routing logs: class, provider, fallback; no text.
+Runbook: inject M3 and local variables, launch the gateway then the harness.
+A local failure consumes at most 2 s before L, within the M3 deadline. L price reserved
+before call; L errors remain explicit. Local quality SLO to be measured in M6.
+`make test-fallback` replays a recorded Scaleway response after a real local failure;
+`make eval-routing` writes BRAIN/eval/routing.json. Bonus UI not delivered.
 
-M7 : /agent/complete accepte local_enabled=false pour une escalade directe sans
-sonde GPU. observe=true ajoute provider (local/escalade) et route (simple/complexe)
-à la réponse. Les anciens clients conservent leur format et leur cascade M4.
+M7: /agent/complete accepts local_enabled=false for direct escalation without
+GPU probing. observe=true adds provider (local/escalade) and route (simple/complexe)
+to the response. Older clients retain their format and their M4 cascade.
 
-M12 : `/vision/complete` valide les images avec `packages/images.py`, réserve le
-budget avant inférence et utilise `vision.yaml` pour le modèle souverain et son
-tarif. Le transport n'effectue ni recherche d'URL image ni fallback texte.
+M12: `/vision/complete` validates images with `packages/images.py`, reserves the
+budget before inference, and uses `vision.yaml` for the sovereign model and its
+rate. The transport performs neither image URL lookup nor text fallback.
 
-M15 : dev_gateway prépare une requête code immuable et réserve octets UTF8 +512 et maximum sortant sous50000microEUR. Transport TLS unique, sans redirection ni reprise ; SSE borné2Mo et usage terminal obligatoire. Les tests rejouent de vrais deltas Scaleway (métadonnées fournisseur retirées), sans dépendance SDK externe.
+M15: dev_gateway prepares an immutable code request and reserves UTF8 bytes +512 and maximum output under 50000 microEUR. Single TLS transport, no redirection or resumption; SSE bounded to 2 MB and mandatory terminal usage. Tests replay real Scaleway deltas (provider metadata removed), without external SDK dependency.

@@ -109,11 +109,7 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
     model.sink = answer_stream
     model.reasoning_effort = request.reasoning_effort
     memory_prefix = (
-        (
-            "Mémoire du projet :\n"
-            + "\n".join("- " + f.text for f in context.facts)
-            + "\n\n"
-        )
+        ("Project memory:\n" + "\n".join("- " + f.text for f in context.facts) + "\n\n")
         if context.facts
         else ""
     )

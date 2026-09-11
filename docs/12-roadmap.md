@@ -1,131 +1,113 @@
-# 12 — Roadmap, jalons et organisation
+# 12 — Roadmap, milestones and organization
 
-## 1. Séquencement — logique
+## 1. Sequencing — logic
 
-L'ordre n'est pas négociable, et il est contre-intuitif : **on construit les évals et la
-passerelle avant la première fonctionnalité visible.** Un système génératif sans mesure ne
-s'améliore pas, il dérive. Toute inversion de cet ordre a un coût connu : refonte au
-premier changement de modèle.
+The order is non-negotiable, and it is counter-intuitive: **we build the evaluations and the gateway before the first visible feature.** A generative system without measurement does not improve; it drifts. Any inversion of this order has a known cost: rework at the first model change.
 
-## 2. Phase 0 — Fondations (semaines 1–4)
+## 2. Phase 0 — Foundations (weeks 1–4)
 
-| Livrable | Doc | Critère de sortie |
+| Deliverable | Doc | Exit Criteria |
 |---|---|---|
-| Corpus de spec validé, ADR 001–008 actés | tous | Signés par archi + sécu + métier |
-| Contrats OpenAPI + schémas mergés | `08` | Clients générés |
-| `model-gateway` avec 2 fournisseurs qualifiés | `03` | AC-ARC-1 : bascule < 1 h prouvée |
-| `eval-harness` + 50 premiers cas dorés | `09` | Tourne en CI, < 3 min |
-| Charte v0.1 | `05` | Revue métier + juridique |
-| Squelette CI/CD, IaC, observabilité | `10`, `11` | Pipeline complet vert |
-| Validation juridique des licences des modèles retenus | `03` | Avis écrit |
-| Mesure réelle des hypothèses A-1..A-6 | `01` | Modèle FinOps recalculé |
+| Validated spec corpus, ADR 001–008 finalized | all | Signed by architecture + security + business |
+| OpenAPI contracts + merged schemas | `08` | Clients generated |
+| `model-gateway` with 2 qualified providers | `03` | AC-ARC-1: switch < 1 h proven |
+| `eval-harness` + first 50 golden cases | `09` | Runs in CI, < 3 min |
+| Charter v0.1 | `05` | Business + legal review |
+| CI/CD skeleton, IaC, observability | `10`, `11` | Full pipeline green |
+| Legal validation of licenses for selected models | `03` | Written opinion |
+| Real measurement of hypotheses A-1..A-6 | `01` | Recalculated FinOps model |
 
-**Gate de sortie** : on peut échanger un modèle contre un autre en une PR de config, et
-mesurer objectivement l'impact. Rien d'autre n'est requis.
+**Exit Gate**: We can swap one model for another via a config PR, and objectively measure the impact. Nothing else is required.
 
-## 3. Phase 1 — Pilote interne (semaines 5–12)
+## 3. Phase 1 — Internal Pilot (weeks 5–12)
 
-Périmètre : chat + RAG sur 2–3 corpus + 3–5 outils, 1 département pilote (~50 users).
+Scope: chat + RAG on 2–3 corpora + 3–5 tools, 1 pilot department (~50 users).
 
-| Livrable | Doc |
+| Deliverable | Doc |
 |---|---|
-| Orchestrateur (machine à états, budgets, reprise) | `06` |
-| RAG hybride + reranker + citations vérifiées | `06` |
-| Guardrails IN/OUT (petits modèles auto-hébergés) | `07` |
-| UI avec citations cliquables, feedback, transparence des étapes | `08` |
-| Multi-tenant + RLS + tests de fuite | `08` |
-| Dashboards qualité / coût / SLO | `04`, `10` |
-| Jeu doré métier ≥ 300 cas, suite adversariale ≥ 200 cas | `09` |
-| Red team #1, DPIA, classification AI Act | `07` |
+| Orchestrator (state machine, budgets, recovery) | `06` |
+| Hybrid RAG + reranker + verified citations | `06` |
+| IN/OUT Guardrails (small self-hosted models) | `07` |
+| UI with clickable citations, feedback, step transparency | `08` |
+| Multi-tenant + RLS + leak tests | `08` |
+| Quality / cost / SLO dashboards | `04`, `10` |
+| Business golden set ≥ 300 cases, adversarial suite ≥ 200 cases | `09` |
+| Red team #1, DPIA, AI Act classification | `07` |
 
-**Gate de sortie (GA interne)** :
-- G1–G7 de `09` §6 verts.
-- Zéro fuite cross-tenant, zéro effet de bord par injection indirecte.
-- €/requête ≤ budget ; TTFT p95 < 1,2 s.
-- Satisfaction pilote ≥ 4,0/5 ; ≥ 60 % d'usage hebdomadaire.
-- 4 runbooks joués en game day.
+**Exit Gate (Internal GA)**:
+- G1–G7 of `09` §6 green.
+- Zero cross-tenant leaks, zero side effects from indirect injection.
+- €/request ≤ budget; TTFT p95 < 1.2 s.
+- Pilot satisfaction ≥ 4.0/5; ≥ 60% weekly usage.
+- 4 runbooks exercised in a game day.
 
-## 4. Phase 2 — Généralisation entreprise (mois 4–8)
+## 4. Phase 2 — Enterprise Rollout (months 4–8)
 
-| Livrable | Doc |
+| Deliverable | Doc |
 |---|---|
-| Cascade de routage S→M→L + classifieur évalué | `03` |
-| Auto-hébergement des **petits** modèles (embeddings, rerank, guards, routage) — le meilleur ROI infra | `04` §4 |
-| Prefix caching optimisé, cache sémantique | `04` |
-| Assistants par équipe, connecteurs MCP internes | `06` |
-| Sandbox d'exécution de code | `06` |
-| SFT/DPO sur adaptateurs LoRA (format, ton, tool-calling, anti-flagornerie) | `05` |
-| Mémoire longue, projets/espaces | `06` |
-| Red team #2 (externe) | `07` |
+| S→M→L routing cascade + evaluated classifier | `03` |
+| Self-hosting of **small** models (embeddings, rerank, guards, routing) — the best infra ROI | `04` §4 |
+| Optimized prefix caching, semantic cache | `04` |
+| Team assistants, internal MCP connectors | `06` |
+| Code execution sandbox | `06` |
+| SFT/DPO on LoRA adapters (format, tone, tool-calling, anti-sycophancy) | `05` |
+| Long-term memory, projects/spaces | `06` |
+| Red team #2 (external) | `07` |
 
-**Gate de sortie** : −40 % de coût/requête à qualité constante (AC-INF-4) ; suite d'évals
-métier ≥ 90 % du modèle propriétaire de référence (CS-3) ; ≥ 60 % de DAU sur la cible.
+**Exit Gate**: −40% cost/request at constant quality (AC-INF-4); business eval suite ≥ 90% of the reference proprietary model (CS-3); ≥ 60% DAU on target.
 
-## 5. Phase 3 — Optimisation et éventuel auto-hébergement (mois 9–15)
+## 5. Phase 3 — Optimization and potential self-hosting (months 9–15)
 
-Déclenché **uniquement** si le calcul de `04` §4 est franchi avec des volumes réels.
+Triggered **only** if the calculation of `04` §4 is crossed with real volumes.
 
-| Livrable | Condition |
+| Deliverable | Condition |
 |---|---|
-| Distillation d'un modèle L vers un S sur nos tâches | ROI ≥ 20 % démontré |
-| Auto-hébergement du modèle principal (vLLM/SGLang, FP8, spec decoding) | U > 60 % soutenu **et** 1–2 ETP SRE/ML alloués |
-| Pool batch sur spot | volume batch significatif |
-| Multimodal (image en entrée) | demande métier validée |
-| Extension multi-tenant externe / produit | décision business |
+| Distillation of an L model to an S on our tasks | ROI ≥ 20% demonstrated |
+| Self-hosting of the main model (vLLM/SGLang, FP8, spec decoding) | U > 60% sustained **and** 1–2 FTE SRE/ML allocated |
+| Batch pool on spot instances | Significant batch volume |
+| Multimodal (image input) | Validated business demand |
+| External multi-tenant extension / product | Business decision |
 
-> Rappel : franchir ce seuil sans les ETP dédiés est le scénario d'échec le plus courant
-> de ce type de projet. Le GPU n'est pas le coût ; l'exploitation l'est.
+> Reminder: Crossing this threshold without dedicated FTEs is the most common failure scenario for this type of project. The GPU is not the cost; operations are.
 
-## 6. Équipe minimale
+## 6. Minimum Team
 
-| Rôle | ETP | Rôle des agents IA |
+| Role | FTE | Role of AI Agents |
 |---|---|---|
-| Tech lead / architecte | 1 | Rédige les specs et les AC, revoit tout ADR |
-| Ingénieur ML (post-training, évals) | 1 | Pilote les évals et les fine-tunes |
-| Ingénieur backend/plateforme | 1–2 | Encadre les agents sur services et contrats |
-| SRE / infra | 0,5 → 1 | IaC, SLO, runbooks |
-| Sécurité / conformité | 0,5 | Guards, DPIA, AI Act, red team |
-| Product / métier | 0,5 | Jeux dorés, charte, adoption |
-| **Agents d'implémentation** | — | Code sous spec (`11`), tests, migrations, outillage, docs |
+| Tech lead / architect | 1 | Writes specs and ACs, reviews every ADR |
+| ML Engineer (post-training, evals) | 1 | Leads evals and fine-tunes |
+| Backend/Platform Engineer | 1–2 | Supervises agents on services and contracts |
+| SRE / infra | 0.5 → 1 | IaC, SLO, runbooks |
+| Security / compliance | 0.5 | Guards, DPIA, AI Act, red team |
+| Product / business | 0.5 | Golden sets, charter, adoption |
+| **Implementation Agents** | — | Code under spec (`11`), tests, migrations, tooling, docs |
 
-Les agents produisent le volume ; les humains produisent **les spécifications, les
-critères d'acceptation et les décisions**. Toute tentative d'inverser ce rapport
-(« les agents décident, les humains relisent ») échoue : c'est le retour du vibe coding,
-à plus grande échelle et plus vite.
+Agents produce the volume; humans produce **the specifications, the acceptance criteria, and the decisions**. Any attempt to reverse this ratio ("agents decide, humans review") fails: it is the return of vibe coding, at a larger scale and faster.
 
-## 6bis. Adoption et conduite du changement
+## 6bis. Adoption and change management
 
-Le critère CS-1 (≥ 60 % d'actifs à 30 jours) ne s'atteint pas par la qualité technique
-seule. Prévoir, dès la phase 1 :
-- **Champions** : 2–3 relais par département pilote, formés avant l'ouverture, qui
-  remontent les cas d'usage et alimentent le jeu doré (`09` — c'est le même travail).
-- **Formation** : sessions courtes orientées cas d'usage réels du département, pas
-  « démo générale de l'IA » ; guide interne de prompting maintenu.
-- **Boucle visible** : les retours 👍/👎 donnent lieu à un changelog utilisateur mensuel
-  (« vous nous avez signalé X, c'est corrigé ») — c'est le levier d'adoption le moins
-  cher qui existe.
-- **Mesure honnête** : suivre aussi le *shadow IT* (usage persistant d'IA grand public
-  malgré l'outil interne) : c'est l'indicateur d'échec le plus fiable, avant les sondages.
-- REQ-ADO-001 (MUST) : un propriétaire produit est responsable de ces actions ; elles
-  figurent au même plan que les livrables techniques dans les gates de phase.
+Criterion CS-1 (≥ 60% active at 30 days) is not achieved by technical quality alone. Plan from Phase 1:
+- **Champions**: 2–3 liaisons per pilot department, trained before launch, who report use cases and feed the golden set (`09` — it is the same work).
+- **Training**: Short sessions oriented toward real department use cases, not "general AI demo"; maintained internal prompting guide.
+- **Visible loop**: 👍/👎 feedback results in a monthly user changelog ("you reported X, it is fixed") — this is the cheapest adoption lever in existence.
+- **Honest measurement**: Also track *shadow IT* (persistent use of public AI despite the internal tool): this is the most reliable failure indicator, before surveys.
+- REQ-ADO-001 (MUST): A product owner is responsible for these actions; they appear in the same plan as technical deliverables in phase gates.
 
-## 7. Risques majeurs et mitigations
+## 7. Major Risks and Mitigations
 
-| Risque | Impact | Mitigation |
+| Risk | Impact | Mitigation |
 |---|---|---|
-| On sous-estime le post-training / le comportement et on livre un assistant « techniquement correct, humainement médiocre » | Adoption nulle | `05` dès la phase 0 (charte + évals de comportement) |
-| Achat de GPU prématuré | Capex gaspillé, ETP immobilisés | ADR-001, seuil `04` §4, revue trimestrielle |
-| Lock-in fournisseur malgré tout | Perte du bénéfice « open » | `model-gateway` + game day mensuel de bascule |
-| Guards trop stricts → contournement par les utilisateurs (shadow IT vers une IA grand public) | Risque de fuite **pire** que le risque initial | Mesurer `refusal_precision` et `guard_false_positive` (`09` §5) |
-| Le modèle de référence open-weight change tous les 2 mois | Instabilité | Le pipeline d'évals rend le changement de modèle routinier — c'est justement le but |
-| Injection indirecte via documents d'entreprise | Sév 1 | REQ-SEC-015 : défense **architecturale**, pas seulement par prompt |
-| Le fine-tuning dégrade l'alignement | Sév 1 | REQ-PT-011 : suite de sécurité rejouée après chaque fine-tune, bloquante |
-| Explosion des coûts par contexte long | Budget | Budgets durs, plafond de contexte, RAG discipliné |
+| Underestimating post-training / behavior and delivering an assistant that is "technically correct, humanly mediocre" | Zero adoption | `05` from phase 0 (charter + behavior evals) |
+| Premature GPU purchase | Wasted Capex, immobilized FTEs | ADR-001, threshold `04` §4, quarterly review |
+| Vendor lock-in despite everything | Loss of "open" benefit | `model-gateway` + monthly switch game day |
+| Guards too strict → user workarounds (shadow IT to public AI) | Leak risk **worse** than initial risk | Measure `refusal_precision` and `guard_false_positive` (`09` §5) |
+| Reference open-weight model changes every 2 months | Instability | The eval pipeline makes model changes routine — that is precisely the goal |
+| Indirect injection via corporate documents | Sev 1 | REQ-SEC-015: **architectural** defense, not just via prompt |
+| Fine-tuning degrades alignment | Sev 1 | REQ-PT-011: Security suite replayed after every fine-tune, blocking |
+| Cost explosion due to long context | Budget | Hard budgets, context ceiling, disciplined RAG |
 
-## 8. Rituels
+## 8. Rituals
 
-- **Hebdo** : revue qualité (métriques L6), revue des incidents, triage des faux refus.
-- **Mensuel** : `model-review` (le portefeuille de `03` a-t-il bougé ?), revue FinOps
-  (le seuil de `04` §4 est-il franchi ?), game day.
-- **Trimestriel** : décision d'auto-hébergement, test de restauration, revue des licences,
-  ouverture du jeu gelé avant release majeure.
+- **Weekly**: Quality review (L6 metrics), incident review, false refusal triage.
+- **Monthly**: `model-review` (has the portfolio of `03` changed?), FinOps review (has the threshold of `04` §4 been crossed?), game day.
+- **Quarterly**: Self-hosting decision, restore test, license review, opening of the frozen set before major release.

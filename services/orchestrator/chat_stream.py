@@ -79,7 +79,7 @@ def response(
                     await queue.put(
                         {
                             "delta": {
-                                "content": "\n\n*Étape intermédiaire terminée : appel d’outil.*\n\n"
+                                "content": "\n\n*Intermediate step completed: tool call.*\n\n"
                             },
                             "atlas": {"turn": turn, "phase": "intermediate"},
                         }
