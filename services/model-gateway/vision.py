@@ -57,6 +57,7 @@ class VisionProvider:
         request = VisionRequest.model_validate(payload)
         incoming, reserved = self.reserve(request)
         prompt = Path("prompts/vision.txt").read_text()
+        prompt += Path("prompts/chat.txt").read_text()
         # Count the versioned system instruction before transport as well.
         incoming += len(prompt.encode()) + 64
         reserved = self.cost(incoming, self.config["max_tokens"])

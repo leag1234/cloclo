@@ -82,7 +82,12 @@ class ServerlessPolicy:
         # Covers every primary/fallback pair, including an unknown primary failure.
         return {
             key: str(
-                2 * max(Decimal(str(self.prices[m][key])) for m in self.models.values())
+                max(
+                    Decimal(str(self.prices[self.models[role]][key]))
+                    + Decimal(str(self.prices[self.models[entry["fallback"]]][key]))
+                    for role, entry in self.config.items()
+                    if "fallback" in entry
+                )
             )
             for key in ("input_eur_per_mtok", "output_eur_per_mtok")
         } | {"max_tokens": 2048}

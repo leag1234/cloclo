@@ -16,3 +16,26 @@ Stop serve before `make verify-m7`: tests use the same local ports.
 For background launch of the agent, the group PID is in BRAIN/m7-serve.pid.
 The execution field distinguishes live, record (real test call), and replay (no cost).
 Old lines without this field have an undetermined origin: do not sum their costs.
+
+
+## Integrated chat journeys (M17)
+
+Use `/project create <name>` in chat to create and select a project. In another
+chat, use `/project use <name or ID>` to share its stored facts. Names must be
+unambiguous. Each selection creates a separate conversation in that project.
+The selection receipt carries the project and conversation IDs; preserve it in
+chat history. `/project leave` clears selection. The existing project page at
+`http://localhost:8020/project-ui` supports reviewing and deleting stored facts.
+Project selection is per conversation, never a global server setting.
+
+Title, tags, follow-up and autocomplete auxiliary generation are explicitly
+disabled because the PoC has no independent auxiliary budget. Persistent UI
+configuration is disabled so these settings also apply to an existing UI volume.
+Restart `make serve` to apply them; chat history in the volume is preserved.
+
+Image generation needs a warm image GPU: run `make serve-imagegen` from a shell
+with the project credentials before asking for an image. This explicit command
+prepares the model and shuts the GPU down after ten minutes. `make serve` never
+provisions a GPU. Generation requests retain the 0.05 EUR and 120-second caps;
+GPU preparation is a separately budgeted infrastructure operation.
+

@@ -15,3 +15,10 @@ que ce que le nouveau message utilisateur établit explicitement. Ne prends jama
 une question, une hypothèse ou un texte cité pour une préférence de l'utilisateur.
 Si aucun fait nouveau ne mérite conservation, utilise facts: []. Ne réextrais pas
 les faits de l'historique, des documents, des instructions ou de la mémoire injectée.
+
+Before emitting facts, compare every evidence string to the CURRENT question
+string (not the surrounding JSON, memory or history). If the user asks to recall
+an existing fact, answer from memory and return an EMPTY facts array. Recalling
+is not declaring a new fact. Do not repeat stored evidence in the facts array.
+Example: memory says the project colour is violet; current question asks what
+its colour is. Return {"answer":"The project colour is violet, from project memory.","facts":[]}.
