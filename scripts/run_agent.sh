@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Exécute UN jalon avec Codex CLI (OpenAI) en mode headless, puis s'arrête.
-# L'agent MERGE lui-même sa PR une fois la CI verte (auto-merge délégué).
-# Codex construit le PoC ; il n'est jamais une dépendance d'exécution du produit.
+# Run ONE milestone with Codex CLI (OpenAI) in headless mode, then stop.
+# The agent MERGES its own PR once CI is green (delegated merge).
+# Codex builds the PoC; it is never a product runtime dependency.
 # Usage : run_agent.sh M2
 set -Eeuo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -9,37 +9,37 @@ set -a; [[ -f .env ]] && source .env; set +a
 
 MILESTONE="${1:?usage: run_agent.sh M<n>}"
 mkdir -p BRAIN
-echo "=== $(date -Is) — démarrage agent sur $MILESTONE ===" | tee -a BRAIN/agent.log
+echo "=== $(date -Is) — starting agent on $MILESTONE ===" | tee -a BRAIN/agent.log
 
 read -r -d '' PROMPT <<EOF || true
-Tu réalises le jalon ${MILESTONE} du projet ATLAS-0.
+Implement milestone ${MILESTONE} of the ATLAS-0 project.
 
-Avant toute action : lis AGENTS.md, MISSION.md, docs/13-poc-spec.md.
-Respecte STRICTEMENT docs/11 et docs/14 (règles absolues, marqueurs d'observabilité,
-anti-rationalisation, état BRAIN/).
+Before taking any action: read AGENTS.md, MISSION.md, docs/13-poc-spec.md.
+STRICTLY follow docs/11 and docs/14 (absolute rules, observability markers,
+anti-rationalization, BRAIN/ state).
 
-Contrat (R-02) : tu PEUX inclure le contrat ET l'implémentation dans la MÊME PR pour
-ce jalon (assouplissement autorisé), sauf si le jalon exige explicitement un contrat
-séparé. Vise UNE seule PR par jalon quand c'est raisonnable.
+Contract (R-02): you MAY include the contract AND implementation in the SAME PR for
+this milestone (authorized exception), unless the milestone explicitly requires a
+separate contract. Aim for ONE PR per milestone when reasonable.
 
-Définition de terminé pour ${MILESTONE} :
-  1. \`make verify-${MILESTONE,,}\` passe EN LOCAL, puis
-  2. crée une branche ${MILESTONE,,}-<sujet>, commit, push, ouvre une Pull Request, puis
-  3. ATTENDS que le job CI 'ci' soit VERT : interroge
+Definition of done for ${MILESTONE} :
+  1. \`make verify-${MILESTONE,,}\` passes LOCALLY, then
+  2. create branch ${MILESTONE,,}-<topic>, commit, push, open a Pull Request, then
+  3. WAIT until the CI job 'ci' is GREEN: query
      GET https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/commits/<sha>/check-runs
-     ou /actions/runs, avec le header "Authorization: Bearer \${GITHUB_TOKEN}", en boucle
-     (max 60 essais, 15s d'intervalle = 15 min ; la CI de ce repo peut être lente), puis
-  4. SI ET SEULEMENT SI la CI est VERTE, MERGE toi-même la PR via :
+     or /actions/runs, with the header "Authorization: Bearer \${GITHUB_TOKEN}", in a loop
+     (max 60 attempts, 15s intervals = 15 min; repository CI can be slow), then
+  4. IF AND ONLY IF CI is GREEN, MERGE the PR yourself using:
      curl -X PUT -H "Authorization: Bearer \${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" \\
        https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/pulls/<N>/merge \\
        -d '{"merge_method":"squash"}'
-     puis mets à jour BRAIN/ et ARRÊTE-toi. NE PASSE PAS au jalon suivant.
+     then update BRAIN/ and STOP. DO NOT move to the next milestone.
 
-AUTORISATION DE MERGE : tu es autorisé à merger tes propres PR, à la CONDITION STRICTE
-que le job 'ci' soit vert. Ne merge JAMAIS une PR à CI rouge ou en attente. Ne modifie
-JAMAIS un fichier protégé (CODEOWNERS, scripts/verify-*, .github/workflows).
-Si bloqué après 3 tentatives sur le même problème : écris dans BRAIN/BLOCKERS.md et
-arrête-toi proprement. Ne prétends jamais qu'un test passe sans preuve CI.
+MERGE AUTHORIZATION: you may merge your own PRs, on the STRICT CONDITION
+that the 'ci' job is green. NEVER merge a PR with failed or pending CI. NEVER modify
+a protected file (CODEOWNERS, scripts/verify-*, .github/workflows).
+If blocked after 3 attempts on the same issue: write to BRAIN/BLOCKERS.md and
+stop cleanly. Never claim a test passes without CI evidence.
 EOF
 
 SANDBOX="${CODEX_SANDBOX:-danger-full-access}"
@@ -52,5 +52,5 @@ codex exec "$PROMPT" \
 CODE=$?
 set -e
 
-echo "=== $(date -Is) — agent sur $MILESTONE terminé (exit $CODE) ===" | tee -a BRAIN/agent.log
+echo "=== $(date -Is) — agent on $MILESTONE finished (exit $CODE) ===" | tee -a BRAIN/agent.log
 exit $CODE

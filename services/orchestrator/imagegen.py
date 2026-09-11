@@ -27,7 +27,7 @@ async def process_image(prompt: str, item: Interaction) -> None:
         cost = float(str(response["cost_eur"]))
         if not 0 <= cost <= 0.05:
             raise ValueError("invalid_provider_cost")
-        item.reponse = f"![Image générée]({image.url})"
+        item.reponse = f"![Generated image]({image.url})"
         item.cout_eur, item.state = cost, "done"
         sink = sink_context.get()
         if sink is not None:

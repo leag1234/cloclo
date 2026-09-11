@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# infra/gpu-down.sh — délègue au moteur unique infra/gpu.py, qui applique les 6
-# garanties de la spec fermée (propriété par tag atlas-m1 + projet, JSON validé,
-# erreurs non masquées, terminate --wait, refus d'ambiguïté). Une seule implémentation.
+# infra/gpu-down.sh delegates to the single engine infra/gpu.py, enforcing the 6
+# guarantees in the fixed specification (atlas-m1 tag + project ownership, validated JSON,
+# propagated errors, terminate --wait, rejection of ambiguity). One implementation.
 set -Eeuo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -a; [[ -f .env ]] && source .env; set +a

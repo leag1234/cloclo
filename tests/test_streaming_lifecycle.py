@@ -115,9 +115,13 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
                 for x in events
                 if x != "data: [DONE]\n\n"
             )
-            self.assertIn("Étape intermédiaire terminée", content)
-            self.assertLess(content.index("Recherche"), content.index("Étape"))
-            self.assertLess(content.index("Étape"), content.index("Réponse finale"))
+            self.assertIn("Intermediate step completed", content)
+            self.assertLess(
+                content.index("Recherche"), content.index("Intermediate step")
+            )
+            self.assertLess(
+                content.index("Intermediate step"), content.index("Réponse finale")
+            )
 
     async def test_fragmented_citation_is_resolved_before_link(self) -> None:
         key = "a" * 64

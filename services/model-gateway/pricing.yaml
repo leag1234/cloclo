@@ -1,7 +1,7 @@
-# Tarifs des modèles pour le calcul du budget dur (max_cost_eur).
-# Source : catalogue Scaleway Generative APIs, consulté le 2026-09-09.
-# L'API /models n'expose pas les prix ; valeurs issues de la page tarifs Scaleway.
-# Prix en euros par million de tokens (HT).
+# Model rates for hard budget calculation (max_cost_eur).
+# Source : Scaleway Generative APIs catalog, consulted on 2026-09-09.
+# The /models API does not expose prices; values come from the Scaleway pricing page.
+# Prices in euros per million tokens (excluding tax).
 models:
   qwen3.5-397b-a17b:      # ESCALATION_MODEL
     input_eur_per_mtok: 0.60
@@ -18,8 +18,8 @@ models:
   qwen3-embedding-8b:
     input_eur_per_mtok: 0.10
     output_eur_per_mtok: 0.0
-  local:                  # Qwen3-30B servi sur GPU L40S loué
+  local:                  # Qwen3-30B served on a rented L40S GPU
     input_eur_per_mtok: 0.0
     output_eur_per_mtok: 0.0
-    note: "coût au token nul ; le GPU est facturé à l'heure, hors budget par requête"
-source: "Scaleway Generative APIs pricing, consulté 2026-09-09"
+    note: "zero per-token cost; GPU billed hourly, outside the per-request budget"
+source: "Scaleway Generative APIs pricing, consulted 2026-09-09"

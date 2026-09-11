@@ -45,7 +45,7 @@ class ImageUITests(unittest.TestCase):
                     )
                 else:
                     text = response.json()["choices"][0]["message"]["content"]
-                self.assertEqual(text, f"![Image générée]({url})")
+                self.assertEqual(text, f"![Generated image]({url})")
             self.assertEqual(upstream.await_count, 2)
             assert upstream.await_args is not None
             self.assertTrue(upstream.await_args.args[0].endswith("/images/generate"))
