@@ -37,7 +37,7 @@
   3. Tools unavailable → respond without tools stating this;
   4. Everything unavailable → honest error message, not a made-up response.
   **Never** degrade silently: a response without RAG presented as based on documents is worse than an error.
-- REQ-SRE-009 (MUST): Queue + backpressure; under overload, we queue and inform, we do not timeout wildly.
+- REQ-SRE-009 (MUST): Queue + backpressure; under overload, we queue and inform, we do not let requests time out indiscriminately.
 - REQ-SRE-010 (MUST): Encrypted backups, restoration **tested** quarterly (RTO 4 h / RPO 15 min, REQ-NFR-008). A backup that has not been restored does not exist.
 
 ## 5. Runbooks (to be written, one file per scenario)
@@ -48,14 +48,14 @@
 | RB-02 | Cost explosion (routing drift, tool loop, giant prompt) | Budget at 80% before term |
 | RB-03 | Drop in prefix cache hit rate | `prefix_cache_hit_ratio` < 40% |
 | RB-04 | Quality regression detected in canary | Auto rollback → analysis |
-| RB-05 | Suspicion of cross-tenant leak | **Sev 1**: Tenant cutoff, log freeze, crisis cell |
+| RB-05 | Suspicion of cross-tenant leak | **Sev 1**: Tenant cutoff, log freeze, incident response team |
 | RB-06 | Successful prompt injection with side effect | **Sev 1**: Tool kill switch, revocation, audit |
 | RB-07 | Corrupted or stale RAG index | Re-indexing, graceful degradation in the meantime |
 | RB-08 | Model withdrawn by its publisher / license change | Provider or model switch, legal review |
 | RB-09 | Wave of false refusals | Threshold adjustment via flag, added eval cases |
 
 - REQ-SRE-011 (MUST): Each runbook contains: detection, impact, immediate mitigation (< 5 min), correction, communication, and the reference of the eval to be added afterwards.
-- REQ-SRE-012 (MUST): Monthly **game days** — provider switch, kill switch, restoration, RB-05 in simulation. A runbook never played is fiction.
+- REQ-SRE-012 (MUST): Monthly **game days** — provider switch, kill switch, restoration, RB-05 in simulation. A runbook never exercised is fiction.
 
 ## 6. Post-mortem
 
@@ -64,6 +64,6 @@
 ## 7. Acceptance Criteria
 
 - AC-SRE-1: A single trace allows reconstructing a complete request, cost included.
-- AC-SRE-2: The 9 runbooks exist; ≥ 4 have been played in a game day.
-- AC-SRE-3: Automatic rollback triggered successfully during a provoked test.
+- AC-SRE-2: The 9 runbooks exist; ≥ 4 have been exercised in a game day.
+- AC-SRE-3: Automatic rollback triggered successfully during a deliberately triggered test.
 - AC-SRE-4: Restoration tested and documented within the last 3 months.

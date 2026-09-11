@@ -3,12 +3,12 @@
 > **Freshness Warning.** The ranking of open-weight models changes every
 > 4 to 8 weeks. This document establishes a **selection method** and a **portfolio as of
 > 14/07/2026**. The portfolio is reviewed monthly (ritual `model-review`, cf. `12`).
-> No component outside `model-gateway` must depend on a model name (REQ-ARC-006).
+> No component outside `model-gateway` may depend on a model name (REQ-ARC-006).
 
 ## 1. Vocabulary — do not confuse
 
 - **Open source (OSI)**: weights + code + data + training pipeline published.
-  Almost no frontier models meet this criteria.
+  Almost no frontier models meet these criteria.
 - **Open weight**: downloadable weights, variable license, unpublished data.
   This is what we use. The cited models (Qwen, GLM, DeepSeek, Kimi, Llama, Gemma)
   are **open-weight**, not open source.
@@ -98,7 +98,7 @@ request → XS classifier (cost ~€0.00001)
 ```
 
 - REQ-INF-003 (MUST): the routing classifier is itself evaluated (`09`); its confusion
-  matrix is monitored. An error "L classified as S" (sous-routage) is much more costly
+  matrix is monitored. An error "L classified as S" (under-routing) is much more costly
   in quality than the reverse error in €. Optimize the threshold based on this asymmetry.
 - REQ-INF-004 (MUST): each task class has a **default** model and a **fallback**
   at another provider, declared in config:
@@ -137,7 +137,7 @@ task_classes:
   **batch** pools (large batch, spot instances, up to −70% cost, eviction-tolerant).
 - REQ-INF-012 (MUST): load weights from a local/NVMe cache or an internal artifact
   registry — no downloading from the Internet at pod startup (startup time + supply chain risk).
-- REQ-INF-013 (MUST): verify the footprint (checksum/signature) of weights; downloaded models are a supply chain vector. Internal mirroring is mandatory.
+- REQ-INF-013 (MUST): verify the fingerprint (checksum/signature) of weights; downloaded models are a supply chain vector. Internal mirroring is mandatory.
 
 ### Capacity planning — formulas to use (do not guess)
 

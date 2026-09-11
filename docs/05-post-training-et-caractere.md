@@ -1,6 +1,6 @@
 # 05 — Post-training, character and alignment
 
-> This is the role everyone underestimates. A raw open-weight model, even excellent
+> This is the area everyone underestimates. A raw open-weight model, even excellent
 > in benchmarks, does not "behave" like a quality assistant: it flatters, it
 > hallucinates with confidence, it refuses poorly, it loses track of tools, its tone is unstable.
 > **Behavior cannot be downloaded.** It is built.
@@ -9,15 +9,15 @@
 
 | Level | Cost | Delay | When |
 |---|---|---|---|
-| **L1 — Context engineering**: charter + system prompt + policies + few-shots + format | € | days | **Always, first.** 80% of perceived benefit. |
-| **L2 — SFT / DPO on LoRA adapters** | €€ | weeks | Phase 2, when L1 plateaus and evals prove it |
-| **L3 — Distillation / RL on business tasks** | €€€€ | months | Phase 3+, only with a quantified ROI |
+| **N1 — Context engineering**: charter + system prompt + policies + few-shots + format | € | days | **Always, first.** 80% of perceived benefit. |
+| **N2 — SFT / DPO on LoRA adapters** | €€ | weeks | Phase 2, when N1 plateaus and evals prove it |
+| **N3 — Distillation / RL on business tasks** | €€€€ | months | Phase 3+, only with a quantified ROI |
 
 - **REQ-PT-001 (MUST)**: do not move to the next level without an eval demonstrating that
   the current level has plateaued. "We will fine-tune" is not an answer to a problem
   that has not been measured.
 
-## 2. L1 — The behavior charter (the central artifact)
+## 2. N1 — The behavior charter (the central artifact)
 
 A document in natural language, versioned, which defines what the assistant is. It is the
 single source from which are derived: the production system prompt, the behavior
@@ -44,17 +44,17 @@ eval datasets, and later the preference data for DPO.
 - **REQ-PT-004 (MUST)**: the charter is a **product** artifact (reviewed by business,
   legal, security), not a dev file.
 
-## 3. L1 — System prompt engineering
+## 3. N1 — System prompt engineering
 
 - REQ-PT-005 (MUST): the system prompt is **compiled** from versioned
-  blocks (charter → policies → tools → holding context), with a **stable** order (imperative
+  blocks (charter → policies → tools → tenant context), with a **stable** order (imperative
   for prefix cache, REQ-FIN-004).
 - REQ-PT-006 (MUST): every modification of the system prompt triggers the full eval suite. A prompt is code: review, versioning, rollback.
 - REQ-PT-007 (SHOULD): the prompt is **model-specific**. A prompt optimized for
   an L model does not transpose as-is to an S model. The `prompt × model` matrix is
   evaluated, not assumed.
 
-## 4. L2 — Fine-tuning (phase 2)
+## 4. N2 — Fine-tuning (phase 2)
 
 **What to fine-tune, and what not to fine-tune.**
 
@@ -74,10 +74,10 @@ Pipeline:
    traceable provenance (`source`, `licence`, `validé_par`, `date`).
 3. **SFT (LoRA/QLoRA)**: adapters, no full fine-tune. A LoRA adapter on a
    30–70B model is managed on 1–2 GPUs (QLoRA even makes the 70B accessible on a
-   24 GB). Cost: hundreds of euros, not hundreds of thousands.
+   24 GB GPU). Cost: hundreds of euros, not hundreds of thousands.
 4. **Preferences (DPO/ORPO)**: pairs (preferred, rejected) derived from the charter and
    feedback. More effective than SFT alone against sycophancy and verbosity.
-5. **RLAIF / AI-guided feedback constrained by the charter**: a model judges, constrained by the
+5. **RLAIF / AI-guided feedback constrained by the charter**: a judge model, constrained by the
    charter, generates preferences at scale; sample audited by humans.
    REQ-PT-009 (MUST): ≥ 5% of AI-generated preferences are human-verified,
    with measured inter-annotator agreement (Cohen's κ ≥ 0.6).
@@ -93,7 +93,7 @@ Pipeline:
   hash of output weights) in the model registry. A non-reproducible model does not
   go to prod.
 
-## 5. L3 — Distillation (phase 3, cost-driven)
+## 5. N3 — Distillation (phase 3, cost-driven)
 
 Objective: replace a costly L model with an S model specialized on our 5 to 10 most
 frequent tasks.

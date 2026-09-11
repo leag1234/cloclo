@@ -9,7 +9,7 @@ Explicit, testable, incident recovery. Implicit unbounded loops are forbidden.
 
 - REQ-HAR-001 (MUST): `max_tool_calls` (12), `max_wall_clock` (120 s), `max_cost_eur`
   (0.10 €), `max_tokens` per request. Exceeding limits → **explicit** termination with an honest
-  user message ("I could not finish, here is where I stand"), never a silently truncated exit.
+  user message ("I could not finish, here is where I stand"), never a silently truncated output.
 - REQ-HAR-002 (MUST): loop detection — if the last 3 tool calls are
   identical (same name, same normalized arguments), interrupt and change strategy or explicitly abort.
 - REQ-HAR-003 (MUST): parallelization of **independent** tool calls (the model
@@ -19,8 +19,8 @@ Explicit, testable, incident recovery. Implicit unbounded loops are forbidden.
 
 ### 1.2 Context Management
 - REQ-HAR-005 (MUST): deterministic compaction policy when the conversation exceeds
-  the budget: structured summary of old turns (via cheap S model) + integral preservation
-  of the last N turns + **integral** preservation of recent tool results. The summary is persisted, not recalculated at every turn.
+  the budget: structured summary of old turns (via cheap S model) + full preservation
+  of the last N turns + **full** preservation of recent tool results. The summary is persisted, not recalculated at every turn.
 - REQ-HAR-006 (MUST): large tool results (SQL dumps, large files) are
   **truncated with a handle** (`result_id` retrievable via a `fetch_result` tool),
   never pasted in full into the context.
@@ -31,7 +31,7 @@ Explicit, testable, incident recovery. Implicit unbounded loops are forbidden.
   description, examples, side effects (`readonly` | `mutating` | `destructive`), and
   expected cost/latency.
 - REQ-TOOL-002 (MUST): schema validation **before** execution; in case of invalid
-  arguments, return a structured error readable by the model ("field `date`: expected format YYYY-MM-DD, received '12 mars'") — not a stack trace. The quality of
+  arguments, return a structured error readable by the model ("field `date`: expected format YYYY-MM-DD, received '12 March'") — not a stack trace. The quality of
   error messages determines the model's ability to self-correct: this is a quality component, not plumbing.
 - REQ-TOOL-003 (MUST): `destructive` tools require **explicit user confirmation
   outside the model's control** (the UI asks, the model cannot bypass).

@@ -39,9 +39,9 @@ Scope: chat + RAG on 2–3 corpora + 3–5 tools, 1 pilot department (~50 users)
 - Zero cross-tenant leaks, zero side effects from indirect injection.
 - €/request ≤ budget; TTFT p95 < 1.2 s.
 - Pilot satisfaction ≥ 4.0/5; ≥ 60% weekly usage.
-- 4 runbooks played in game day.
+- 4 runbooks exercised in a game day.
 
-## 4. Phase 2 — Enterprise Generalization (months 4–8)
+## 4. Phase 2 — Enterprise Rollout (months 4–8)
 
 | Deliverable | Doc |
 |---|---|

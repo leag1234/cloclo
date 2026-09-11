@@ -59,7 +59,7 @@ At 2,000 DAU: ~340 Mtok input / 35 Mtok output per day.
 
 | Id | Requirement | Level |
 |---|---|---|
-| REQ-SEC-001 | Input/output filtering by classifiers before any user restitution. | MUST |
+| REQ-SEC-001 | Input/output filtering by classifiers before anything is displayed to the user. | MUST |
 | REQ-SEC-002 | Strict data isolation per tenant, including in vector indexes. | MUST |
 | REQ-SEC-003 | Defense against indirect prompt injection via documents/tools. | MUST |
 | REQ-SEC-004 | Code execution sandbox without outgoing network access by default. | MUST |

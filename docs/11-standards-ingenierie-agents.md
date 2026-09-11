@@ -127,7 +127,7 @@ lint + format → typecheck → build → unit tests → contract tests
 
 ## 8. ADR
 
-- REQ-ENG-012 (MUST): any structural decision → an ADR (`/adr/NNNN-title.md`):
+- REQ-ENG-012 (MUST): any structural decision → an ADR (`/adr/NNNN-titre.md`):
   context, considered options, decision, consequences, status. ADRs are **immutable**:
   they are replaced (`superseded by ADR-NNNN`), not rewritten.
 - REQ-ENG-013 (MUST): an agent wishing to deviate from an ADR **must** open a

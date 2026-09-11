@@ -1,6 +1,6 @@
 # 04 — FinOps: Cost Model, Thresholds, Levers
 
-> This document contains the most structuring decision of the project: **when (not) to
+> This document contains the most consequential decision of the project: **when (not) to
 > buy GPUs**. The price figures are orders of magnitude for Q3 2026 and
 > **MUST** be re-sourced via quotes before any commitment. The *method*, however, holds.
 
@@ -93,7 +93,7 @@ Special cases where self-hosting wins anyway, and which must be identified:
   timestamps, UUIDs, or random content at the start of the prompt — this is the most
   frequent and costly error.
 - **REQ-FIN-006**: The semantic cache **MUST NOT** be shared between tenants
-  (data leak + out-of-context responses). Cache key = `hash(tenant_id, corpus_version, normalized_prompt)`.
+  (data leak + out-of-context responses). Cache key = `hash(tenant_id, corpus_version, prompt_normalisé)`.
 
 ## 6. Beware of False "Free" Costs
 
