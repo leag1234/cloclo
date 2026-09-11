@@ -66,3 +66,5 @@ M15 : entrée développeurs `PYTHONPATH=.:services/model-gateway uvicorn service
 M15 protocole Chat : dev_chat normalise les messages texte et assemble les deltas sans exécuter les fonctions. Les identifiants doivent rester stables, les arguments complets être des objets JSON finis et les noms provenir des outils déclarés. Le stop fournisseur avec appel complet devient tool_calls ; length reste une troncature.
 
 Sélection M10 : les contributions de pertinence sont additionnées avec math.fsum pour conserver les égalités indépendamment du hash seed Python. Le départage existant par position reste déterministe ; la cassette fournisseur exacte est inchangée.
+
+M15 : dev_input traduit les historiques Responses/Messages vers les mêmes messages validés, sans stockage de conversations. Métadonnées et cache sont des indications sans effet d'identité ni garantie de cache ; l'effort Messages sans thinking ne l'active pas. Les images, outils hébergés, stockage Responses et thinking Messages sont refusés explicitement.
