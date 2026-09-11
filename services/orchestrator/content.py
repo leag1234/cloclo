@@ -47,15 +47,16 @@ def select_passages(text: str, query: str, budget: int) -> list[SelectedPassage]
     }
     scores = []
     for (_, _, part), match in zip(windows, matches, strict=True):
-        score = 0.0
+        contributions = []
         for term in match:
             weight = 1.0
             if term in identifiers:
                 # Keep the definition after its heading, not a heading at the cut.
                 position = part.casefold().find(term)
                 weight = 4 * (2 - position / len(part))
-            score += math.log1p(len(windows) / frequency[term]) * weight
-        scores.append(score)
+            contributions.append(math.log1p(len(windows) / frequency[term]) * weight)
+        # Accurate summation preserves ties independently of set iteration order.
+        scores.append(math.fsum(contributions))
     chosen: list[SelectedPassage] = []
     remaining = budget
     for index in sorted(range(len(windows)), key=lambda i: (-scores[i], i)):
