@@ -1,182 +1,181 @@
-# 13 — Spécification du PoC « ATLAS-0 »
+# 13 — ATLAS-0 PoC Specification
 
-> Durée cible : 6 semaines. Budget infra cible : < 800 € tout compris.
-> Objet : démontrer sur données réelles qu'un assistant « Claude-like » construit sur
-> modèles open-weight atteint un niveau de qualité mesuré et suffisant pour lancer la
-> phase 1 — ou démontrer le contraire, ce qui est un succès du PoC aussi.
-> Ce document est **auto-portant** : un agent d'implémentation doit pouvoir le réaliser
-> en le lisant avec `14-implementation-autonome.md`, sans lire tout le corpus (les REQ
-> du corpus citées ici sont reprises avec leur substance).
+> Target duration: 6 weeks. Target infra budget: < €800 all-inclusive.
+> Objective: demonstrate on real data that a "Claude-like" assistant built on
+> open-weight models reaches a measured quality level sufficient to launch
+> phase 1 — or demonstrate the opposite, which is also a success for the PoC.
+> This document is **self-contained**: an implementation agent must be able to execute it
+> by reading it alongside `14-implementation-autonome.md`, without reading the entire corpus (the REQs from the corpus cited here are included with their substance).
 
-## 1. Ce que le PoC FAIT
+## 1. What the PoC DOES
 
-| Id | Capacité | Détail |
+| Id | Capability | Detail |
 |---|---|---|
-| POC-F1 | Chat multi-tours en streaming | SSE, arrêt de génération, historique persisté |
-| POC-F2 | RAG avec citations | Ingestion pdf/docx/md/html, hybride BM25+dense+reranker, citations cliquables résolues vers le passage source |
-| POC-F3 | **Recherche web automatique** | Le modèle décide de chercher ; API SerpApi (Google Search + Google News), requêtes reformulées par le modèle, localisation `gl`/`hl` adaptée à la langue de la question |
-| POC-F4 | **Lecture de pages web (scraping)** | Récupération + extraction du contenu principal (trafilatura), respect de robots.txt, cache local, contenus utilisés dans le raisonnement **avec citation URL + date** |
-| POC-F5 | Appels d'outils en boucle agentique | Machine à états avec budgets durs ; outils : `web_search`, `web_fetch`, `rag_search`, `calculator` |
-| POC-F6 | Cascade 2 niveaux | Modèle local (défaut) + escalade vers un modèle L serverless UE pour les requêtes complexes, via le gateway |
-| POC-F7 | Évaluation automatique continue | Suite d'évals exécutable par CI et à la demande, rapport HTML, comparaison entre runs |
-| POC-F8 | Télémétrie minimale | tokens, coût, TTFT, tok/s, taux de hit du prefix cache, par requête ; export CSV/dashboard simple |
+| POC-F1 | Multi-turn streaming chat | SSE, generation stop, persisted history |
+| POC-F2 | RAG with citations | Ingestion of pdf/docx/md/html, hybrid BM25+dense+reranker, clickable citations resolved to source passage |
+| POC-F3 | **Automatic web search** | The model decides to search; SerpApi API (Google Search + Google News), queries reformulated by the model, `gl`/`hl` localization adapted to the question language |
+| POC-F4 | **Web page reading (scraping)** | Retrieval + extraction of main content (trafilatura), respect for robots.txt, local cache, content used in reasoning **with URL + date citation** |
+| POC-F5 | Tool calls in agent loop | State machine with hard budgets; tools: `web_search`, `web_fetch`, `rag_search`, `calculator` |
+| POC-F6 | 2-level cascade | Local model (default) + escalation to a serverless EU L model for complex requests, via the gateway |
+| POC-F7 | Continuous automatic evaluation | Eval suite executable by CI and on-demand, HTML report, comparison between runs |
+| POC-F8 | Minimal telemetry | tokens, cost, TTFT, tok/s, prefix cache hit rate, per request; CSV export/simple dashboard |
 
-## 2. Ce que le PoC ne fait PAS (assumé, ne pas implémenter)
+## 2. What the PoC does NOT do (assumed, do not implement)
 
-Multi-tenant durci (une seule organisation, auth basique par mot de passe partagé ou
-OIDC simple) · guardrails complets (un filtre d'entrée minimal seulement) · SSO/SCIM ·
-haute disponibilité · sandbox d'exécution de code · fine-tuning · mémoire long terme ·
-mobile · conformité formelle (mais **aucune donnée sensible réelle** dans le PoC :
-corpus documentaire public ou interne non confidentiel uniquement — c'est la contrepartie
-qui permet d'aller vite).
+Hardened multi-tenancy (single organization, basic auth via shared password or
+simple OIDC) · complete guardrails (only a minimal input filter) · SSO/SCIM ·
+high availability · code execution sandbox · fine-tuning · long-term memory ·
+mobile · formal compliance (but **no real sensitive data** in the PoC:
+public or internal non-confidential document corpus only — this is the trade-off
+that allows speed).
 
-Règle : toute demande d'extension pendant le PoC est refusée par défaut et notée pour la
-phase 1. Le périmètre est gelé à la signature de ce document.
+Rule: any request for extension during the PoC is refused by default and noted for
+phase 1. The scope is frozen upon signature of this document.
 
-## 3. Architecture PoC (2 machines)
+## 3. PoC Architecture (2 machines)
 
 ```
-[ VM CPU "app" — petite, ~10-20 €/mois ]
-  ├─ UI (Open WebUI ou LibreChat)          ← on ne développe PAS d'UI
-  ├─ gateway (LiteLLM) ── fallback ──────────► fournisseur serverless UE (modèle L)
-  ├─ harness (FastAPI, ~800 lignes) : machine à états, outils, budgets
-  ├─ client SerpApi (recherche) + fetcher (trafilatura) + cache
-  ├─ Postgres + pgvector (conversations, chunks, télémétrie, résultats d'evals)
+[ CPU VM "app" — small, ~€10-20/month ]
+  ├─ UI (Open WebUI or LibreChat)          ← we do NOT develop a UI
+  ├─ gateway (LiteLLM) ── fallback ──────────► EU serverless provider (L model)
+  ├─ harness (FastAPI, ~800 lines): state machine, tools, budgets
+  ├─ SerpApi client (search) + fetcher (trafilatura) + cache
+  ├─ Postgres + pgvector (conversations, chunks, telemetry, eval results)
   └─ eval-harness (CLI)
 
-[ Nœud GPU — éphémère, reconstructible par script ]
-  └─ vLLM : modèle principal + (embeddings + reranker servis via le même vLLM ou TEI)
+[ GPU Node — ephemeral, reconstructible by script ]
+  └─ vLLM: main model + (embeddings + reranker served via same vLLM or TEI)
 ```
 
-Décisions imposées :
-- POC-A1 : le nœud GPU est **jetable** — provisionné par script (Terraform ou CLI du
-  fournisseur + cloud-init), poids sur volume Block Storage persistant réattachable.
-  Aucune installation manuelle en SSH.
-- POC-A2 : la VM app est **permanente** (elle porte l'état) ; le nœud GPU est éteint
-  la nuit et le week-end par cron (`scheduler on/off`) → ÷2 à ÷3 sur la facture.
-- POC-A3 : tout l'applicatif ne connaît que le gateway (une URL). Changer de modèle ou
-  de tier GPU = config uniquement.
-- POC-A4 : prefix caching vLLM activé ; ordre des blocs de prompt stable (system →
-  outils → docs → historique) — vérifié par un test.
+Imposed decisions:
+- POC-A1: the GPU node is **disposable** — provisioned by script (Terraform or provider
+  CLI + cloud-init), weights on persistent Block Storage volume reattachable.
+  No manual installation via SSH.
+- POC-A2: the app VM is **permanent** (it holds the state); the GPU node is turned off
+  at night and on weekends by cron (`scheduler on/off`) → ÷2 to ÷3 on the bill.
+- POC-A3: the entire application only knows the gateway (one URL). Changing model or
+  GPU tier = config only.
+- POC-A4: vLLM prefix caching enabled; prompt block order stable (system →
+  tools → docs → history) — verified by a test.
 
-## 4. Modèles du PoC
+## 4. PoC Models
 
-| Rôle | Choix initial | Remplaçant testé |
+| Role | Initial Choice | Tested Replacement |
 |---|---|---|
-| Principal (local) | Qwen3-30B-A3B, FP8 (Apache-2.0) | tier supérieur si les évals plafonnent |
-| Escalade (serverless UE) | un modèle L open-weight hébergé UE (classe GLM/DeepSeek/Kimi) | second fournisseur en fallback |
-| Embeddings | modèle multilingue open-weight, dim ≤ 1024 | — |
-| Reranker | cross-encoder open-weight | — |
-| Juge d'évals | le modèle L serverless (≠ modèle évalué) | — |
+| Main (local) | Qwen3-30B-A3B, FP8 (Apache-2.0) | higher tier if evals plateau |
+| Escalation (serverless EU) | an open-weight L model hosted in EU (GLM/DeepSeek/Kimi class) | second provider as fallback |
+| Embeddings | open-weight multilingual model, dim ≤ 1024 | — |
+| Reranker | open-weight cross-encoder | — |
+| Eval Judge | the serverless L model (≠ evaluated model) | — |
 
-## 5. Outils web — spécification précise (POC-F3/F4)
+## 5. Web tools — precise specification (POC-F3/F4)
 
-- POC-W1 : `web_search(query, n=5, lang)` interroge **SerpApi** (Google Search ; Google
-  News pour les questions d'actualité). Retour : titre, URL, snippet, date si dispo.
-  Paramètres `gl`/`hl` alignés sur la langue détectée de la question (une question en
-  allemand cherche sur google.de en allemand). Plan **Starter (25 $/mois, 1 000
-  recherches)** ; quota applicatif dans le harness : max 3 recherches/requête utilisateur,
-  compteur mensuel avec arrêt propre à 90 % du quota, cache des recherches identiques
-  (TTL 1 h) pour ne pas brûler le quota sur les évals répétées — la FAQ SerpApi indique
-  que seules les recherches réussies sont décomptées, et les runs d'évals sont les plus
-  gros consommateurs.
-  *Note de résidence* : SerpApi est un prestataire US ; acceptable pour le PoC car seules
-  les **requêtes de recherche** (jamais les documents ni les conversations complètes) lui
-  sont transmises et le corpus PoC est non sensible. Pour la prod, ce point repasse par
-  la revue REQ-INF-002/REQ-CMP-004 (DPA, clauses de transfert) ou par une alternative UE —
-  décision à instruire en phase 1, pas dans le PoC.
-- POC-W2 : `web_fetch(url)` : GET avec User-Agent identifié, timeout 15 s, taille max
-  2 Mo, **respect de robots.txt**, extraction du contenu principal par trafilatura,
-  troncature à 8 000 tokens avec handle pour la suite, cache disque TTL 24 h.
-- POC-W3 : sécurité minimale mais non négociable, même en PoC :
-  - denylist de réseaux privés (SSRF : 10.x, 172.16–31.x, 192.168.x, 169.254.x,
-    localhost, métadonnées cloud 169.254.169.254) ;
-  - contenu web = **non fiable** : encadré par délimiteurs + instruction de ne jamais
-    exécuter d'instructions qu'il contient ; aucun outil à effet de bord n'existe dans
-    le PoC (tous les outils sont read-only), ce qui neutralise l'essentiel du risque ;
-  - max 8 fetches par requête utilisateur.
-- POC-W4 : toute affirmation issue du web porte URL + date de consultation dans la
-  réponse. Le pipeline de vérification de citations (POC-E5) s'applique aussi au web.
-- POC-W5 : boucle de recherche type : reformuler → chercher → sélectionner 2–3 URLs →
-  fetch → synthétiser → si insuffisant, itérer (max 3 itérations, budget POC-P6).
+- POC-W1: `web_search(query, n=5, lang)` queries **SerpApi** (Google Search; Google
+  News for current affairs questions). Return: title, URL, snippet, date if available.
+  `gl`/`hl` parameters aligned with detected question language (a question in
+  German searches on google.de in German). **Starter Plan ($25/month, 1,000
+  searches)**; application quota in harness: max 3 searches/user request,
+  monthly counter with clean stop at 90% of quota, cache for identical searches
+  (TTL 1 h) to avoid burning quota on repeated evals — the SerpApi FAQ states
+  that only successful searches are counted, and eval runs are the biggest
+  consumers.
+  *Residency note*: SerpApi is a US provider; acceptable for the PoC since only
+  **search queries** (never documents nor full conversations) are transmitted to it
+  and the PoC corpus is non-sensitive. For production, this point goes back through
+  review REQ-INF-002/REQ-CMP-004 (DPA, transfer clauses) or via an EU alternative —
+  decision to be investigated in phase 1, not in the PoC.
+- POC-W2: `web_fetch(url)`: GET with identified User-Agent, 15 s timeout, max size
+  2 MB, **respect for robots.txt**, main content extraction by trafilatura,
+  truncation to 8,000 tokens with handle for continuation, disk cache TTL 24 h.
+- POC-W3: minimal but non-negotiable security, even in PoC:
+  - denylist of private networks (SSRF: 10.x, 172.16–31.x, 192.168.x, 169.254.x,
+    localhost, cloud metadata 169.254.169.254);
+  - web content = **untrusted**: framed by delimiters + instruction to never
+    execute instructions contained within; no side-effect tools exist in the
+    PoC (all tools are read-only), which neutralizes most of the risk;
+  - max 8 fetches per user request.
+- POC-W4: any assertion derived from the web includes URL + consultation date in the
+  response. The citation verification pipeline (POC-E5) also applies to the web.
+- POC-W5: typical search loop: reformulate → search → select 2–3 URLs →
+  fetch → synthesize → if insufficient, iterate (max 3 iterations, budget POC-P6).
 
-## 6. Performances attendues (cibles mesurables)
+## 6. Expected Performance (measurable targets)
 
-Chargées comme seuils dans l'eval-harness ; un chiffre non atteint = décision explicite
-(accepter/corriger/monter de tier), pas un haussement d'épaules.
+Loaded as thresholds in the eval-harness; a missed figure = explicit decision
+(accept/correct/upgrade tier), not a shrug.
 
-| Id | Métrique | Cible PoC | Mesure |
+| Id | Metric | PoC Target | Measurement |
 |---|---|---|---|
-| POC-P1 | TTFT p95 (chat sans outil) | < 2,0 s | bench de charge scripté |
-| POC-P2 | Débit décodage p95 | > 30 tok/s | idem |
-| POC-P3 | Latence bout-en-bout p95, requête RAG | < 12 s | idem |
-| POC-P4 | Latence bout-en-bout p95, requête web (2 fetches) | < 30 s | idem |
-| POC-P5 | Concurrence soutenue sans dégradation > 20 % | 8 requêtes parallèles | idem |
-| POC-P6 | Budgets durs par requête | ≤ 10 appels d'outils, ≤ 120 s, ≤ 0,05 € | test d'intégration qui les fait sauter |
-| POC-P7 | Prefix cache hit rate | > 50 % | métrique vLLM |
-| POC-P8 | Coût moyen / requête (GPU amorti + serverless) | < 0,02 € | télémétrie |
-| POC-P9 | Disponibilité heures ouvrées sur les 2 dernières semaines | > 97 % | uptime monitor |
+| POC-P1 | TTFT p95 (chat without tool) | < 2.0 s | scripted load bench |
+| POC-P2 | Decoding throughput p95 | > 30 tok/s | idem |
+| POC-P3 | End-to-end latency p95, RAG request | < 12 s | idem |
+| POC-P4 | End-to-end latency p95, web request (2 fetches) | < 30 s | idem |
+| POC-P5 | Sustained concurrency without > 20% degradation | 8 parallel requests | idem |
+| POC-P6 | Hard budgets per request | ≤ 10 tool calls, ≤ 120 s, ≤ €0.05 | integration test that triggers them |
+| POC-P7 | Prefix cache hit rate | > 50% | vLLM metric |
+| POC-P8 | Average cost / request (amortized GPU + serverless) | < €0.02 | telemetry |
+| POC-P9 | Business hours availability over last 2 weeks | > 97% | uptime monitor |
 
-## 7. Validation automatique de la qualité (le cœur du PoC)
+## 7. Automatic Quality Validation (the heart of the PoC)
 
-Jeu doré versionné dans Git : **140 cas minimum**, répartis sur **FR, DE, ES, IT, EN
-(aucune langue < 15 % du jeu)**, scores calculés et rapportés **par langue** :
+Versioned golden set in Git: **minimum 140 cases**, distributed across **FR, DE, ES, IT, EN
+(no language < 15% of the set)**, scores calculated and reported **per language**:
 
-| Suite | Cas | Vérification | Seuil GO |
+| Suite | Cases | Verification | GO Threshold |
 |---|---|---|---|
-| POC-E1 retrieval | 40 questions → doc/chunk attendu (corpus et questions multilingues, y compris question dans une langue ≠ langue du document) | **déterministe** : recall@8, MRR | recall@8 ≥ 0,70 (gate PoC ; cible 0,85) |
-| POC-E2 RAG bout-en-bout | 30 Q/R sur le corpus | juge LLM (rubrique exactitude/complétude) + présence de citation | ≥ 4,0/5 moyen |
-| POC-E3 refus honnête | 10 questions sans réponse dans le corpus | déterministe (regex « ne trouve pas ») + juge | 10/10 : zéro invention |
-| POC-E4 tool-calling | 20 scénarios (bon outil, bons args, récupération sur erreur injectée) | déterministe (assertions sur la trace) | ≥ 90 % |
-| POC-E5 fidélité des citations | échantillon des réponses E2 + web | vérificateur NLI/juge : chaque citation supporte la phrase | ≥ 0,90 |
-| POC-E6 **web Q/R** | ≥5 faits web stables vérifiés, multilingue (jeu ALLÉGÉ PoC ; quota SerpApi ménagé ; extension 20 cas + actualité post-PoC) | juge + citation de source | exécutable, faits sourcés |
-| POC-E7 comportement | 15 cas anti-flagornerie / honnêteté / format (mini-charte) | juge calibré | ≥ 4,0/5 |
-| POC-E8 routage | 30 requêtes étiquetées simple/complexe | déterministe : matrice de confusion | ≥ 85 % ; zéro « complexe→local » silencieux sur les cas critiques |
-| POC-E9 **traduction** | cas métier disponibles (faux amis, terminologie ; FLORES post-PoC) | juge bilingue | ≥ 4,0/5 ; aucun sens inversé |
+| POC-E1 retrieval | 40 questions → expected doc/chunk (corpus and questions multilingual, including question in a language ≠ document language) | **deterministic**: recall@8, MRR | recall@8 ≥ 0.70 (PoC gate; target 0.85) |
+| POC-E2 RAG end-to-end | 30 Q/A on corpus | LLM judge (accuracy/completeness rubric) + presence of citation | ≥ 4.0/5 average |
+| POC-E3 honest refusal | 10 questions with no answer in corpus | deterministic (regex "does not find") + judge | 10/10: zero hallucination |
+| POC-E4 tool-calling | 20 scenarios (correct tool, correct args, recovery on injected error) | deterministic (assertions on trace) | ≥ 90% |
+| POC-E5 citation fidelity | sample of E2 + web responses | NLI/judge verifier: each citation supports the sentence | ≥ 0.90 |
+| POC-E6 **web Q/A** | ≥5 stable web facts verified, multilingual (LIGHTENED PoC set; SerpApi quota spared; extension 20 cases + post-PoC current affairs) | judge + source citation | executable, sourced facts |
+| POC-E7 behavior | 15 cases anti-sycophancy / honesty / format (mini-charter) | calibrated judge | ≥ 4.0/5 |
+| POC-E8 routing | 30 requests labeled simple/complex | deterministic: confusion matrix | ≥ 85%; zero silent "complex→local" on critical cases |
+| POC-E9 **translation** | available business cases (false friends, terminology; FLORES post-PoC) | bilingual judge | ≥ 4.0/5; no inverted meaning |
 
-Seuil transversal (POC-EL, PoC assoupli) : la contrainte de répartition par langue (aucune langue < 15%) est INDICATIVE pour le PoC (l'italien à ~11% ne bloque pas). À terme : pour chaque suite jugée (E2, E6, E7, E9), **l'écart entre
-la meilleure et la moins bonne langue ≤ 15 %** — c'est le test d'égalité de traitement.
-Un modèle qui passe les moyennes mais échoue ce seuil est un NO-GO au même titre.
+Cross-cutting threshold (POC-EL, PoC relaxed): the constraint on language distribution (no language < 15%) is INDICATIVE for the PoC (Italian at ~11% does not block). Ultimately: for each judged suite (E2, E6, E7, E9), **the gap between
+the best and worst language ≤ 15%** — this is the equal treatment test.
+A model that passes averages but fails this threshold is a NO-GO just the same.
 
-Règles d'exécution :
-- POC-R1 : `make eval` exécute tout, produit un rapport HTML horodaté avec diff vs le
-  run précédent **et ventilation par langue**, stocke les résultats en base.
-  Durée < 20 min, coût < 3 €.
-- POC-R2 (PoC) : le juge de production (glm-5.2) est calibré par ACCORD CROISÉ avec un
-  juge de référence d'une autre famille (gpt-oss-120b) : κ de Cohen calculé sur un
-  échantillon d'éval. La calibration HUMAINE (30 notes, κ≥0,7) reste une action pré-GA.
-- POC-R3 : les cas E6 (web) incluent la date de création de la clé de correction ; un
-  cas périmé (la réalité a changé) est marqué `stale`, pas compté en échec.
-- POC-R4 : CI : `make eval-smoke` (15 cas représentatifs couvrant ≥ 3 langues, < 3 min,
-  < 0,3 €) sur chaque PR ; suite complète nightly + à chaque changement de modèle/prompt.
+Execution rules:
+- POC-R1: `make eval` executes everything, produces a timestamped HTML report with diff vs the
+  previous run **and breakdown by language**, stores results in database.
+  Duration < 20 min, cost < €3.
+- POC-R2 (PoC): the production judge (glm-5.2) is calibrated by CROSS-AGREEMENT with a
+  reference judge from another family (gpt-oss-120b): Cohen's κ calculated on an
+  eval sample. HUMAN calibration (30 notes, κ≥0.7) remains a pre-GA action.
+- POC-R3: E6 cases (web) include the creation date of the correction key; an
+  expired case (reality has changed) is marked `stale`, not counted as failure.
+- POC-R4: CI: `make eval-smoke` (15 representative cases covering ≥ 3 languages, < 3 min,
+  < €0.3) on every PR; full suite nightly + on every model/prompt change.
 
-## 8. Critères GO / NO-GO de fin de PoC
+## 8. End of PoC GO / NO-GO Criteria
 
-**GO phase 1** si : tous les seuils §6 et §7 atteints avec le modèle local (escalades
-≤ 25 % des requêtes) **ou** atteints avec un tier GPU supérieur dont le coût projeté
-respecte REQ-NFR-005 (< 0,015 €/req à l'échelle). Sinon : rapport d'écart chiffré et
-décision explicite (changer de modèle, revoir les cibles, ou arrêter).
+**GO phase 1** if: all thresholds §6 and §7 reached with the local model (escalations
+≤ 25% of requests) **or** reached with a higher GPU tier whose projected cost
+respects REQ-NFR-005 (< €0.015/req at scale). Otherwise: quantified gap report and
+explicit decision (change model, revise targets, or stop).
 
-## 9. Infrastructure louée — recommandation chiffrée (juillet 2026, à re-vérifier au devis)
+## 9. Leased Infrastructure — quantified recommendation (July 2026, re-verify at quote)
 
-| Option | Machine | Prix constaté | Rôle recommandé |
+| Option | Machine | Observed Price | Recommended Role |
 |---|---|---|---|
-| **Recommandé : Scaleway L40S-1-48G** (Paris) | 48 Go VRAM, ~8 vCPU, scratch NVMe | **~1,47 €/h HT** ; ~250–350 €/mois en heures ouvrées avec extinction planifiée (POC-A2) | Nœud GPU principal : Qwen3-30B-A3B FP8 + embeddings + reranker. FP8 natif (Ada). Facturation horaire = parfait pour l'extinction nocturne. UE/France, cohérent avec la contrainte de souveraineté. |
-| Scaleway L4-1-24G | 24 Go | ~0,75–0,90 €/h | Variante ultra-frugale (30B-A3B en Q4 serré) ; garder en secours |
-| Scaleway H100-1-80G | 80 Go | ~2,7–3,0 €/h | Le « tier au-dessus » pour tester un MoE ~120B en fin de PoC (quelques jours suffisent) |
-| Hetzner GEX130 (RTX 6000 Ada 48 Go) | dédié mensuel | ~900 €/mois flat (à re-vérifier) | Uniquement si le PoC devait tourner 24/7 — pas notre cas, l'horaire Scaleway gagne |
-| RunPod/Vast (spot L40S) | 48 Go | ~0,26–0,50 €/h | Le moins cher, mais hors UE/préemptible : acceptable pour des benchs jetables, pas pour le PoC de référence |
-| VM app (Scaleway DEV/PRO ou Hetzner CX) | 4–8 vCPU, 16 Go RAM | ~10–25 €/mois | UI, gateway, harness, client SerpApi, Postgres |
+| **Recommended: Scaleway L40S-1-48G** (Paris) | 48 GB VRAM, ~8 vCPU, NVMe scratch | **~€1.47/h ex-VAT**; ~€250–350/month in business hours with scheduled shutdown (POC-A2) | Main GPU node: Qwen3-30B-A3B FP8 + embeddings + reranker. Native FP8 (Ada). Hourly billing = perfect for nightly shutdown. EU/France, consistent with sovereignty constraint. |
+| Scaleway L4-1-24G | 24 GB | ~€0.75–0.90/h | Ultra-frugal variant (30B-A3B in tight Q4); keep as backup |
+| Scaleway H100-1-80G | 80 GB | ~€2.7–3.0/h | The "tier above" to test a ~120B MoE at end of PoC (a few days suffice) |
+| Hetzner GEX130 (RTX 6000 Ada 48 GB) | monthly dedicated | ~€900/month flat (re-verify) | Only if PoC had to run 24/7 — not our case, Scaleway hourly wins |
+| RunPod/Vast (spot L40S) | 48 GB | ~€0.26–0.50/h | Cheapest, but non-EU/preemptible: acceptable for disposable benches, not for reference PoC |
+| App VM (Scaleway DEV/PRO or Hetzner CX) | 4–8 vCPU, 16 GB RAM | ~€10–25/month | UI, gateway, harness, SerpApi client, Postgres |
 
-Budget PoC 6 semaines, réaliste : GPU ~350–500 € (heures ouvrées + quelques nightly
-d'évals + 3–4 jours de H100 en fin de PoC) + VM ~30 € + serverless L (escalades + juge)
-~50–120 € + SerpApi Starter 2 mois ~45 € + stockage ~10 € ≈ **500–700 €**.
+PoC Budget 6 weeks, realistic: GPU ~€350–500 (business hours + few nightly
+evals + 3–4 days of H100 at end of PoC) + VM ~€30 + serverless L (escalations + judge)
+~€50–120 + SerpApi Starter 2 months ~€45 + storage ~€10 ≈ **€500–700**.
 
-- POC-I1 : alerte budget chez le fournisseur à 50 % et 80 % de 800 € ; coupe-circuit
-  applicatif sur le serverless (plafond mensuel dans le gateway).
-- POC-I2 : l'extinction planifiée du GPU est en place **dès le premier jour** (c'est le
-  levier n°1 du budget) ; le redémarrage matinal recharge le modèle automatiquement
-  (< 10 min, poids sur volume persistant).
+- POC-I1: budget alert at provider at 50% and 80% of €800; application circuit-breaker
+  on serverless (monthly cap in gateway).
+- POC-I2: scheduled GPU shutdown is in place **from day one** (this is budget
+  lever #1); morning restart reloads the model automatically
+  (< 10 min, weights on persistent volume).
 
 
-> **Clarification M5 (PoC)** : la calibration du juge en M5 est une calibration CROISÉE inter-modèles (juge production glm-5.2 vs juge de référence gpt-oss-120b, famille distincte du juge glm-5.2 ET du système testé Qwen), pas une calibration humaine. La calibration humaine (30 notes, κ≥0,7) reste une action **pré-GA**, non bloquante pour le PoC. Voir verify-m5.
+> **Clarification M5 (PoC)**: the judge calibration in M5 is a CROSS-MODEL inter-model calibration (production judge glm-5.2 vs reference judge gpt-oss-120b, family distinct from judge glm-5.2 AND tested system Qwen), not a human calibration. Human calibration (30 notes, κ≥0.7) remains a **pre-GA** action, non-blocking for the PoC. See verify-m5.
