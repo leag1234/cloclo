@@ -1,120 +1,119 @@
-# 05 — Post-training, caractère et alignement
+# 05 — Post-training, character and alignment
 
-> C'est le poste que tout le monde sous-estime. Un modèle open-weight brut, même excellent
-> en benchmark, ne « se comporte » pas comme un assistant de qualité : il flatte, il
-> hallucine avec aplomb, il refuse mal, il perd le fil des outils, son ton est instable.
-> **Le comportement ne se télécharge pas.** Il se construit.
+> This is the role everyone underestimates. A raw open-weight model, even excellent
+> in benchmarks, does not "behave" like a quality assistant: it flatters, it
+> hallucinates with confidence, it refuses poorly, it loses track of tools, its tone is unstable.
+> **Behavior cannot be downloaded.** It is built.
 
-## 1. Stratégie : trois niveaux, dans cet ordre
+## 1. Strategy: three levels, in this order
 
-| Niveau | Coût | Délai | Quand |
+| Level | Cost | Delay | When |
 |---|---|---|---|
-| **N1 — Ingénierie de contexte** : charte + system prompt + politiques + few-shots + format | € | jours | **Toujours, en premier.** 80 % du bénéfice perçu. |
-| **N2 — SFT / DPO sur adaptateurs LoRA** | €€ | semaines | Phase 2, quand N1 plafonne et que les évals le prouvent |
-| **N3 — Distillation / RL sur tâches métier** | €€€€ | mois | Phase 3+, seulement avec un ROI chiffré |
+| **L1 — Context engineering**: charter + system prompt + policies + few-shots + format | € | days | **Always, first.** 80% of perceived benefit. |
+| **L2 — SFT / DPO on LoRA adapters** | €€ | weeks | Phase 2, when L1 plateaus and evals prove it |
+| **L3 — Distillation / RL on business tasks** | €€€€ | months | Phase 3+, only with a quantified ROI |
 
-- **REQ-PT-001 (MUST)** : on ne passe pas au niveau suivant sans une eval démontrant que
-  le niveau courant a plafonné. « On va fine-tuner » n'est pas une réponse à un problème
-  qu'on n'a pas mesuré.
+- **REQ-PT-001 (MUST)**: do not move to the next level without an eval demonstrating that
+  the current level has plateaued. "We will fine-tune" is not an answer to a problem
+  that has not been measured.
 
-## 2. N1 — La charte de comportement (l'artefact central)
+## 2. L1 — The behavior charter (the central artifact)
 
-Un document en langage naturel, versionné, qui définit ce qu'est l'assistant. Il est la
-source unique dont dérivent : le system prompt de production, les jeux d'évals de
-comportement, et plus tard les données de préférence pour le DPO.
+A document in natural language, versioned, which defines what the assistant is. It is the
+single source from which are derived: the production system prompt, the behavior
+eval datasets, and later the preference data for DPO.
 
-- **REQ-PT-002 (MUST)** : `policies/charter/<semver>.md` contient, avec des exemples
-  positifs **et négatifs** pour chaque point :
-  1. **Honnêteté épistémique** : dire « je ne sais pas » ; ne jamais inventer de source,
-     de chiffre ou de citation ; distinguer fait / inférence / opinion ; exprimer
-     l'incertitude calibrée.
-  2. **Anti-flagornerie** (sycophancy) : ne pas changer d'avis sous la seule pression
-     sociale ; désaccord respectueux ; ne pas valider une prémisse fausse.
-  3. **Format et concision** : structure par défaut, quand utiliser des listes, longueur
-     cible selon le canal.
-  4. **Ton** : direct, chaleureux, sans emphase creuse ; pas de préambule ni de flatterie.
-  5. **Refus** : ce qui est refusé, comment (bref, sans sermon, avec alternative).
-  6. **Utilisation des sources** : citer, ne jamais extrapoler au-delà du document,
-     signaler les conflits entre sources.
-  7. **Comportement agentique** : demander confirmation avant les actions irréversibles ;
-     ne pas boucler ; signaler l'échec au lieu de le masquer.
-- **REQ-PT-003 (MUST)** : chaque clause de la charte est reliée à ≥ 3 cas de test dans la
-  suite d'évals comportementales (`09` §4). Une clause non testable est une clause à
-  réécrire.
-- **REQ-PT-004 (MUST)** : la charte est un artefact **produit** (revue par le métier, le
-  juridique, la sécurité), pas un fichier de dev.
+- **REQ-PT-002 (MUST)**: `policies/charter/<semver>.md` contains, with **positive and negative** examples
+  for each point:
+  1. **Epistemic honesty**: say "I don't know"; never invent a source,
+     a figure, or a citation; distinguish fact / inference / opinion; express
+     calibrated uncertainty.
+  2. **Anti-sycophancy**: do not change opinion under social pressure
+     alone; respectful disagreement; do not validate a false premise.
+  3. **Format and concision**: default structure, when to use lists, target
+     length according to the channel.
+  4. **Tone**: direct, warm, without empty emphasis; no preamble or flattery.
+  5. **Refusals**: what is refused, how (briefly, without preaching, with an alternative).
+  6. **Source usage**: cite, never extrapolate beyond the document,
+     flag conflicts between sources.
+  7. **Agentic behavior**: ask for confirmation before irreversible actions;
+     do not loop; report failure instead of hiding it.
+- **REQ-PT-003 (MUST)**: each clause of the charter is linked to ≥ 3 test cases in the
+  behavioral eval suite (`09` §4). A non-testable clause is a clause to
+  rewrite.
+- **REQ-PT-004 (MUST)**: the charter is a **product** artifact (reviewed by business,
+  legal, security), not a dev file.
 
-## 3. N1 — Ingénierie du system prompt
+## 3. L1 — System prompt engineering
 
-- REQ-PT-005 (MUST) : le system prompt est **compilé** depuis des blocs versionnés
-  (charte → politiques → outils → contexte tenant), avec un ordre **stable** (impératif
-  pour le prefix cache, REQ-FIN-004).
-- REQ-PT-006 (MUST) : chaque modification du system prompt déclenche la suite d'évals
-  complète. Un prompt est du code : revue, versionnage, rollback.
-- REQ-PT-007 (SHOULD) : le prompt est **spécifique au modèle**. Un prompt optimisé pour
-  un modèle L ne se transpose pas tel quel sur un S. La matrice `prompt × modèle` est
-  évaluée, pas supposée.
+- REQ-PT-005 (MUST): the system prompt is **compiled** from versioned
+  blocks (charter → policies → tools → holding context), with a **stable** order (imperative
+  for prefix cache, REQ-FIN-004).
+- REQ-PT-006 (MUST): every modification of the system prompt triggers the full eval suite. A prompt is code: review, versioning, rollback.
+- REQ-PT-007 (SHOULD): the prompt is **model-specific**. A prompt optimized for
+  an L model does not transpose as-is to an S model. The `prompt × model` matrix is
+  evaluated, not assumed.
 
-## 4. N2 — Fine-tuning (phase 2)
+## 4. L2 — Fine-tuning (phase 2)
 
-**Ce qu'on fine-tune, et ce qu'on ne fine-tune pas.**
+**What to fine-tune, and what not to fine-tune.**
 
-| Bon usage du fine-tuning | Mauvais usage |
+| Good use of fine-tuning | Bad use |
 |---|---|
-| Format de sortie strict, jargon métier, style maison | Ajouter des connaissances factuelles (→ RAG) |
-| Fiabilité du tool-calling sur **nos** outils | Corriger un prompt mal écrit |
-| Distiller un gros modèle vers un petit (coût) | « Améliorer la qualité » sans cible mesurée |
-| Réduire la verbosité / la flagornerie | Rattraper un modèle de base inadapté |
+| Strict output format, business jargon, house style | Adding factual knowledge (→ RAG) |
+| Reliability of tool-calling on **our** tools | Fixing a poorly written prompt |
+| Distilling a large model to a small one (cost) | "Improving quality" without a measured target |
+| Reducing verbosity / sycophancy | Compensating for an unsuitable base model |
 
-Pipeline :
-1. **Collecte** : conversations de production (avec consentement et anonymisation),
-   feedback 👍/👎, corrections d'experts, données synthétiques générées par un modèle L
-   puis **filtrées par des humains**.
-2. **Curation** : c'est 80 % du travail. Déduplication, filtrage qualité, équilibrage des
-   catégories, retrait des PII. REQ-PT-008 (MUST) : chaque exemple d'entraînement porte
-   une provenance traçable (`source`, `licence`, `validé_par`, `date`).
-3. **SFT (LoRA/QLoRA)** : adaptateurs, pas de full fine-tune. Un adaptateur LoRA sur un
-   modèle de 30–70B se pilote sur 1–2 GPU (QLoRA rend même le 70B accessible sur un
-   24 Go). Coût : centaines d'euros, pas centaines de milliers.
-4. **Préférences (DPO/ORPO)** : paires (préféré, rejeté) issues de la charte et du
-   feedback. Plus efficace que le SFT seul contre la flagornerie et la verbosité.
-5. **RLAIF / feedback par IA guidé par la charte** : un modèle juge, contraint par la
-   charte, génère les préférences à grande échelle ; échantillon audité par des humains.
-   REQ-PT-009 (MUST) : ≥ 5 % des préférences générées par IA sont vérifiées humainement,
-   avec accord inter-annotateur mesuré (κ de Cohen ≥ 0,6).
+Pipeline:
+1. **Collection**: production conversations (with consent and anonymization),
+   feedback 👍/👎, expert corrections, synthetic data generated by an L
+   model then **filtered by humans**.
+2. **Curation**: this is 80% of the work. Deduplication, quality filtering, balancing of
+   categories, removal of PII. REQ-PT-008 (MUST): every training example carries
+   traceable provenance (`source`, `licence`, `validé_par`, `date`).
+3. **SFT (LoRA/QLoRA)**: adapters, no full fine-tune. A LoRA adapter on a
+   30–70B model is managed on 1–2 GPUs (QLoRA even makes the 70B accessible on a
+   24 GB). Cost: hundreds of euros, not hundreds of thousands.
+4. **Preferences (DPO/ORPO)**: pairs (preferred, rejected) derived from the charter and
+   feedback. More effective than SFT alone against sycophancy and verbosity.
+5. **RLAIF / AI-guided feedback constrained by the charter**: a model judges, constrained by the
+   charter, generates preferences at scale; sample audited by humans.
+   REQ-PT-009 (MUST): ≥ 5% of AI-generated preferences are human-verified,
+   with measured inter-annotator agreement (Cohen's κ ≥ 0.6).
 
-**Garde-fous d'entraînement**
-- REQ-PT-010 (MUST) : jeu de test **gelé** et jamais vu à l'entraînement ; toute
-  contamination invalide le run.
-- REQ-PT-011 (MUST) : mesurer la **régression** hors domaine (le fine-tuning dégrade
-  fréquemment des capacités générales et — point de sécurité majeur — **affaiblit
-  l'alignement du modèle de base**, même avec des données bénignes). La suite de sécurité
-  (`07`) est rejouée après chaque fine-tune. Bloquant.
-- REQ-PT-012 (MUST) : traçabilité complète du run (données, hyperparamètres, seed, code,
-  hash des poids de sortie) dans le registre de modèles. Un modèle non reproductible ne
-  va pas en prod.
+**Training guardrails**
+- REQ-PT-010 (MUST): **frozen** test set never seen during training; any
+  contamination invalidates the run.
+- REQ-PT-011 (MUST): measure **regression** out-of-domain (fine-tuning frequently degrades
+  general capabilities and — a major security point — **weakens
+  the alignment of the base model**, even with benign data). The security
+  suite (`07`) is re-run after every fine-tune. Blocking.
+- REQ-PT-012 (MUST): complete traceability of the run (data, hyperparameters, seed, code,
+  hash of output weights) in the model registry. A non-reproducible model does not
+  go to prod.
 
-## 5. N3 — Distillation (phase 3, piloté par le coût)
+## 5. L3 — Distillation (phase 3, cost-driven)
 
-Objectif : remplacer un modèle L coûteux par un modèle S spécialisé sur nos 5 à 10 tâches
-les plus fréquentes.
-Méthode : le modèle L génère des traces (raisonnement + réponse) sur un large corpus de
-requêtes réelles → filtrage par vérificateur automatique + juge → SFT du modèle S.
-Critère de succès : **≥ 95 % du score du L sur nos évals, à ≤ 20 % du coût.** Si non
-atteint, on abandonne — pas d'acharnement.
+Objective: replace a costly L model with an S model specialized on our 5 to 10 most
+frequent tasks.
+Method: the L model generates traces (reasoning + response) on a large corpus of
+real queries → filtering by automatic verifier + judge → SFT of the S model.
+Success criterion: **≥ 95% of the L score on our evals, at ≤ 20% of the cost.** If not
+reached, we abandon — no persistence.
 
-## 6. Registre de modèles
+## 6. Model registry
 
-- REQ-PT-013 (MUST) : tout artefact modèle (base, adaptateur, quantifié) est enregistré
-  avec : hash, licence, lignage (parent), évals passées, date, propriétaire, statut
+- REQ-PT-013 (MUST): every model artifact (base, adapter, quantized) is registered
+  with: hash, licence, lineage (parent), past evals, date, owner, status
   (`candidate` / `champion` / `deprecated`).
-- REQ-PT-014 (MUST) : promotion en `champion` uniquement via le gate d'eval (`09` §6) et
-  un déploiement progressif (canary 5 % → 25 % → 100 %) avec rollback automatique sur
-  dégradation des métriques.
+- REQ-PT-014 (MUST): promotion to `champion` only via the eval gate (`09` §6) and
+  a progressive deployment (canary 5% → 25% → 100%) with automatic rollback on
+  metric degradation.
 
-## 7. Critères d'acceptation
+## 7. Acceptance criteria
 
-- AC-PT-1 : la charte existe, est versionnée, et chaque clause est couverte par ≥ 3 evals.
-- AC-PT-2 : un run de fine-tuning est intégralement reproductible depuis le registre.
-- AC-PT-3 : la suite de sécurité est rejouée automatiquement après chaque fine-tune (gate bloquant).
-- AC-PT-4 : aucune donnée personnelle non anonymisée dans les jeux d'entraînement (contrôle automatisé).
+- AC-PT-1: the charter exists, is versioned, and each clause is covered by ≥ 3 evals.
+- AC-PT-2: a fine-tuning run is fully reproducible from the registry.
+- AC-PT-3: the security suite is re-run automatically after every fine-tune (blocking gate).
+- AC-PT-4: no non-anonymized personal data in training datasets (automated control).
