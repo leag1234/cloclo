@@ -18,6 +18,7 @@ from services.orchestrator.loop import Call, Limits, Message, Query, run
 from services.orchestrator.model import GatewayModel
 from services.orchestrator.tools import Rag, Runtime
 from services.orchestrator.stream_client import sink_context
+from services.orchestrator.vision import process_vision
 
 
 class Source(BaseModel):
@@ -129,6 +130,9 @@ class ChatTools(Runtime):
 
 
 async def process(request: ChatRequest, item: Interaction) -> None:
+    if any(m.images for m in request.messages):
+        await process_vision(request, item)
+        return
     if request.project_id is not None:
         from services.orchestrator.project_chat import process_project
 
@@ -144,10 +148,10 @@ async def process(request: ChatRequest, item: Interaction) -> None:
     model.reasoning_effort = request.reasoning_effort
     model.local_enabled = os.environ.get("GPU_LOCAL", "0") == "1"
     item.cout_eur = 0.05  # Conservative upper bound until the loop returns its ledger.
-    tools = ChatTools(item, request.messages[-1].content)
+    tools = ChatTools(item, request.messages[-1].text)
     try:
         result = await run(
-            Query(question=request.messages[-1].content, lang=request.lang),
+            Query(question=request.messages[-1].text, lang=request.lang),
             model,
             tools,
             Path("prompts/agent.txt").read_text()

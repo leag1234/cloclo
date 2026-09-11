@@ -171,8 +171,11 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                 status, response = 400, {"code": "invalid_input"}
             except TimeoutError:
                 status, response = 504, {"code": "timeout"}
-            except RuntimeError:
-                status, response = 502, {"code": "provider_error"}
+            except RuntimeError as exc:
+                if self.path == "/vision/complete" and str(exc) == "cost_budget":
+                    status, response = 504, {"code": "cost_budget"}
+                else:
+                    status, response = 502, {"code": "provider_error"}
             body = json.dumps(response).encode()
             self.send_response(status)
             self.send_header("Content-Type", "application/json")

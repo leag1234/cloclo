@@ -13,6 +13,7 @@ import html
 from services.orchestrator.chat_pipeline import process, source
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.chat_stream import response as stream_response
+from services.orchestrator.model import GatewayError
 from services.orchestrator.interactions import Interaction, write_interaction
 
 from services.orchestrator.project_ui import router as project_router
@@ -78,16 +79,20 @@ async def chat(request: Request) -> Response:
         async with asyncio.timeout(5):
             async for piece in request.stream():
                 body.extend(piece)
-                if len(body) > 160000:
+                if len(body) > 6 * 1024 * 1024:
                     status, code = 413, "context_exceeded"
                     break
         if not code:
             try:
                 payload = ChatRequest.model_validate_json(body)
             except (ValidationError, ValueError):
-                status, code = 400, "invalid_request"
+                status, code = (
+                    (413, "context_exceeded")
+                    if len(body) > 160000
+                    else (400, "invalid_request")
+                )
         if payload is not None:
-            item.question = payload.messages[-1].content
+            item.question = payload.messages[-1].text
             if payload.stream:
                 streaming = True
                 return stream_response(payload, item, started, process)
@@ -99,6 +104,8 @@ async def chat(request: Request) -> Response:
                 code = "request_stopped"
     except asyncio.CancelledError:
         status, code = 499, "cancelled"
+    except GatewayError as exc:
+        status, code = exc.status, exc.code
     except TimeoutError:
         status, code = 504, "timeout"
     except Exception:

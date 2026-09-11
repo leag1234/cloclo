@@ -52,3 +52,11 @@ M12 : `packages/images.py` définit les messages image validés du contrat `cont
 PNG/JPEG sont décodés par Pillow après contrôle des dimensions ; URL distantes,
 formats non pris en charge et dépassements cumulés sont refusés. Cette première
 brique est commune aux futures frontières adaptateur/gateway vision.
+Le chat accepte désormais des parties `text` et `image_url` en data URI PNG/JPEG.
+Toute image de l'historique sélectionne `/vision/complete` ; les échanges texte
+conservent le harness. Le journal contient métadonnées, tokens/coût et route vision,
+sans base64, y compris si le fournisseur renvoie les octets en écho. Les erreurs
+budget et délai restent distinctes et conservent une réservation de 0,05 EUR.
+
+La vision relaie sa réponse complète validée dans SSE ; elle ne prétend pas
+produire des tokens progressifs amont. Le texte/projet conserve le transport M11.

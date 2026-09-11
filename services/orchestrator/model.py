@@ -48,6 +48,12 @@ class WireTurn(BaseModel):
     calls: list[WireCall] = Field(max_length=10)
 
 
+class GatewayError(RuntimeError):
+    def __init__(self, code: str, status: int) -> None:
+        self.code, self.status = code, status
+        super().__init__(code)
+
+
 class GatewayModel:
     def __init__(self, url: str, configuration: Configuration) -> None:
         self.url, self.configuration = url.rstrip("/"), configuration
@@ -74,6 +80,20 @@ class GatewayModel:
                     url, json=payload, allow_redirects=False
                 ) as response:
                     if response.status != 200:
+                        if url.endswith("/vision/complete"):
+                            error = json.loads(await response.content.read(512))
+                            codes = {
+                                "cost_budget": 504,
+                                "timeout": 504,
+                                "context_exceeded": 413,
+                                "invalid_input": 400,
+                                "provider_error": 502,
+                            }
+                            code = (
+                                error.get("code") if isinstance(error, dict) else None
+                            )
+                            if code in codes:
+                                raise GatewayError(code, codes[code])
                         raise RuntimeError("gateway_error")
                     data = bytearray()
                     async for piece in response.content.iter_chunked(16384):
