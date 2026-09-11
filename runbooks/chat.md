@@ -17,7 +17,6 @@ For background launch of the agent, the group PID is in BRAIN/m7-serve.pid.
 The execution field distinguishes live, record (real test call), and replay (no cost).
 Old lines without this field have an undetermined origin: do not sum their costs.
 
-`make test-serve-idempotent` starts `make serve` twice and checks readiness after
-the second start. Run only with no active user session. It is excluded from CI.
-The launcher gracefully replaces only its own processes and matching containers;
-persistent volumes are preserved, including during automatic-removal races.
+Project image requests validate project/conversation scope before vision. Only
+server history and the current upload are forwarded. Descriptions are stored in
+the selected conversation without image bytes; resend images to inspect them again.

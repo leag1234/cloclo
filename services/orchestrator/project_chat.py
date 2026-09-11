@@ -15,7 +15,10 @@ from services.orchestrator.chat_pipeline import (
     retrieval_url,
     select_passages,
 )
-from services.orchestrator.chat_schema import ChatRequest
+from services.orchestrator.chat_schema import ChatMessage, ChatRequest
+from services.orchestrator.vision import process_vision
+from services.orchestrator.imagegen import process_image
+from packages.imagegen import image_request
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.loop import Call, Limits, Message, Query, run
 from services.orchestrator.memory import consolidated
@@ -99,6 +102,36 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
             5,
         )
     )
+    # Client history has no trusted scope. Rebuild it from the validated server
+    # conversation; only the current upload belongs to this request's project.
+    scoped_messages = [
+        message
+        for turn in context.history
+        for message in (
+            ChatMessage(role="user", content=turn.question),
+            ChatMessage(role="assistant", content=turn.answer),
+        )
+    ]
+    scoped_messages.append(request.messages[-1])
+    if request.messages[-1].images or image_request(question):
+        scoped = request.model_copy(update={"messages": scoped_messages})
+        if request.messages[-1].images:
+            await process_vision(scoped, item)
+        else:
+            await process_image(question, item)
+        if item.state == "done" and request.messages[-1].images:
+            await GatewayModel.post(
+                base + "/turns",
+                {
+                    "conversation_id": request.conversation_id,
+                    "question": question,
+                    "answer": item.reponse,
+                    "facts": [],
+                    "revision": context.revision,
+                },
+                max(0.001, 120 - (time.monotonic() - started)),
+            )
+        return
     model = await GatewayModel.connect(
         os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"),
         local_enabled=False,
