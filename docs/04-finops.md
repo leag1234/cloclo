@@ -1,113 +1,111 @@
-# 04 — FinOps : modèle de coût, seuils, leviers
+# 04 — FinOps: Cost Model, Thresholds, Levers
 
-> Ce document contient la décision la plus structurante du projet : **quand (ne pas)
-> acheter des GPU**. Les chiffres de prix sont des ordres de grandeur au T3 2026 et
-> **DOIVENT** être re-sourcés par devis avant tout engagement. La *méthode*, elle, tient.
+> This document contains the most structuring decision of the project: **when (not) to
+> buy GPUs**. The price figures are orders of magnitude for Q3 2026 and
+> **MUST** be re-sourced via quotes before any commitment. The *method*, however, holds.
 
-## 1. Principe
+## 1. Principle
 
-- **REQ-FIN-001 (MUST)** : le coût est une métrique produit, exposée au même titre que la
-  latence. Tableau de bord : €/requête, €/utilisateur actif/mois, €/tenant, € par
-  fonctionnalité.
-- **REQ-FIN-002 (MUST)** : toute PR modifiant le chemin d'inférence déclare dans sa
-  description l'impact estimé sur €/1 000 requêtes. La CI publie la mesure réelle depuis
-  le benchmark de charge.
-- **REQ-FIN-003 (MUST)** : budgets durs par tenant et global, avec coupe-circuit
-  (arrêt gracieux + alerte) à 100 % du budget et alerte à 80 %.
+- **REQ-FIN-001 (MUST)**: Cost is a product metric, exposed on the same footing as
+  latency. Dashboard: €/request, €/active user/month, €/tenant, € per
+  feature.
+- **REQ-FIN-002 (MUST)**: Any PR modifying the inference path must declare in its
+  description the estimated impact on €/1,000 requests. The CI publishes the actual measurement from
+  the load benchmark.
+- **REQ-FIN-003 (MUST)**: Hard budgets per tenant and global, with a circuit breaker
+  (graceful shutdown + alert) at 100% of the budget and an alert at 80%.
 
-## 2. Décomposition du coût unitaire
+## 2. Unit Cost Breakdown
 
 ```
-C_requête = C_prefill + C_decode + C_embedding + C_rerank + C_guardrails
-            + C_outils + C_stockage + C_plateforme
+C_request = C_prefill + C_decode + C_embedding + C_rerank + C_guardrails
+            + C_tools + C_storage + C_platform
 
-C_prefill = (tokens_entrée × (1 - taux_hit_cache)) × prix_entrée_par_token
-C_decode  = tokens_sortie × prix_sortie_par_token      # ~3 à 5× le prix d'entrée
+C_prefill = (input_tokens × (1 - cache_hit_rate)) × input_price_per_token
+C_decode  = output_tokens × output_price_per_token      # ~3 to 5× the input price
 ```
 
-Deux constats qui pilotent toutes les optimisations :
-1. **Le prefill domine en RAG.** Avec 6 000 tokens d'entrée et 700 de sortie, l'entrée
-   représente ~60–70 % du coût malgré son prix unitaire plus faible. → attaquer d'abord
-   la taille du contexte et le cache de préfixe, pas la longueur des réponses.
-2. **Les tokens de raisonnement (« thinking ») sont facturés en sortie.** Un modèle de
-   raisonnement peut multiplier le coût par 5–10. → n'activer le mode raisonnement que
-   sur les classes de tâches qui le justifient (REQ-INF-003).
+Two observations that drive all optimizations:
+1. **Prefill dominates in RAG.** With 6,000 input tokens and 700 output tokens, the input
+   represents ~60–70% of the cost despite its lower unit price. → Attack the context size and prefix cache first, not the response length.
+2. **Reasoning tokens ("thinking") are billed as output.** A reasoning model can multiply the cost by 5–10. → Enable reasoning mode only
+   for task classes that justify it (REQ-INF-003).
 
-## 3. Ordres de grandeur (à revalider par devis)
+## 3. Orders of Magnitude (to be revalidated by quotes)
 
-| Poste | Fourchette T3 2026 |
+| Item | Q3 2026 Range |
 |---|---|
-| Serverless open-weight, modèle S (~30B MoE) | ~0,05–0,20 € / Mtok entrée ; 0,20–0,60 € / Mtok sortie |
-| Serverless open-weight, modèle L (~1T MoE) | ~0,40–1,00 € / Mtok entrée ; 1,50–3,00 € / Mtok sortie |
-| GPU H100 80 Go à la demande | ~2,0–3,0 € / h |
-| GPU H100 réservé 1 an | ~1,3–2,0 € / h |
-| GPU spot / preemptible | −60 à −80 % vs à la demande |
-| Nœud 8×H100 (auto-hébergement modèle L) | ~11 000–17 000 € / mois en réservé |
+| Serverless open-weight, S model (~30B MoE) | ~€0.05–0.20 / Mtok input; €0.20–0.60 / Mtok output |
+| Serverless open-weight, L model (~1T MoE) | ~€0.40–1.00 / Mtok input; €1.50–3.00 / Mtok output |
+| On-demand H100 80 GB GPU | ~€2.0–3.0 / h |
+| 1-year reserved H100 GPU | ~€1.3–2.0 / h |
+| Spot / preemptible GPU | −60 to −80% vs on-demand |
+| 8×H100 Node (self-hosted L model) | ~€11,000–17,000 / month reserved |
 
-## 4. Seuil de bascule serverless → auto-hébergement (le calcul à faire)
+## 4. Serverless → Self-hosting Switch Threshold (the calculation to perform)
 
 ```
-Coût_selfhost_par_Mtok = (coût_horaire_nœud × 730) / (débit_tok_par_s × 3600 × 730 × U) × 1e6
-                       = coût_horaire_nœud / (débit_tok_par_s × 3600 × U) × 1e6
+Cost_selfhost_per_Mtok = (node_hourly_cost × 730) / (tok_per_s_throughput × 3600 × 730 × U) × 1e6
+                       = node_hourly_cost / (tok_per_s_throughput × 3600 × U) × 1e6
 
-  U = taux d'utilisation réel (fraction du temps où le GPU décode réellement)
+  U = actual utilization rate (fraction of time the GPU is actually decoding)
 ```
 
-**Exemple travaillé — modèle L sur un nœud 8×H100 :**
-- Coût nœud : 15 € / h.
-- Débit agrégé réaliste en régime batché : ~4 000 tokens de sortie / s (à mesurer !).
-- À `U = 100 %` : 15 / (4 000 × 3 600) × 1e6 ≈ **1,04 € / Mtok sortie**.
-- À `U = 30 %` (réalité d'un trafic interne aux heures ouvrées) : ≈ **3,5 € / Mtok**.
-- Prix serverless comparable : 1,50–3,00 € / Mtok.
+**Worked Example — L model on an 8×H100 node:**
+- Node cost: €15 / h.
+- Realistic aggregated throughput in batched mode: ~4,000 output tokens / s (to be measured!).
+- At `U = 100%`: 15 / (4,000 × 3,600) × 1e6 ≈ **€1.04 / Mtok output**.
+- At `U = 30%` (reality of internal traffic during business hours): ≈ **€3.5 / Mtok**.
+- Comparable serverless price: €1.50–3.00 / Mtok.
 
-> **Conclusion (ADR-001).** L'auto-hébergement d'un modèle frontier n'est rentable
-> qu'au-delà d'environ **60–70 % d'utilisation soutenue**, ce qui, avec nos hypothèses
-> A-1 à A-6, exige un ordre de grandeur de **plusieurs milliards de tokens de sortie
-> par mois** — soit ~10× notre volume à 2 000 DAU. **On n'achète pas de GPU en phase 1
-> ni en phase 2.** On réévalue le calcul chaque trimestre avec les volumes réels.
+> **Conclusion (ADR-001).** Self-hosting a frontier model is only profitable
+> beyond approximately **60–70% sustained utilization**, which, with our hypotheses
+> A-1 to A-6, requires an order of magnitude of **several billion output tokens
+> per month** — i.e., ~10× our volume at 2,000 DAU. **We do not buy GPUs in Phase 1
+> nor in Phase 2.** We re-evaluate the calculation every quarter with actual volumes.
 
-Cas particuliers où l'auto-hébergement gagne malgré tout, et qu'il faut savoir identifier :
-- Modèles **XS/S** utilisés à très haute fréquence (routage, guardrails, embeddings,
-  reranking, classification) : ils tournent sur 1 GPU bon marché (L4/L40S), à taux
-  d'utilisation élevé, et représentent un volume d'appels énorme. → **héberger ces
-  modèles-là dès la phase 2** est souvent le meilleur ROI du projet.
-- Traitements **batch** massifs (ingestion, ré-indexation, génération de données
-  synthétiques) : GPU spot, U ≈ 100 %. → très rentable.
-- Contrainte réglementaire absolue interdisant tout tiers.
+Special cases where self-hosting wins anyway, and which must be identified:
+- **XS/S models** used at very high frequency (routing, guardrails, embeddings,
+  reranking, classification): they run on 1 cheap GPU (L4/L40S), at high
+  utilization rates, and represent a huge volume of calls. → **Hosting these
+  models from Phase 2** is often the best ROI of the project.
+- Massive **batch** processing (ingestion, re-indexing, synthetic data
+  generation): spot GPUs, U ≈ 100%. → Very profitable.
+- Absolute regulatory constraint forbidding any third party.
 
-## 5. Leviers de réduction, par ROI décroissant
+## 5. Reduction Levers, by Decreasing ROI
 
-| # | Levier | Gain typique | Effort | Exigence |
+| # | Lever | Typical Gain | Effort | Requirement |
 |---|---|---|---|---|
-| 1 | **Prefix caching** (system prompt + outils + docs stables en tête de prompt) | −40 à −70 % sur le prefill | Faible | REQ-FIN-004 (MUST) |
-| 2 | **Cascade de routage** S→M→L | −40 à −70 % global | Moyen | REQ-INF-003 |
-| 3 | **Contexte discipliné** : RAG précis plutôt que contexte long ; élaguer l'historique par résumé | −30 à −50 % sur l'entrée | Moyen | REQ-FIN-005 (MUST) |
-| 4 | **Cache exact + cache sémantique** des réponses | −10 à −30 % (dépend de la redondance des questions internes ; souvent élevée) | Faible | REQ-FIN-006 (SHOULD) |
-| 5 | **Auto-héberger les petits modèles** (embeddings, rerank, guards, routage) | −60 à −90 % sur ces postes | Moyen | REQ-FIN-007 (SHOULD) |
-| 6 | **Mode raisonnement sélectif** | −50 % sur les tâches où il était inutile | Faible | REQ-INF-003 |
-| 7 | **Batch API / off-peak** pour l'asynchrone | −50 % | Faible | REQ-FIN-008 (SHOULD) |
-| 8 | **Distillation** d'un modèle L vers un S sur nos tâches | −70 à −90 % sur les tâches couvertes | Élevé | phase 3, cf. `05` |
-| 9 | Quantization FP8 (auto-hébergement) | −40 % VRAM, +débit | Faible | REQ-INF-008 |
+| 1 | **Prefix caching** (system prompt + tools + stable docs at head of prompt) | −40 to −70% on prefill | Low | REQ-FIN-004 (MUST) |
+| 2 | **Routing Cascade** S→M→L | −40 to −70% global | Medium | REQ-INF-003 |
+| 3 | **Disciplined Context**: Precise RAG rather than long context; prune history via summarization | −30 to −50% on input | Medium | REQ-FIN-005 (MUST) |
+| 4 | **Exact cache + Semantic cache** of responses | −10 to −30% (depends on redundancy of internal questions; often high) | Low | REQ-FIN-006 (SHOULD) |
+| 5 | **Self-host small models** (embeddings, rerank, guards, routing) | −60 to −90% on these items | Medium | REQ-FIN-007 (SHOULD) |
+| 6 | **Selective reasoning mode** | −50% on tasks where it was unnecessary | Low | REQ-INF-003 |
+| 7 | **Batch API / off-peak** for asynchronous tasks | −50% | Low | REQ-FIN-008 (SHOULD) |
+| 8 | **Distillation** of an L model to an S model on our tasks | −70 to −90% on covered tasks | High | Phase 3, cf. `05` |
+| 9 | FP8 Quantization (self-hosting) | −40% VRAM, +throughput | Low | REQ-INF-008 |
 
-- **REQ-FIN-004 (MUST)** : l'ordre des blocs du prompt est **stable et normalisé**
-  (system → outils → politiques → documents → historique → message courant). Toute
-  variation en tête de prompt détruit le cache de préfixe. Interdire l'injection de
-  timestamps, d'UUID ou de contenus aléatoires en début de prompt — c'est l'erreur la
-  plus fréquente et la plus coûteuse.
-- **REQ-FIN-006** : le cache sémantique **NE DOIT PAS** être partagé entre tenants
-  (fuite de données + réponses hors contexte). Clé de cache = `hash(tenant_id, corpus_version, prompt_normalisé)`.
+- **REQ-FIN-004 (MUST)**: The order of prompt blocks is **stable and normalized**
+  (system → tools → policies → documents → history → current message). Any
+  variation at the head of the prompt destroys the prefix cache. Prohibit injection of
+  timestamps, UUIDs, or random content at the start of the prompt — this is the most
+  frequent and costly error.
+- **REQ-FIN-006**: The semantic cache **MUST NOT** be shared between tenants
+  (data leak + out-of-context responses). Cache key = `hash(tenant_id, corpus_version, normalized_prompt)`.
 
-## 6. Attention aux faux coûts « gratuits »
+## 6. Beware of False "Free" Costs
 
-L'auto-hébergement déplace le coût plus qu'il ne le supprime :
-ingénieurs SRE/ML d'astreinte, capacity planning, gestion des pannes GPU, mises à jour
-de drivers, tests de charge, gestion des poids. Compter **1 à 2 ETP** dédiés dès qu'un
-cluster GPU est en production 24/7. Ce coût dépasse souvent l'économie visée à notre
-échelle — c'est la raison principale d'ADR-001, plus encore que le calcul de §4.
+Self-hosting shifts costs more than it eliminates them:
+on-call SRE/ML engineers, capacity planning, GPU failure management, driver
+updates, load testing, weight management. Count **1 to 2 FTEs** dedicated as soon as a
+GPU cluster is in 24/7 production. This cost often exceeds the targeted savings at our
+scale — this is the main reason for ADR-001, even more so than the calculation in §4.
 
-## 7. Critères d'acceptation
+## 7. Acceptance Criteria
 
-- AC-FIN-1 : dashboard € temps réel (coût par requête, tenant, classe de tâche, modèle).
-- AC-FIN-2 : le taux de hit du prefix cache est > 60 % en prod, alerte si < 40 %.
-- AC-FIN-3 : le coupe-circuit budgétaire est testé (test d'intégration, pas seulement en théorie).
-- AC-FIN-4 : revue de coût mensuelle produisant une décision documentée sur le seuil §4.
+- AC-FIN-1: Real-time € dashboard (cost per request, tenant, task class, model).
+- AC-FIN-2: Prefix cache hit rate is > 60% in prod, alert if < 40%.
+- AC-FIN-3: The budget circuit breaker is tested (integration test, not just in theory).
+- AC-FIN-4: Monthly cost review producing a documented decision on the threshold in §4.
