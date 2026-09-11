@@ -70,3 +70,5 @@ Sélection M10 : les contributions de pertinence sont additionnées avec math.fs
 M15 : dev_input traduit les historiques Responses/Messages vers les mêmes messages validés, sans stockage de conversations. Métadonnées et cache sont des indications sans effet d'identité ni garantie de cache ; l'effort Messages sans thinking ne l'active pas. Les images, outils hébergés, stockage Responses et thinking Messages sont refusés explicitement.
 
 M15 : POST /v1/responses fournit les événements nommés texte/fonctions, les identifiants d'items et la terminaison completed/incomplete ; store=false. Le même quota est réservé avant le flux et réconcilié sur l'usage fournisseur.
+
+M15 : POST /v1/messages traduit texte/tool_use/tool_result et les événements SSE message/content_block. Une sortie tronquée reste max_tokens ; les coûts viennent du même registre par clé. Compatibilité expérimentale pour les clients configurés sans thinking ni outils hébergés.

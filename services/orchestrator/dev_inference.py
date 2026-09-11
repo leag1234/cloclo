@@ -14,7 +14,8 @@ from pydantic import ValidationError
 import dev_gateway as gateway
 from services.orchestrator.dev_auth import QuotaError, Store
 from services.orchestrator.dev_chat import ChatInput, Output
-from services.orchestrator.dev_input import responses
+from services.orchestrator.dev_input import responses, messages
+from services.orchestrator.dev_messages import Wire as MessagesWire
 from services.orchestrator.dev_responses import Wire
 
 
@@ -83,7 +84,11 @@ async def chat(request: Request, protocol: str = "chat") -> Response:
                     return error("body_limit", 400)
         raw = json.loads(body)
         parsed = (
-            responses(raw) if protocol == "responses" else ChatInput.model_validate(raw)
+            responses(raw)
+            if protocol == "responses"
+            else messages(raw)
+            if protocol == "messages"
+            else ChatInput.model_validate(raw)
         )
         plan = gateway.prepare(parsed)
         store, developer = request.state.store, request.state.developer
@@ -102,7 +107,13 @@ async def chat(request: Request, protocol: str = "chat") -> Response:
     except (TimeoutError, KeyError):
         return error("unavailable", 503)
     output = Output(request_id, parsed)
-    wire = Wire(output, raw) if protocol == "responses" else None
+    wire = (
+        Wire(output, raw)
+        if protocol == "responses"
+        else MessagesWire(output, raw)
+        if protocol == "messages"
+        else None
+    )
 
     async def chunks() -> AsyncGenerator[str, None]:
         if wire:
@@ -115,7 +126,11 @@ async def chat(request: Request, protocol: str = "chat") -> Response:
         ) as frames:
             async for chunk in frames:
                 if wire:
-                    for event in wire.feed(chunk):
+                    try:
+                        events = wire.feed(chunk)
+                    except (ValueError, TypeError, KeyError):
+                        events = wire.feed({"error": {"message": "provider_error"}})
+                    for event in events:
                         yield (
                             "event: "
                             + event["type"]
@@ -141,5 +156,8 @@ async def chat(request: Request, protocol: str = "chat") -> Response:
             if "error" in frame:
                 return error("provider_error", 502)
             if wire:
-                wire.feed(frame)
+                try:
+                    wire.feed(frame)
+                except (ValueError, TypeError, KeyError):
+                    return error("provider_error", 502)
     return JSONResponse(wire.result() if wire else output.result())
