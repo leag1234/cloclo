@@ -145,12 +145,11 @@ API** proves it. Component tests are necessary, never sufficient.
 1. **Language drift** — reply in English while the conversation was in French, after an
    image was sent. The vision path (likely also web and image paths) does not carry the
    conversation-language rule from `prompts/chat.txt`.
-2. **Image generation fails** — "crée moi une image d'un chien qui danse…" →
+2. **Image generation fails** — a French request to create an image of a dancing dog →
    `stream_error`; UI shows "Uh-oh! There was an issue with the response."
 3. **Projects unreachable** — M9 exists in the backend (`services/retrieval/project_api.py`)
    but a user cannot create or use a project from Open WebUI.
-4. **Web search never returns a final answer** — UI shows two "Étape intermédiaire
-   terminée : appel d'outil" then nothing. Tools run; no answer is delivered.
+4. **Web search never returns a final answer** — UI shows two intermediate tool-call notices then nothing. Tools run; no answer is delivered.
 5. **Auxiliary Open WebUI functions always fail** — title/tags/follow-up return
    `provider_error`/`cost`/`request_stopped` on every message. Either make them work
    (dedicated light model + own budget) or disable them with an explicit note.
@@ -187,7 +186,7 @@ WebUI tool/function. Document the chosen path in `runbooks/chat.md`.
 J1 plain question → non-empty final answer, in the question's language.
 J2 corpus question → answer with ≥ 1 resolvable citation.
 J3 image sent → description, **in the conversation language**.
-J4 "génère une image de X" → an image is returned (live on VM; cassette in CI).
+J4 a French request to generate an image of X → an image is returned (live on VM; cassette in CI).
 J5 project → a fact stated in conversation A is used in conversation B of the same
    project; a different project does NOT see it.
 J6 web question → tools run **and a final answer is delivered** (live on VM; cassette in CI).

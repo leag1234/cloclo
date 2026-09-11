@@ -132,16 +132,16 @@ class ChatTools(Runtime):
 
 
 async def process(request: ChatRequest, item: Interaction) -> None:
+    if request.project_id is not None:
+        from services.orchestrator.project_chat import process_project
+
+        await process_project(request, item)
+        return
     if image_request(request.messages[-1].text):
         await process_image(request.messages[-1].text, item)
         return
     if any(m.images for m in request.messages):
         await process_vision(request, item)
-        return
-    if request.project_id is not None:
-        from services.orchestrator.project_chat import process_project
-
-        await process_project(request, item)
         return
     started = time.monotonic()
     model = await GatewayModel.connect(
