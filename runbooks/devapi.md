@@ -73,3 +73,16 @@ présente, un vrai aller-retour fonction/résultat et le grand contexte. Chaque 
 de test live a un plafond50000microEUR. Preuves locales BRAIN/eval/devapi*.json ;
 la CI par PR ne consomme aucune inférence. Les clients natifs sont testés séparément
 sur des dossiers synthétiques, avec assertions externes sur le fichier généré.
+
+Reproduction native : Docker CPU et image python:3.12-slim figée par digest dans
+`tests/devapi_clients.py`, binaire Codex0.153.4 (Apache-2.0, paquet officiel installé)
+et Claude Code2.1.268 (licence fournisseur, paquet officiel de test) nécessaires.
+Définir ATLAS_CODEX_VENDOR_DIR sur le répertoire vendor x86_64 du client installé et
+ATLAS_CLAUDE_BINARY sur son exécutable natif, puis `make test-devapi-clients`.
+Versions vérifiées avant inférence ; aucune dépendance de ces clients dans le serveur.
+Le harness monte uniquement binaire, dossier synthétique, relais et socketAPI dans
+des conteneurs sans réseau/capabilities. Aucune clé cloud/GitHub ni configuration
+personnelle. Le bypass Codex est limité à ce conteneur ; le grader est un second
+conteneur sans clé avec dossier en lecture seule. Nettoyage automatique à la sortie.
+Chaque client dispose de4requêtes et50000microEUR au total ; preuve expurgée dans
+BRAIN/eval/devapi-clients.json, sans contenu utilisateur réel.
