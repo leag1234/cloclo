@@ -55,14 +55,7 @@ class ProjectVisionScopeTests(unittest.TestCase):
             patch("services.orchestrator.model.GatewayModel.post", new=upstream),
             TestClient(app) as client,
         ):
-            client.post(
-                "/v1/chat/completions",
-                json={
-                    "messages": messages,
-                    "project_id": "00000000-0000-0000-0000-000000000001",
-                    "conversation_id": "00000000-0000-0000-0000-000000000002",
-                },
-            )
+            client.post("/v1/chat/completions", json={"messages": messages})
         forwarded = [
             call.args[1]
             for call in upstream.await_args_list

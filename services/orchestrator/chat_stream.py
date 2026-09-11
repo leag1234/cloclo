@@ -9,6 +9,7 @@ import re
 import time
 
 from fastapi.responses import StreamingResponse
+from packages.language import question_language
 
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.interactions import Interaction, write_interaction
@@ -21,6 +22,10 @@ def response(
     started: float,
     process: Callable[[ChatRequest, Interaction], Awaitable[None]],
 ) -> StreamingResponse:
+    labels = json.loads(Path("prompts/progress.json").read_text())
+    language = question_language(payload.messages[-1].text, payload.lang)
+    progress = str(labels.get(language, labels["en"]))
+
     async def generate() -> AsyncIterator[str]:
         queue: asyncio.Queue[dict[str, object] | None] = asyncio.Queue(maxsize=8)
         pending = ""
@@ -78,15 +83,13 @@ def response(
                 if event["phase"] == "intermediate":
                     await queue.put(
                         {
-                            "delta": {
-                                "content": "\n\n*Intermediate step completed: tool call.*\n\n"
-                            },
+                            "delta": {"content": f"\n\n*{progress}*\n\n"},
                             "atlas": {"turn": turn, "phase": "intermediate"},
                         }
                     )
                 if event["phase"] == "generating":
                     citation_numbers.clear()
-                turn = int(str(event["turn"]))
+                turn = int(str(event.get("turn", turn)))
                 await queue.put(
                     {"atlas": {**event, "reasoning_effort": payload.reasoning_effort}}
                 )

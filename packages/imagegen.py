@@ -24,7 +24,7 @@ class ImagePrompt(Strict):
 def image_request(text: str) -> bool:
     return bool(
         re.match(
-            r"(?i)^\s*(?:génère|générer|genere|crée|cree|generate|create|draw)\s+(?:(?:une?|an?|the)\s+)?(?:image|picture|illustration|photo)\b",
+            r"(?i)^\s*(?:génère|générer|genere|crée|cree|generate|create|draw)(?:[ -]moi)?\s+(?:(?:une?|an?|the)\s+)?(?:image|picture|illustration|photo)\b",
             text,
         )
     )
