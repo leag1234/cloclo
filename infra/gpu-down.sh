@@ -28,13 +28,22 @@ if [[ -n "${ID:-}" ]]; then
   echo "[gpu-down] suppression de $GPU_NAME ($ID) dans le projet $SCW_DEFAULT_PROJECT_ID…"
   scw instance server terminate "$ID" zone="$SCW_DEFAULT_ZONE" with-ip=true with-block=false >/dev/null \
     || { echo "[gpu-down] ERREUR: terminate a échoué pour $ID — GPU PEUT-ÊTRE ENCORE ACTIF !" >&2; exit 1; }
-  # vérification post-destruction : l'instance ne doit plus apparaître
+  # Vérification post-destruction. On distingue explicitement 3 cas :
+  #  - vérification OK et instance absente  -> succès
+  #  - vérification OK et instance présente -> échec (GPU encore actif)
+  #  - vérification IMPOSSIBLE               -> échec (on ne prétend JAMAIS un succès
+  #                                            que l'on n'a pas pu constater)
   sleep 5
-  if scw instance server list zone="$SCW_DEFAULT_ZONE" project-id="$SCW_DEFAULT_PROJECT_ID" -o json \
-     | grep -q "\"id\":\"$ID\""; then
-    echo "[gpu-down] ERREUR: $ID est toujours présent après terminate !" >&2; exit 1
+  if ! CHECK=$(scw instance server list zone="$SCW_DEFAULT_ZONE" project-id="$SCW_DEFAULT_PROJECT_ID" -o json 2>&1); then
+    echo "[gpu-down] ERREUR: vérification post-destruction IMPOSSIBLE (API injoignable)." >&2
+    echo "[gpu-down] L'instance $ID peut être encore ACTIVE et FACTURÉE — vérifier à la main !" >&2
+    exit 1
   fi
-  echo "[gpu-down] instance supprimée et vérifiée, volume de poids conservé."
+  if printf '%s' "$CHECK" | grep -q "\"$ID\""; then
+    echo "[gpu-down] ERREUR: $ID est toujours présent après terminate — GPU ENCORE FACTURÉ !" >&2
+    exit 1
+  fi
+  echo "[gpu-down] instance supprimée et vérifiée (absente de l'inventaire), volume conservé."
 else
   echo "[gpu-down] aucune instance $GPU_NAME dans ce projet — rien à faire."
 fi
