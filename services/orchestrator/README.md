@@ -60,3 +60,5 @@ budget et délai restent distinctes et conservent une réservation de 0,05 EUR.
 
 La vision relaie sa réponse complète validée dans SSE ; elle ne prétend pas
 produire des tokens progressifs amont. Le texte/projet conserve le transport M11.
+
+M15 : entrée développeurs `PYTHONPATH=.:services/model-gateway uvicorn services.orchestrator.devapi:app --host 127.0.0.1 --port 8030 --no-access-log` ; clés via `python -m services.orchestrator.dev_auth create <dev> --key-file <fichier-privé>`, révocation via `revoke <dev>`. ATLAS_DEVAPI_DB conserve les quotas quotidiens et réservations inconnues ; contrat contracts/m15.md. Cet incrément expose models/usage authentifiés ; inférence au prochain incrément.
