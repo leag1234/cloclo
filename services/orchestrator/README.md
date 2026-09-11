@@ -61,7 +61,7 @@ budget et délai restent distinctes et conservent une réservation de 0,05 EUR.
 La vision relaie sa réponse complète validée dans SSE ; elle ne prétend pas
 produire des tokens progressifs amont. Le texte/projet conserve le transport M11.
 
-M15 : entrée développeurs `PYTHONPATH=.:services/model-gateway uvicorn services.orchestrator.devapi:app --host 127.0.0.1 --port 8030 --no-access-log` ; clés via `python -m services.orchestrator.dev_auth create <dev> --key-file <fichier-privé>`, révocation via `revoke <dev>`. ATLAS_DEVAPI_DB conserve les quotas quotidiens et réservations inconnues ; contrat contracts/m15.md. Cet incrément expose models/usage authentifiés ; inférence au prochain incrément.
+M15 : entrée développeurs `PYTHONPATH=.:services/model-gateway uvicorn services.orchestrator.devapi:app --host 127.0.0.1 --port 8030 --no-access-log` ; clés via `python -m services.orchestrator.dev_auth create <dev> --key-file <fichier-privé>`, révocation via `revoke <dev>`. ATLAS_DEVAPI_DB conserve les quotas quotidiens et réservations inconnues ; contrat contracts/m15.md. POST /v1/chat/completions expose désormais texte et fonctions en JSON ou SSE, sans accès aux outils/données du chat privé.
 
 M15 protocole Chat : dev_chat normalise les messages texte et assemble les deltas sans exécuter les fonctions. Les identifiants doivent rester stables, les arguments complets être des objets JSON finis et les noms provenir des outils déclarés. Le stop fournisseur avec appel complet devient tool_calls ; length reste une troncature.
 
