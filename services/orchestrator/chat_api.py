@@ -1,18 +1,18 @@
 """Loopback OpenAI-compatible adapter with one journal row on every outcome."""
 
 import asyncio
-import json
 import os
 import time
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import ValidationError
 import html
 
 from services.orchestrator.chat_pipeline import process, source
 from services.orchestrator.chat_schema import ChatRequest
+from services.orchestrator.chat_stream import response as stream_response
 from services.orchestrator.interactions import Interaction, write_interaction
 
 from services.orchestrator.project_ui import router as project_router
@@ -72,6 +72,7 @@ async def chat(request: Request) -> Response:
         return JSONResponse({"error": "origin_rejected"}, status_code=403)
     item, started = Interaction(), time.monotonic()
     status, code, payload = 200, "", None
+    streaming = False
     try:
         body = bytearray()
         async with asyncio.timeout(5):
@@ -87,6 +88,9 @@ async def chat(request: Request) -> Response:
                 status, code = 400, "invalid_request"
         if payload is not None:
             item.question = payload.messages[-1].content
+            if payload.stream:
+                streaming = True
+                return stream_response(payload, item, started, process)
             await execute(
                 request, payload, item, max(0, 120 - (time.monotonic() - started))
             )
@@ -104,10 +108,12 @@ async def chat(request: Request) -> Response:
         if code:
             item.erreurs.append(code)
             item.state, item.reponse = "error", ""
-        item.latence_ms["total"] = (time.monotonic() - started) * 1000
-        write_interaction(
-            item, Path(os.environ.get("ATLAS_INTERACTION_DIR", "BRAIN/interactions"))
-        )
+        if not streaming:
+            item.latence_ms["total"] = (time.monotonic() - started) * 1000
+            write_interaction(
+                item,
+                Path(os.environ.get("ATLAS_INTERACTION_DIR", "BRAIN/interactions")),
+            )
     if code:
         return JSONResponse(
             {"error": {"message": code, "type": code, "code": code}}, status_code=status
@@ -119,29 +125,6 @@ async def chat(request: Request) -> Response:
     }
     base = {"id": item.request_id, "created": int(time.time()), "model": "atlas"}
     message = {"role": "assistant", "content": item.reponse}
-    if payload is not None and payload.stream:
-        chunks = [
-            {
-                **base,
-                "object": "chat.completion.chunk",
-                "choices": [{"index": 0, "delta": message, "finish_reason": None}],
-            },
-            {
-                **base,
-                "object": "chat.completion.chunk",
-                "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
-                "usage": usage,
-            },
-        ]
-        return StreamingResponse(
-            iter(
-                [
-                    *("data: " + json.dumps(c) + "\n\n" for c in chunks),
-                    "data: [DONE]\n\n",
-                ]
-            ),
-            media_type="text/event-stream",
-        )
     return JSONResponse(
         {
             **base,

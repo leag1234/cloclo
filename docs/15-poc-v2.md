@@ -102,6 +102,9 @@ possible avant tout fragment visible, jamais après émission de contenu/réflex
 Le client relaie aussi les réponses de projet progressivement : seul le champ réponse
 est affiché ; le JSON de consolidation reste interne et la réponse finale est validée.
 
+Les citations diffusées utilisent les passages récupérés et les routes propres au
+projet ; le préambule mémoire reste identique entre JSON et SSE.
+
 ### M12 — Description d'image (multimodal entrée)
 **But** : le système voit et analyse les images envoyées.
 **Livrables** : routage des requêtes contenant une image vers un modèle vision

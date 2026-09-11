@@ -72,6 +72,18 @@ class ProjectTools(ChatTools):
             self.item.latence_ms["retrieval"] += (time.monotonic() - started) * 1000
 
 
+def render_project_citations(item: Interaction, project: str, answer: str) -> str:
+    retrieved = {str(p["chunk_id"]): p for p in item.chunks_recuperes}
+    keys = list(dict.fromkeys(re.findall(r"\b[a-f0-9]{64}\b", answer)))
+    if not set(keys) <= retrieved.keys():
+        raise ValueError("invalid_citation")
+    # Sources are validated against this request's scoped retrieval results.
+    for key in keys:
+        item.citations.append(Source.model_validate(retrieved[key]).model_dump())
+        answer = answer.replace(key, f"[Source](/projects/{project}/sources/{key})")
+    return answer
+
+
 async def process_project(request: ChatRequest, item: Interaction) -> None:
     started = time.monotonic()
     project = request.project_id
@@ -151,14 +163,7 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
         answer, facts = consolidated(result.text, question)
         if answer_stream and answer_stream.shown != answer:
             raise ValueError("project_stream_changed")
-        retrieved = {str(p["chunk_id"]): p for p in item.chunks_recuperes}
-        keys = list(dict.fromkeys(re.findall(r"\b[a-f0-9]{64}\b", answer)))
-        if not set(keys) <= retrieved.keys():
-            raise ValueError("invalid_citation")
-        # Sources are validated against this request's scoped retrieval results.
-        for key in keys:
-            item.citations.append(Source.model_validate(retrieved[key]).model_dump())
-            answer = answer.replace(key, f"[Source](/projects/{project}/sources/{key})")
+        answer = render_project_citations(item, str(project), answer)
         answer = memory_prefix + answer
         await GatewayModel.post(
             base + "/turns",
