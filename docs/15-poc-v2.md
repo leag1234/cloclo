@@ -155,6 +155,8 @@ des serveurs MCP autorisés ; les actions à effet de bord (créer, publier, mod
 passent par une confirmation utilisateur ; journalisation des actions.
 **Principe frontier** : l'assistant enchaîne lecture + action sur les outils comme un
 collaborateur, avec confirmation avant tout effet de bord.
+Le contrat `contracts/m14.md` fixe le transport stdio et la configuration autorisée ;
+le premier incrément refuse les écritures en attendant le formulaire de confirmation.
 **Validation** : lecture d'une ressource GitLab via MCP ; création d'une issue après
 confirmation ; refus d'une action non confirmée ; aucun secret MCP exposé.
 
