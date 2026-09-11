@@ -1,9 +1,9 @@
 # edge-bff
 
-Responsable : `OWNERS`.
+Owner: `OWNERS`.
 
-M0 : liveness locale uniquement, contrat `contracts/edge-bff.openapi.json`.
-Runbook : `python3 services/edge-bff/server.py`, puis
-`bash services/edge-bff/healthcheck.sh` ; arrêt par Ctrl-C.
-SLO M0 : `/health` retourne 200 tant que le processus fonctionne.
-Dashboard M0 : logs JSON stdout (`service`, `event`) ; métriques M5.
+M0: local liveness only, contract `contracts/edge-bff.openapi.json`.
+Runbook: `python3 services/edge-bff/server.py`, then
+`bash services/edge-bff/healthcheck.sh`; stop with Ctrl-C.
+SLO M0: `/health` returns 200 as long as the process is running.
+Dashboard M0: JSON stdout logs (`service`, `event`); metrics M5.
