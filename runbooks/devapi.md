@@ -1,40 +1,39 @@
-# API développeurs M15
+# M15 Developer API
 
-REQ-DEV-001..005 ; contrat `contracts/m15.md`. `make serve-devapi` écoute sur
-127.0.0.1:8030, accessible par tunnel SSH8030. Aucun GPU. Les clients n'ont accès
-ni aux conversations, ni au RAG, ni aux outils MCP du chat privé8020.
+REQ-DEV-001..005; contract `contracts/m15.md`. `make serve-devapi` listens on
+127.0.0.1:8030, accessible via SSH tunnel 8030. No GPU. Clients have no access
+to conversations, RAG, or MCP tools from the private chat 8020.
 
-Administrer les clés localement, avec la même variable ATLAS_DEVAPI_DB que le serveur
-(défaut BRAIN/devapi/usage.sqlite) :
+Administer keys locally, using the same ATLAS_DEVAPI_DB variable as the server
+(default BRAIN/devapi/usage.sqlite):
 
 ```sh
 python -m services.orchestrator.dev_auth create alice --key-file /chemin/prive/alice.key --daily-requests 20 --daily-micro-eur 50000
 python -m services.orchestrator.dev_auth revoke alice
 ```
 
-Le fichier de remise est créé exclusivement en0600 ; aucune clé sur stdout. Le
-transmettre par canal privé. Conserver SQLite entre les démarrages : réservations
-inconnues et quotas quotidiens UTC persistent. GET /v1/usage expose seulement le
-compteur de la clé authentifiée. Ne pas supprimer la base pour réinitialiser un quota.
+The delivery file is created exclusively with mode 0600; no keys on stdout. Transmit
+it via a private channel. Preserve SQLite between restarts: unknown reservations and
+daily UTC quotas persist. GET /v1/usage exposes only the counter for the authenticated
+key. Do not delete the database to reset a quota.
 
-Alias public `atlas-code`, rôle code du gateway ; une tentative par requête,
-0,05EUR maximum réservé AVANT l'appel. Les octets UTF8 et le maximum sortant sont
-majorés : la capacité financière peut être inférieure à la fenêtre du fournisseur.
-Le cas validé contient24 616octets de code utile. Réduire explicitement contexte ou
-max_tokens si400 ; aucune troncature silencieuse. Quota quotidien insuffisant429,
-clé absente/invalide/révoquée401, erreur fournisseur502. Après annulation/usage
-absent, la réserve reste débitée ; un coût fournisseur connu la remplace.
+Public alias `atlas-code`, gateway code role; one attempt per request,
+maximum 0.05 EUR reserved BEFORE the call. UTF8 bytes and the output maximum are
+conservatively bounded: the financial capacity may be lower than the provider's window.
+The validated case contains 24,616 bytes of useful code. Explicitly reduce context or
+max_tokens if 400; no silent truncation. Insufficient daily quota returns 429,
+missing/invalid/revoked key returns 401, provider error returns 502. After cancellation or missing
+usage, the reserve remains debited; a known provider cost replaces it.
 
-Chat Completions, Responses et Messages acceptent texte et fonctions exécutées
-par le client. Pas d'images/audio, outils hébergés, previous_response_id ou stockage
-Responses. Les options non prises en charge sont refusées. Les métadonnées/cache
-n'accordent ni identité ni garantie de cache. Messages fonctionne sans thinking.
-Les sorties tronquées restent length/incomplete/max_tokens ; ne pas exécuter un
-appel tronqué comme une fonction complète. Journaux : identifiants, tokens/coût,
-durée ; aucun contenu ni credential.
+Chat Completions, Responses, and Messages accept text and functions executed
+by the client. No images/audio, hosted tools, previous_response_id, or Responses
+storage. Unsupported options are rejected. Metadata/cache grants neither identity
+nor cache guarantee. Messages works without thinking. Truncated outputs remain
+length/incomplete/max_tokens; do not execute a truncated call as a complete function.
+Logs: identifiers, tokens/cost, duration; no content nor credentials.
 
-Profil Codex0.153.4 : clé ATLAS_API_KEY chargée depuis le fichier privé dans
-l'environnement du client, base du tunnel. Fragment de configuration :
+Codex Profile 0.153.4: ATLAS_API_KEY key loaded from the private file in the
+client environment, base of the tunnel. Configuration fragment:
 
 ```toml
 model = "atlas-code"
@@ -55,34 +54,34 @@ goals = false
 remote_plugin = false
 ```
 
-Le profil court borne les instructions initiales ; le contexte d'un dépôt entier
-peut dépasser le budget. Conserver les protections d'exécution habituelles du client.
-Source: [configuration Codex](https://learn.chatgpt.com/docs/config-file/config-advanced).
+The short profile bounds initial instructions; the context of an entire repository
+may exceed the budget. Retain the client's usual execution protections.
+Source: [Codex configuration](https://learn.chatgpt.com/docs/config-file/config-advanced).
 
-Profil Claude Code2.1.268 : ANTHROPIC_BASE_URL=http://127.0.0.1:8030,
-ANTHROPIC_API_KEY issue de sa propre clé privée, CLAUDE_CODE_DISABLE_THINKING=1,
-CLAUDE_CODE_MAX_OUTPUT_TOKENS=512, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 et
-CLAUDE_CODE_ATTRIBUTION_HEADER=0. Commande `claude --bare --model atlas-code --tools Bash
---allowedTools Bash --system-prompt "$(cat prompts/dev-client-system.txt)" -p "tâche"`.
-Ce pont vers un modèle non-Claude est expérimental et non pris en charge par le
-fournisseur du client ; pas de promesse de compatibilité avec les versions futures.
-Source: [protocole gateway](https://code.claude.com/docs/en/llm-gateway-protocol).
+Claude Code Profile 2.1.268: ANTHROPIC_BASE_URL=http://127.0.0.1:8030,
+ANTHROPIC_API_KEY derived from its own private key, CLAUDE_CODE_DISABLE_THINKING=1,
+CLAUDE_CODE_MAX_OUTPUT_TOKENS=512, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1, and
+CLAUDE_CODE_ATTRIBUTION_HEADER=0. Command `claude --bare --model atlas-code --tools Bash
+--allowedTools Bash --system-prompt "$(cat prompts/dev-client-system.txt)" -p "task"`.
+This bridge to a non-Claude model is experimental and not supported by the
+client provider; no promise of compatibility with future versions.
+Source: [gateway protocol](https://code.claude.com/docs/en/llm-gateway-protocol).
 
-`make verify-m15` exécute le rejeu HTTP sans secret puis, si la clé Scaleway est
-présente, un vrai aller-retour fonction/résultat et le grand contexte. Chaque clé
-de test live a un plafond50000microEUR. Preuves locales BRAIN/eval/devapi*.json ;
-la CI par PR ne consomme aucune inférence. Les clients natifs sont testés séparément
-sur des dossiers synthétiques, avec assertions externes sur le fichier généré.
+`make verify-m15` executes HTTP replay without secrets, then, if the Scaleway key is
+present, a real function/result round-trip and large context. Each live test key
+has a cap of 50,000 micro-EUR. Local proofs in BRAIN/eval/devapi*.json;
+CI by PR consumes no inference. Native clients are tested separately
+on synthetic folders, with external assertions on the generated file.
 
-Reproduction native : Docker CPU et image python:3.12-slim figée par digest dans
-`tests/devapi_clients.py`, binaire Codex0.153.4 (Apache-2.0, paquet officiel installé)
-et Claude Code2.1.268 (licence fournisseur, paquet officiel de test) nécessaires.
-Définir ATLAS_CODEX_VENDOR_DIR sur le répertoire vendor x86_64 du client installé et
-ATLAS_CLAUDE_BINARY sur son exécutable natif, puis `make test-devapi-clients`.
-Versions vérifiées avant inférence ; aucune dépendance de ces clients dans le serveur.
-Le harness monte uniquement binaire, dossier synthétique, relais et socketAPI dans
-des conteneurs sans réseau/capabilities. Aucune clé cloud/GitHub ni configuration
-personnelle. Le bypass Codex est limité à ce conteneur ; le grader est un second
-conteneur sans clé avec dossier en lecture seule. Nettoyage automatique à la sortie.
-Chaque client dispose de4requêtes et50000microEUR au total ; preuve expurgée dans
-BRAIN/eval/devapi-clients.json, sans contenu utilisateur réel.
+Native reproduction: Docker CPU and python:3.12-slim image pinned by digest in
+`tests/devapi_clients.py`, Codex binary 0.153.4 (Apache-2.0, official installed package)
+and Claude Code 2.1.268 (provider license, official test package) required.
+Define ATLAS_CODEX_VENDOR_DIR to the installed client's x86_64 vendor directory and
+ATLAS_CLAUDE_BINARY to its native executable, then `make test-devapi-clients`.
+Versions verified before inference; no dependencies of these clients in the server.
+The harness mounts only binary, synthetic folder, relay, and API socket into
+containers without network/capabilities. No cloud/GitHub keys nor personal
+configuration. The Codex bypass is limited to this container; the grader is a second
+container without keys with a read-only folder. Automatic cleanup on exit.
+Each client has 4 requests and 50,000 micro-EUR total; redacted proof in
+BRAIN/eval/devapi-clients.json, without real user content.
