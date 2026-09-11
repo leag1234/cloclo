@@ -96,6 +96,8 @@ réponses longues.
   séparément quand pertinent, avec le surcoût tokens signalé/borné.
 **Cible d'évaluation** : latence perçue fortement réduite ; ressenti proche d'un frontier.
 **Validation** : les tokens s'affichent progressivement ; le budget par requête reste tenu.
+Le transport SSE applique la politique serverless M8 avant I/O ; un fallback reste
+possible avant tout fragment visible, jamais après émission de contenu/réflexion.
 
 ### M12 — Description d'image (multimodal entrée)
 **But** : le système voit et analyse les images envoyées.

@@ -3,7 +3,9 @@
 import asyncio
 import json
 import logging
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import select
+import socket
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 
 from gateway_cpu import CPUModels, EMBEDDING_REVISION
 from generation import Generator
@@ -14,6 +16,54 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: object) -> None:
             pass  # Request bodies and URLs must not enter infrastructure logs.
+
+        def stream_response(self, request: object) -> None:
+            from stream_transport import StreamRequest
+
+            validated = StreamRequest.model_validate(request)
+            provider = AgentProvider()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.close_connection = True
+
+            def send(event: dict[str, object]) -> None:
+                self.wfile.write(("data: " + json.dumps(event) + "\n\n").encode())
+                self.wfile.flush()
+
+            async def relay() -> None:
+                from contextlib import aclosing
+
+                async def produce() -> None:
+                    async with aclosing(
+                        provider.stream(validated.model_dump())
+                    ) as events:
+                        async for event in events:
+                            send(event)
+
+                task = asyncio.create_task(produce())
+                try:
+                    while not task.done():
+                        await asyncio.wait({task}, timeout=0.05)
+                        readable, _, _ = select.select([self.connection], [], [], 0)
+                        if readable and not self.connection.recv(1, socket.MSG_PEEK):
+                            return
+                    await task
+                finally:
+                    if not task.done():
+                        task.cancel()
+                    await asyncio.gather(task, return_exceptions=True)
+
+            try:
+                asyncio.run(relay())
+            except (BrokenPipeError, ConnectionResetError):
+                return
+            except (ValueError, RuntimeError, TimeoutError, OSError):
+                try:
+                    send({"error": "provider_error"})
+                except (BrokenPipeError, ConnectionResetError):
+                    return
 
         def do_POST(self) -> None:
             try:
@@ -76,6 +126,9 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                     response = AgentProvider().configuration(
                         request.get("local_enabled", True)
                     )
+                elif self.path == "/agent/stream":
+                    self.stream_response(request)
+                    return
                 elif self.path == "/agent/complete":
                     response = asyncio.run(AgentProvider().complete(request))
                 elif self.path == "/answer":
@@ -116,7 +169,7 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
             self.end_headers()
             self.wfile.write(body)
 
-    return HTTPServer(("127.0.0.1", port), Handler)
+    return ThreadingHTTPServer(("127.0.0.1", port), Handler)
 
 
 if __name__ == "__main__":
