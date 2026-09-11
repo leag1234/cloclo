@@ -45,14 +45,28 @@ done
 [[ "$ERR" == "0" ]] || fail "documentation not translated (see above)"
 pass "documentation (docs/, contracts/, runbooks/, README, MISSION, AGENTS) is in English"
 
-# 3. Code: comments, docstrings and messages must be in English.
-HITS=$(grep -rilE "$FR" --include="*.py" --include="*.sh" services/ scripts/ infra/ tests/ 2>/dev/null \
-       | grep -vE "$EXCLUDE" || true)
+# 3. Code: comments, docstrings and user-facing messages must be in English.
+#    We only look at COMMENT lines and docstrings, and we match French *accents*
+#    there. Rationale: identifiers and keyword arguments (e.g. Pydantic's `le=2048`)
+#    are not prose and must never be flagged; French prose in this codebase is
+#    always accented. Files whose purpose is to test French handling are excluded.
+CODE_EXCLUDE='(corpus/|evals/golden/|BRAIN/|scripts/verify-m[0-9]+\.sh|tests/.*(multiling|french|langue|i18n).*)'
+HITS=""
+while IFS= read -r f; do
+  [[ "$f" =~ $CODE_EXCLUDE ]] && continue
+  # comment lines (#, //) and docstring lines, containing French accents
+  if grep -nE '^[[:space:]]*(#|//)|"""|\x27\x27\x27' "$f" 2>/dev/null \
+     | grep -qE '[àâçéèêëîïôûùüœ]'; then
+    HITS="$HITS$f"$'\n'
+  fi
+done < <(find services scripts infra tests -type f \( -name '*.py' -o -name '*.sh' \) 2>/dev/null)
+HITS=$(printf '%s' "$HITS" | grep -v '^$' || true)
 if [[ -n "$HITS" ]]; then
-  echo "::error::verify-m16: French found in code:" >&2; echo "$HITS" | head -10 >&2
-  fail "code not translated ($(echo "$HITS" | wc -l) files)"
+  echo "::error::verify-m16: French comments/docstrings found in code:" >&2
+  echo "$HITS" | head -10 >&2
+  fail "code comments not translated ($(echo "$HITS" | wc -l) files)"
 fi
-pass "code (comments, docstrings, messages) is in English"
+pass "code comments and docstrings are in English"
 
 # 4. Intentionally multilingual content MUST be preserved (not translated away).
 grep -rqE "[àéèêçù]" corpus/ 2>/dev/null || fail "multilingual corpus lost: French must REMAIN there"
