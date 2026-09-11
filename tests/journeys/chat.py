@@ -145,24 +145,33 @@ def main() -> None:
         recalled = answer.split("\n\n", 1)[-1]
         assert "Ambre-742" in recalled, answer
         report["J5_memory_shared"] = True
-        alpha_selected = selected
+        alpha_command, alpha_selected = command, selected
+        alpha_image: dict[str, object] = {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Décris cette image du projet Alpha."},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": "data:image/png;base64," + encoded},
+                },
+            ],
+        }
+        description, _ = ask(
+            [
+                alpha_command,
+                {"role": "assistant", "content": alpha_selected},
+                alpha_image,
+            ]
+        )
+        assert "rouge" in description.lower() and "bleu" in description.lower()
         command = user("/project create JourneyBeta")
         selected, _ = ask([command])
         answer, _ = ask(
             [
                 user("/project use JourneyAlpha"),
                 {"role": "assistant", "content": alpha_selected},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Image Alpha Ambre-742"},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": "data:image/png;base64," + encoded},
-                        },
-                    ],
-                },
-                {"role": "assistant", "content": "Alpha Ambre-742"},
+                alpha_image,
+                {"role": "assistant", "content": description},
                 command,
                 {"role": "assistant", "content": selected},
                 user("Quel est le nom du prototype de ce projet ?"),
