@@ -34,6 +34,9 @@ class VisionProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body["model"], provider.config["model"])
         self.assertEqual(body["messages"][1:], value["messages"])
         self.assertNotIn("tools", body)
+        self.assertIn(
+            Path("prompts/chat.txt").read_text(), body["messages"][0]["content"]
+        )
 
     async def test_budget_and_context_stop_before_transport(self) -> None:
         for boundary in ("cost", "context"):

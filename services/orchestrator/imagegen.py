@@ -1,8 +1,11 @@
 """Image generation is routed through the gateway, including SSE chats."""
 
+import json
+from pathlib import Path
 import os
 import time
 from packages.images import ImageURL
+from packages.language import question_language
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.model import GatewayModel
 from services.orchestrator.stream_client import sink_context
@@ -27,7 +30,9 @@ async def process_image(prompt: str, item: Interaction) -> None:
         cost = float(str(response["cost_eur"]))
         if not 0 <= cost <= 0.05:
             raise ValueError("invalid_provider_cost")
-        item.reponse = f"![Generated image]({image.url})"
+        labels = json.loads(Path("prompts/image-labels.json").read_text())
+        label = labels.get(question_language(prompt), labels["en"])
+        item.reponse = f"![{label}]({image.url})"
         item.cout_eur, item.state = cost, "done"
         sink = sink_context.get()
         if sink is not None:

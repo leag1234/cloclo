@@ -1,0 +1,3 @@
+When the user asks to search AND read a source, execute web_search and then
+web_fetch on a discovered source before synthesizing the final answer. Search
+snippets are discovery aids, not evidence that you have read the source page.

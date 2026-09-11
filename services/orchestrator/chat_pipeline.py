@@ -107,8 +107,25 @@ class ChatTools(Runtime):
     async def execute(self, call: Call, timeout: float) -> Message:
         if call.name != "rag_search":
             output = await super().execute(call, timeout)
+            # Keep enough source text for synthesis within the unchanged request cap.
+            data = output.get("data")
+            if call.name == "web_fetch" and isinstance(data, dict):
+                text = str(data.get("text", ""))
+                data["text"] = "\n".join(
+                    p.text for p in select_content(text, self.question, 400)
+                )
+                data["truncated"] = len(str(data["text"])) < len(text)
             if "error" in output:
                 self.item.erreurs.append(str(output["error"]))
+            sink = sink_context.get()
+            if sink:
+                await sink(
+                    {
+                        "phase": "tool_finished",
+                        "tool": call.name,
+                        "ok": "error" not in output,
+                    }
+                )
             return output
         started = time.monotonic()
         try:
@@ -132,6 +149,10 @@ class ChatTools(Runtime):
 
 
 async def process(request: ChatRequest, item: Interaction) -> None:
+    from services.orchestrator.project_commands import select
+
+    if await select(request, item, retrieval_url()):
+        return
     if request.project_id is not None:
         from services.orchestrator.project_chat import process_project
 
@@ -160,7 +181,8 @@ async def process(request: ChatRequest, item: Interaction) -> None:
             model,
             tools,
             Path("prompts/agent.txt").read_text()
-            + Path("prompts/chat.txt").read_text(),
+            + Path("prompts/chat.txt").read_text()
+            + Path("prompts/web-chat.txt").read_text(),
             Limits(wall_clock=max(0, 120 - (time.monotonic() - started))),
             history=[m.model_dump() for m in request.messages[:-1]],
         )
