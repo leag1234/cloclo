@@ -17,9 +17,12 @@ from services.orchestrator.model import GatewayError
 from services.orchestrator.interactions import Interaction, write_interaction
 
 from services.orchestrator.project_ui import router as project_router
+from services.orchestrator.mcp_confirmation import router as mcp_router
 
 app = FastAPI(title="ATLAS chat")
 app.include_router(project_router)
+
+app.include_router(mcp_router)
 
 
 @app.get("/v1/models")
