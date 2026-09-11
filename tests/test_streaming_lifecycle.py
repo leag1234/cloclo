@@ -88,6 +88,37 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn('"finish_reason": "stop"', text)
             self.assertTrue(text.endswith("data: [DONE]\n\n"))
 
+    async def test_intermediate_text_is_labeled_in_the_ui(self) -> None:
+        async def process(payload: ChatRequest, item: Interaction) -> None:
+            sink = sink_context.get()
+            assert sink is not None
+            await sink({"turn": 1, "phase": "generating"})
+            await sink({"delta": {"content": "Recherche en cours."}})
+            await sink({"turn": 1, "phase": "intermediate"})
+            await sink({"turn": 2, "phase": "generating"})
+            await sink({"delta": {"content": "Réponse finale."}})
+            await sink({"turn": 2, "phase": "final"})
+            item.state = "done"
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, {"ATLAS_INTERACTION_DIR": directory}),
+        ):
+            events = [
+                str(x)
+                async for x in response(
+                    request(), Interaction(), time.monotonic(), process
+                ).body_iterator
+            ]
+            content = "".join(
+                json.loads(x[6:])["choices"][0]["delta"].get("content", "")
+                for x in events
+                if x != "data: [DONE]\n\n"
+            )
+            self.assertIn("Étape intermédiaire terminée", content)
+            self.assertLess(content.index("Recherche"), content.index("Étape"))
+            self.assertLess(content.index("Étape"), content.index("Réponse finale"))
+
     async def test_fragmented_citation_is_resolved_before_link(self) -> None:
         key = "a" * 64
         source: dict[str, object] = {
