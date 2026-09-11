@@ -21,7 +21,9 @@ pass "README.md present and structured"
 #    accented proper nouns). This script excludes itself (it holds the pattern).
 FR='\b(le|la|les|un|une|des|du|dans|pour|avec|sans|est|sont|etre|avoir|cette|ces|qui|que|dont|ainsi|donc|mais|aucun|chaque|toujours|jamais|doit|peut|selon|lors|afin|voir|ici)\b'
 SELF="scripts/verify-m16.sh"
-EXCLUDE='^(corpus/|evals/golden/|BRAIN/|scripts/verify-m16\.sh)'
+# Protected internal check scripts (scripts/verify-*.sh) are tooling, not public
+# documentation: they are excluded from the translation requirement.
+EXCLUDE='^(corpus/|evals/golden/|BRAIN/|scripts/verify-m[0-9]+\.sh)'
 
 scan() {  # $1=dir  $2=include-glob  $3=label
   [[ -d "$1" ]] || return 0
