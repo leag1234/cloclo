@@ -1,12 +1,12 @@
 # guardrails
 
-Responsable : `OWNERS`.
+Owner: `OWNERS`.
 
-Squelette M0 sans processus actif.
-SLO, runbook et dashboard : non applicables avant activation du service
-au jalon correspondant dans MISSION.md.
+M0 skeleton with no active processes.
+SLO, runbook, and dashboard: not applicable before service activation
+at the corresponding milestone in MISSION.md.
 
-M6 active un filtre pur dans Query, avant I/O : contrôles invisibles dangereux
-rejetés, langues et retours à la ligne conservés. Les erreurs 422 ne renvoient pas
-le texte rejeté. Log structuré input_rejected sans contenu. Ce filtre minimal ne
-constitue pas une défense complète contre l'injection sémantique de prompt.
+M6 activates a pure filter in Query, before I/O: dangerous invisible controls
+are rejected, languages and line breaks are preserved. 422 errors do not return
+the rejected text. Structured log input_rejected without content. This minimal filter does
+not constitute a complete defense against semantic prompt injection.

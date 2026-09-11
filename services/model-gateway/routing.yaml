@@ -1,5 +1,5 @@
-# Source de vérité du routage. Les identifiants viennent de l'environnement (.env),
-# jamais codés en dur ailleurs (docs/02 AC-ARC-4).
+# Routing source of truth. Identifiers come from the environment (.env),
+# never hard-coded elsewhere (docs/02 AC-ARC-4).
 task_classes:
   chat_simple:
     primary:  { provider: local,    model: "${LOCAL_MODEL}" }

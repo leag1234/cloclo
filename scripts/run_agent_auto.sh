@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# run_agent_auto.sh — mode AUTONOME NUIT : enchaîne les jalons donnés, sans intervention.
-# L'agent tranche lui-même les contradictions MINEURES (seuils/nombres de cas/assouplissements
-# PoC déjà documentés) et CONTINUE ; il ne s'arrête QUE sur les contradictions de SÉCURITÉ
-# (isolation tenant, secrets, budgets, actions destructrices) ou un échec technique réel.
+# run_agent_auto.sh — AUTONOMOUS NIGHT mode: run the supplied milestones without intervention.
+# The agent resolves MINOR contradictions (thresholds/case counts/relaxations
+# already documented for the PoC) and CONTINUES; it stops ONLY for SECURITY contradictions
+# (tenant isolation, secrets, budgets, destructive actions) or an actual technical failure.
 # Usage : run_agent_auto.sh M5 M6
 set -Eeuo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -10,38 +10,38 @@ set -a; [[ -f .env ]] && source .env; set +a
 
 mkdir -p BRAIN
 for MILESTONE in "$@"; do
-  echo "=== $(date -Is) — AUTO: démarrage $MILESTONE ===" | tee -a BRAIN/agent.log
+  echo "=== $(date -Is) — AUTO: starting $MILESTONE ===" | tee -a BRAIN/agent.log
 
   read -r -d '' PROMPT <<EOF || true
-Tu réalises le jalon ${MILESTONE} du projet ATLAS-0, en MODE AUTONOME.
+Implement milestone ${MILESTONE} of the ATLAS-0 project, in AUTONOMOUS MODE.
 
-Avant toute action : lis AGENTS.md, MISSION.md, docs/13-poc-spec.md. Respecte docs/11 et docs/14.
+Before taking any action: read AGENTS.md, MISSION.md, docs/13-poc-spec.md. Follow docs/11 and docs/14.
 
-RÈGLE D'AUTONOMIE (nuit) : pour toute contradiction MINEURE entre MISSION.md et
-docs/13 portant sur un SEUIL, un NOMBRE DE CAS, une RÉPARTITION PAR LANGUE, ou un
-ASSOUPLISSEMENT déjà marqué "PoC" dans l'un des deux documents, tu NE t'arrêtes PAS :
-tu appliques la version la MOINS STRICTE (celle qui correspond à l'état réel des
-jeux dorés livrés), tu documentes ce choix dans le rapport et BRAIN/JOURNAL.md avec
-le marqueur "CONTRADICTION résolue en autonomie:", et tu CONTINUES.
+AUTONOMY RULE (night): for any MINOR contradiction between MISSION.md and
+docs/13 involving a THRESHOLD, CASE COUNT, LANGUAGE DISTRIBUTION, or a
+RELAXATION already marked "PoC" in either document, DO NOT stop:
+apply the LESS STRICT version (the one matching the actual state of the
+delivered golden sets), document this choice in the report and BRAIN/JOURNAL.md using
+the marker "CONTRADICTION résolue en autonomie:", and CONTINUE.
 
-Tu t'arrêtes et écris dans BRAIN/BLOCKERS.md UNIQUEMENT si :
-- contradiction ou risque de SÉCURITÉ (isolation tenant, fuite de secret, budget dépassé,
-  action destructrice, appel payant hors budget) ;
-- échec TECHNIQUE réel après 3 tentatives (dépendance cassée, erreur fournisseur persistante) ;
-- fichier protégé qui devrait être modifié (CODEOWNERS/verify-*/workflows).
+Stop and write to BRAIN/BLOCKERS.md ONLY for:
+- SECURITY contradiction or risk (tenant isolation, leaked secret, exceeded budget,
+  destructive action, paid call outside the budget);
+- actual TECHNICAL failure after 3 attempts (broken dependency, persistent provider error);
+- a protected file requiring modification (CODEOWNERS/verify-*/workflows).
 
-Définition de terminé pour ${MILESTONE} :
-  1. make verify-${MILESTONE,,} passe en LOCAL, puis
-  2. branche ${MILESTONE,,}-<sujet>, commit, push, PR, puis
-  3. attends la CI 'ci' VERTE (poll API GitHub, max 60 essais × 15s = 15 min), puis
-  4. si CI verte, MERGE toi-même via l'API GitHub (squash), puis maj BRAIN/.
+Definition of done for ${MILESTONE} :
+  1. make verify-${MILESTONE,,} passes LOCALLY, then
+  2. branch ${MILESTONE,,}-<topic>, commit, push, PR, then
+  3. wait for GREEN CI 'ci' (poll GitHub API, max 60 attempts × 15s = 15 min), then
+  4. if CI is green, MERGE yourself via the GitHub API (squash), then update BRAIN/.
 
-AUTORISATION MERGE : autorisé si et seulement si le job 'ci' est vert. Ne modifie
-jamais de fichier protégé. Appels payants (Scaleway/SerpApi) autorisés dans la limite
-du budget par requête ; le GPU n'est PAS requis pour M5/M6.
+MERGE AUTHORIZATION: allowed if and only if the 'ci' job is green. Never modify
+a protected file. Paid calls (Scaleway/SerpApi) are authorized within the
+per-request budget; a GPU is NOT required for M5/M6.
 
-Quand ${MILESTONE} est terminé et mergé, passe AUTOMATIQUEMENT au jalon suivant s'il y
-en a un dans la liste. Écris "JALON ${MILESTONE} TERMINÉ" dans BRAIN/JOURNAL.md.
+Once ${MILESTONE} is completed and merged, AUTOMATICALLY proceed to the next milestone
+if one remains in the list. Write "JALON ${MILESTONE} TERMINÉ" in BRAIN/JOURNAL.md.
 EOF
 
   set +e
@@ -53,17 +53,17 @@ EOF
   CODE=$?
   set -e
 
-  echo "=== $(date -Is) — AUTO: $MILESTONE fini (exit $CODE) ===" | tee -a BRAIN/agent.log
+  echo "=== $(date -Is) — AUTO: $MILESTONE finished (exit $CODE) ===" | tee -a BRAIN/agent.log
 
-  # Si le jalon a écrit un blocage de sécurité, on arrête toute la chaîne
+  # If the milestone reports a security blocker, stop the entire sequence
   if [[ -f "BRAIN/${MILESTONE}.done" ]]; then
-    echo "AUTO: $MILESTONE marqué done, on continue." | tee -a BRAIN/agent.log
+    echo "AUTO: $MILESTONE marked done, continuing." | tee -a BRAIN/agent.log
   fi
-  # Détecter un blocage explicite : si BLOCKERS.md a été touché récemment ET pas de merge,
-  # on s'arrête pour ne pas enchaîner un jalon sur une base cassée.
+  # Detect an explicit blocker: if BLOCKERS.md was changed recently AND no merge occurred,
+  # stop to avoid starting the next milestone from a broken state.
   if grep -q "ARRÊT SÉCURITÉ\|SECURITY STOP" BRAIN/BLOCKERS.md 2>/dev/null; then
-    echo "AUTO: arrêt sécurité détecté, chaîne interrompue." | tee -a BRAIN/agent.log
+    echo "AUTO: security stop detected, sequence interrupted." | tee -a BRAIN/agent.log
     break
   fi
 done
-echo "=== $(date -Is) — AUTO: chaîne terminée ===" | tee -a BRAIN/agent.log
+echo "=== $(date -Is) — AUTO: sequence finished ===" | tee -a BRAIN/agent.log

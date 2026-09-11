@@ -74,12 +74,12 @@ def preview(request: Request, key: str) -> Response:
         with lock:
             action = lookup(key)
         response = HTMLResponse(
-            '<meta charset="utf-8"><title>Confirmer une action ATLAS</title>'
-            "<h1>Confirmer cette action</h1><pre>"
+            '<meta charset="utf-8"><title>Confirm an ATLAS action</title>'
+            "<h1>Confirm this action</h1><pre>"
             + html.escape(action.payload)
             + '</pre><form method="post"><input type="hidden" name="csrf" value="'
             + action.csrf
-            + '"><button>Confirmer et exécuter une fois</button></form>',
+            + '"><button>Confirm and execute once</button></form>',
             headers={
                 "Cache-Control": "no-store",
                 "Referrer-Policy": "no-referrer",

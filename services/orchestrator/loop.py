@@ -220,7 +220,7 @@ async def run(
         result.reason = "provider_error"
     result.state = "stopped"
     result.text = (
-        f"Arrêt explicite : {result.reason}. Outils exécutés : {result.tool_calls}."
+        f"Explicit stop: {result.reason}. Tools executed: {result.tool_calls}."
     )
     logging.getLogger(__name__).info(
         json.dumps(

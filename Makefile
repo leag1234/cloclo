@@ -1,103 +1,103 @@
-# ATLAS-0 — cibles standard. Les verify-* sont la définition de « terminé ».
-# scripts/verify-*.sh sont PROTÉGÉS (CODEOWNERS) : l'agent ne les édite pas.
+# ATLAS-0 — standard targets. The verify-* targets define completion.
+# scripts/verify-*.sh are PROTECTED (CODEOWNERS): the agent does not edit them.
 .DEFAULT_GOAL := help
 SHELL := /usr/bin/env bash
 
-help: ## liste les cibles
+help: ## list targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 	 | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n",$$1,$$2}'
 
 # --- dev ---
 lint: ## lint + format check
 	@bash scripts/lint.sh
-typecheck: ## typage strict
+typecheck: ## strict type checking
 	@bash scripts/typecheck.sh
-test: ## tests unitaires + contrat + intégration (sans LLM live)
+test: ## unit + contract + integration tests (no live LLM)
 	@bash scripts/test.sh
-scan-secrets: ## détection de secrets
+scan-secrets: ## secret detection
 	@bash scripts/scan_secrets.sh
 
-# --- évals ---
-eval-smoke: ## sous-ensemble rapide (<3 min), utilisé en CI par PR
+# --- evaluations ---
+eval-smoke: ## quick subset (<3 min), used in PR CI
 	@bash scripts/eval.sh --smoke
-eval: ## suite complète (<20 min), rapport HTML + diff + par langue
+eval: ## full suite (<20 min), HTML report + diff + per language
 	@bash scripts/eval.sh --full
 
-# --- démo ---
-demo: ## déroule un scénario complet RAG+web+escalade
+# --- demo ---
+demo: ## run a complete RAG+web+escalation scenario
 	@bash scripts/demo.sh
 
-# --- jalons (chacun appelle son script protégé) ---
-verify-m0: ## cadre vérifiable
+# --- milestones (each calls its protected script) ---
+verify-m0: ## verifiable framework
 	@PYTHONPATH=services/edge-bff python3 scripts/verify_m0.py
-verify-m1: ## infra GPU reproductible + gateway
+verify-m1: ## reproducible GPU infrastructure + gateway
 	@bash scripts/verify-m1.sh
 verify-m2: ## ingestion + RAG
 	@bash scripts/verify-m2.sh
-verify-m3: ## harness + outils web
+verify-m3: ## harness + web tools
 	@bash scripts/verify-m3.sh
-verify-m4: ## cascade + UI + escalade
+verify-m4: ## cascade + UI + escalation
 	@bash scripts/verify-m4.sh
-verify-m5: ## évals complètes + télémétrie
+verify-m5: ## full evaluations + telemetry
 	@bash scripts/verify-m5.sh
-verify-m6: ## durcissement + bench + rapport
+verify-m6: ## hardening + benchmark + report
 	@bash scripts/verify-m6.sh
 
 .PHONY: help lint typecheck test scan-secrets eval-smoke eval demo \
         verify-m0 verify-m1 verify-m2 verify-m3 verify-m4 verify-m5 verify-m6
 
 .PHONY: ingest
-ingest: ## ingérer le corpus via gateway dans Postgres/pgvector
+ingest: ## ingest corpus through gateway into Postgres/pgvector
 	@python3 -m services.retrieval.pipeline
 
 .PHONY: eval-retrieval
-eval-retrieval: ## évaluer E1 et résoudre les citations de réponses générées
+eval-retrieval: ## evaluate E1 and resolve citations in generated answers
 	@python3 -m services.retrieval.evaluate
 
 .PHONY: test-web-security test-budgets eval-tools eval-web
-test-web-security: ## contrôles SSRF, robots, corps HTTP et plafonds
+test-web-security: ## SSRF, robots, HTTP body and limit checks
 	@PYTHONPATH=.:tests python3 -m unittest test_web_security test_web_transport test_tool_runtime test_budgets.BudgetTests.test_fetch_limit -v
-test-budgets: ## quatre budgets durs et arrêt des appels en cours
+test-budgets: ## four hard budgets and cancellation of active calls
 	@PYTHONPATH=.:tests python3 -m unittest test_budgets -v
-eval-tools: ## E4 réel avec erreurs injectées exclusivement dans le harness de test
+eval-tools: ## live E4 with errors injected only in the test harness
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/agent_gate_eval.py tools
-eval-web: ## E6 bout en bout ; qualité soumise aux clés et au juge humains
+eval-web: ## end-to-end E6; quality subject to human answer keys and judge
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/agent_gate_eval.py web
 
 .PHONY: eval-routing test-fallback
-eval-routing: ## E8 : matrice de confusion et sous-routage critique
+eval-routing: ## E8: confusion matrix and critical under-routing
 	@PYTHONPATH=services/model-gateway python3 tests/routing_eval.py
-test-fallback: ## endpoint local fermé puis replay de la réponse Scaleway enregistrée
+test-fallback: ## closed local endpoint then replay of the recorded Scaleway response
 	@PYTHONPATH=services/model-gateway:tests python3 -m unittest test_cascade -v
 
 .PHONY: report bench
-report: ## rapport GO/NO-GO depuis les mesures archivées
+report: ## GO/NO-GO report from archived measurements
 	@python3 -m evals.decision
-bench: ## micro-bench serverless borné, sans GPU
+bench: ## bounded serverless microbenchmark, no GPU
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/m6_bench.py
 
 .PHONY: serve test-ui verify-m7
-serve: ## UI locale, gateway CPU, retrieval et adaptateur ; GPU désactivé par défaut
+serve: ## local UI, CPU gateway, retrieval and adapter; GPU disabled by default
 	@bash scripts/serve.sh
-test-ui: ## requête HTTP intégrée avec citation et journal, fournisseur enregistré
+test-ui: ## integrated HTTP request with citation and log, recorded provider
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/ui_gate.py 2>&1
-verify-m7: ## vérificateur protégé UI et interactions
+verify-m7: ## protected UI and interaction verifier
 	@bash scripts/ui_gate.sh
 
 .PHONY: test-serverless verify-m8
-test-serverless: ## sondes M8 réelles ou rejeu explicite, sans GPU
+test-serverless: ## live M8 probes or explicit replay, no GPU
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/serverless_gate.py
-verify-m8: ## vérificateur protégé serverless
+verify-m8: ## protected serverless verifier
 	@bash scripts/verify-m8.sh
 .PHONY: test-memory verify-m9
-test-memory: ## tests intégrés de mémoire et projets sur données synthétiques
+test-memory: ## integrated memory and project tests on synthetic data
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/memory_gate.py
-verify-m9: ## mémoire persistée, isolation et effacement
+verify-m9: ## persistent memory, isolation and erasure
 	@bash scripts/verify-m9.sh
 .PHONY: test-large-input verify-m10
-test-large-input: ## grandes sources publiques : retrieval réel et fournisseur enregistré
+test-large-input: ## large public sources: real retrieval and recorded provider
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/large_input_gate.py 2>&1
-verify-m10: ## grandes entrées sourcées dans les budgets
+verify-m10: ## sourced large inputs within budgets
 	@bash scripts/verify-m10.sh
 .PHONY: test-streaming verify-m11
 test-streaming:
@@ -105,41 +105,45 @@ test-streaming:
 verify-m11:
 	@bash scripts/verify-m11.sh
 .PHONY: test-vision verify-m12
-test-vision: ## M12 : HTTP adaptateur/gateway, transport vision enregistré ou réel
+test-vision: ## M12: adapter/gateway HTTP, recorded or live vision transport
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/vision_gate.py
-verify-m12: ## vérificateur protégé multimodal
+verify-m12: ## protected multimodal verifier
 	@bash scripts/verify-m12.sh
 
 .PHONY: test-imagegen verify-m13
-test-imagegen: ## génération GPU réelle et extinction en fin de cycle
+test-imagegen: ## real GPU generation and shutdown at end of cycle
 	@timeout 1500 bash infra/imagegen.sh 2>&1
-verify-m13: ## gate protégé génération souveraine
+verify-m13: ## protected sovereign generation gate
 	@bash scripts/verify-m13.sh
 
 .PHONY: serve-imagegen
-serve-imagegen: ## active le GPU pour le chat durant dix minutes après chargement
+serve-imagegen: ## enable GPU for chat for ten minutes after loading
 	@timeout 2400 bash infra/imagegen.sh serve 2>&1
 
 .PHONY: test-mcp verify-m14
-test-mcp: ## MCP réel ou rejeu explicite des échanges synthétiques enregistrés
+test-mcp: ## live MCP or explicit replay of recorded synthetic exchanges
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/mcp_gate.py
-verify-m14: ## lecture et écriture confirmée, gate protégé intact
+verify-m14: ## read and confirmed write, protected gate unchanged
 	@bash scripts/verify-m14.sh
 
 .PHONY: serve-devapi
-serve-devapi: ## API développeurs locale, clés et quotas individuels ; sans GPU
+serve-devapi: ## local developer API, individual keys and quotas; no GPU
 	@bash scripts/serve-devapi.sh
 
 .PHONY: test-devapi verify-m15
-test-devapi: ## API développeurs : HTTP réel local et flux fournisseur enregistrés
+test-devapi: ## developer API: real local HTTP and recorded provider streams
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/devapi_gate.py
-verify-m15: ## gate protégé auth/quotas/outils/streaming/contexte/coût
+verify-m15: ## protected auth/quotas/tools/streaming/context/cost gate
 	@bash scripts/verify-m15.sh
 
 .PHONY: test-devapi-e2e
-test-devapi-e2e: ## fournisseur réel : fonction puis réponse et contexte utile >=24KiB
+test-devapi-e2e: ## live provider: function then answer and useful context >=24KiB
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/devapi_live.py
 
 .PHONY: test-devapi-clients
-test-devapi-clients: ## Codex/Claude natifs isolés, fournisseur réel et assertions externes
+test-devapi-clients: ## isolated native Codex/Claude, live provider and external assertions
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/devapi_clients.py
+
+.PHONY: verify-m16
+verify-m16: ## English localization and preservation of multilingual evaluation data
+	@bash scripts/verify-m16.sh

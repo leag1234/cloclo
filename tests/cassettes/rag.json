@@ -315,7 +315,7 @@
         }
       },
       "response": {
-        "text": "Je ne trouve pas la réponse dans les sources.",
+        "text": "I cannot find the answer in the sources.",
         "citations": [],
         "refused": true
       }

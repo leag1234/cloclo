@@ -109,7 +109,7 @@ class ProjectChatTests(unittest.IsolatedAsyncioTestCase):
         reused = await self.ask(self.first, other, "Quel langage utilise le projet ?")
         self.assertEqual(reused.state, "done")
         self.assertIn("Python", reused.reponse)
-        self.assertIn("Mémoire du projet", reused.reponse)
+        self.assertIn("Project memory", reused.reponse)
         self.assertLess(reused.cout_eur, 0.05)
         isolated = await self.ask(
             self.second, self.conversation(self.second), "Quel langage ?"
