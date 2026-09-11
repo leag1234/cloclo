@@ -93,3 +93,8 @@ This repository currently has no root license file granting a general license to
 its code. Public visibility alone does not grant redistribution rights.
 [NOTICE](NOTICE) records upstream attribution. Dependencies, model weights,
 Open WebUI, and evaluation datasets retain their respective licenses.
+
+`make serve` gracefully replaces a previous launcher from the same checkout and
+preserves chat/index volumes. With no active user session, run
+`make test-serve-idempotent` to verify two consecutive starts; this disruptive
+check is separate from CI.

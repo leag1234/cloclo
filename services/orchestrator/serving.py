@@ -30,6 +30,24 @@ def docker(*args: str) -> str:
 
 
 def docker_run(name: str, image: str, options: list[str]) -> None:
+    existing = docker(
+        "ps", "-a", "--filter", "name=^/" + name + "$", "--format", "{{.Names}}"
+    )
+    if existing:
+        actual = docker("inspect", "--format", "{{.Config.Image}}", name)
+        if actual != image:
+            raise RuntimeError("container_owner_mismatch")
+        try:
+            docker("rm", "-f", name)
+        except RuntimeError:
+            # --rm may already be removing a gracefully stopped container.
+            deadline = time.monotonic() + 5
+            while docker(
+                "ps", "-a", "--filter", "name=^/" + name + "$", "--format", "{{.Names}}"
+            ):
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.1)
     docker("run", "--rm", "-d", "--name", name, *options, image)
 
 
@@ -127,7 +145,7 @@ def stack(name: str = "atlas-chat", persistent: bool = True) -> Iterator[None]:
             docker("stop", database)
 
 
-def main() -> None:
+def run() -> None:
     for key in (
         "ESCALATION_MODEL",
         "SCW_GENERATIVE_BASE_URL",
@@ -159,6 +177,13 @@ def main() -> None:
         finally:
             if launched:
                 docker("stop", "atlas-chat-ui")
+
+
+def main() -> None:
+    from services.orchestrator.serve_owner import ownership
+
+    with ownership():
+        run()
 
 
 if __name__ == "__main__":
