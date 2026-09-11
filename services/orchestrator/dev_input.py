@@ -124,6 +124,14 @@ def responses(value: dict[str, Any]) -> ChatInput:
     )
 
 
+def cache_hint(part: dict[str, Any]) -> None:
+    if "cache_control" in part:
+        cache = part["cache_control"]
+        fields(cache, "type ttl")
+        if cache["type"] != "ephemeral" or cache.get("ttl", "5m") not in ("5m", "1h"):
+            raise ValueError("unsupported_cache_hint")
+
+
 def text_blocks(value: Any) -> str:
     if isinstance(value, str):
         return value
@@ -132,14 +140,7 @@ def text_blocks(value: Any) -> str:
         fields(part, "type text cache_control")
         if part["type"] != "text" or not isinstance(part["text"], str):
             raise ValueError("unsupported_content")
-        if "cache_control" in part:
-            cache = part["cache_control"]
-            fields(cache, "type ttl")
-            if cache["type"] != "ephemeral" or cache.get("ttl", "5m") not in (
-                "5m",
-                "1h",
-            ):
-                raise ValueError("unsupported_cache_hint")
+        cache_hint(part)
         parts.append(part["text"])
     return "\n".join(parts)
 
@@ -191,7 +192,8 @@ def messages(value: dict[str, Any]) -> ChatInput:
                     }
                 )
             elif kind == "tool_result" and role == "user" and not texts:
-                fields(block, "type tool_use_id content is_error")
+                fields(block, "type tool_use_id content is_error cache_control")
+                cache_hint(block)
                 if not isinstance(block.get("is_error", False), bool):
                     raise ValueError("invalid_tool_error")
                 text = text_blocks(block.get("content", ""))

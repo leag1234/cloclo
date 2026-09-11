@@ -66,3 +66,10 @@ async def responses(request: Request) -> Response:
     from services.orchestrator.dev_inference import chat
 
     return await chat(request, "responses")
+
+
+@app.post("/v1/messages")
+async def messages(request: Request) -> Response:
+    from services.orchestrator.dev_inference import chat
+
+    return await chat(request, "messages")
