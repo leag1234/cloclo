@@ -104,6 +104,8 @@ est affiché ; le JSON de consolidation reste interne et la réponse finale est 
 
 Les citations diffusées utilisent les passages récupérés et les routes propres au
 projet ; le préambule mémoire reste identique entre JSON et SSE.
+Contrat : `contracts/m11.md` ; protocole et limites : `reports/M11.md`.
+`make verify-m11` vérifie la progression avec une barrière fournisseur sur HTTP réel.
 
 ### M12 — Description d'image (multimodal entrée)
 **But** : le système voit et analyse les images envoyées.

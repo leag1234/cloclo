@@ -99,3 +99,8 @@ test-large-input: ## grandes sources publiques : retrieval réel et fournisseur 
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/large_input_gate.py 2>&1
 verify-m10: ## grandes entrées sourcées dans les budgets
 	@bash scripts/verify-m10.sh
+.PHONY: test-streaming verify-m11
+test-streaming:
+	@PYTHONPATH=.:services/model-gateway ATLAS_STREAM_REPORT=BRAIN/eval/streaming.json python3 -m unittest discover -s tests -p 'test_stream*.py' 2>&1
+verify-m11:
+	@bash scripts/verify-m11.sh

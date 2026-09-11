@@ -25,6 +25,7 @@ def response(
         queue: asyncio.Queue[dict[str, object] | None] = asyncio.Queue(maxsize=8)
         pending = ""
         turn = 0
+        citation_numbers: dict[str, int] = {}
         base = {
             "id": item.request_id,
             "created": int(time.time()),
@@ -49,7 +50,24 @@ def response(
                 )
             else:
                 await render_citations(temporary)
-            await queue.put({"delta": {"content": temporary.reponse}})
+            for citation in temporary.citations:
+                key = str(citation["chunk_id"])
+                citation_numbers.setdefault(key, len(citation_numbers) + 1)
+            labels = {
+                str(index): citation_numbers[str(c["chunk_id"])]
+                for index, c in enumerate(temporary.citations, 1)
+            }
+            temporary.reponse = re.sub(
+                r"\[Source (\d+)\]",
+                lambda match: f"[Source {labels.get(match[1], match[1])}]",
+                temporary.reponse,
+            )
+            await queue.put(
+                {
+                    "delta": {"content": temporary.reponse},
+                    "atlas": {"turn": turn, "phase": "generating"},
+                }
+            )
 
         async def sink(event: dict[str, object]) -> None:
             nonlocal pending, turn
@@ -57,6 +75,8 @@ def response(
                 if event["phase"] != "generating":
                     await content(pending)
                     pending = ""
+                if event["phase"] == "generating":
+                    citation_numbers.clear()
                 turn = int(str(event["turn"]))
                 await queue.put(
                     {"atlas": {**event, "reasoning_effort": payload.reasoning_effort}}
