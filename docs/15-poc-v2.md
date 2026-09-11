@@ -200,3 +200,5 @@ explicites FR/EN passent par `/images/generate` sur le gateway ; sortie PNG int�
 au Markdown/SSE et masquée dans les journaux. L’adresse GPU est configurée par
 `ATLAS_IMAGE_GPU_IP`, son tarif réel par `ATLAS_IMAGE_GPU_EUR_H` ; réservation
 90 secondes au plus 0,05 EUR. Le déploiement GPU fait l’objet d’un cycle séparé.
+
+M15 : contrat `contracts/m15.md`, OpenAPI `contracts/m15.openapi.json` et ADR-0001 ; clés/quotas SQLite locaux dans l'entrée développeur8030, indépendante des données du chat8020.
