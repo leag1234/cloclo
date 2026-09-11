@@ -1,95 +1,69 @@
-# 10 — SRE, observabilité, exploitation
+# 10 — SRE, Observability, Operations
 
-## 1. SLO et budget d'erreur
+## 1. SLO and Error Budget
 
-| SLI | SLO (interne) | SLO (produit) | Fenêtre |
+| SLI | SLO (Internal) | SLO (Product) | Window |
 |---|---|---|---|
-| Disponibilité (`2xx+4xx` / total) | 99,5 % | 99,9 % | 30 j glissants |
-| TTFT p95 | < 1,2 s | < 1,0 s | 30 j |
-| TPOT p95 (inter-token) | > 25 tok/s | > 30 tok/s | 30 j |
-| Taux d'échec de tâche agentique | < 5 % | < 3 % | 30 j |
-| Fraîcheur de l'index RAG | < 15 min après modification de la source | idem | continu |
+| Availability (`2xx+4xx` / total) | 99.5% | 99.9% | Rolling 30 days |
+| TTFT p95 | < 1.2 s | < 1.0 s | 30 days |
+| TPOT p95 (inter-token) | > 25 tok/s | > 30 tok/s | 30 days |
+| Agentic Task Failure Rate | < 5% | < 3% | 30 days |
+| RAG Index Freshness | < 15 min after source modification | same | continuous |
 
-- REQ-SRE-001 (MUST) : budget d'erreur explicite. S'il est consommé, **le développement de
-  nouvelles fonctionnalités s'arrête** au profit de la fiabilité. Règle écrite, appliquée.
-- REQ-SRE-002 (MUST) : alertes basées sur les **symptômes** (SLO brûlé) et non sur les
-  causes (CPU haut). Pas d'alerte non actionnable — chaque alerte a un runbook.
+- REQ-SRE-001 (MUST): Explicit error budget. If consumed, **development of new features stops** in favor of reliability. Written rule, applied.
+- REQ-SRE-002 (MUST): Alerts based on **symptoms** (SLO burned) and not causes (high CPU). No non-actionable alerts — every alert has a runbook.
 
-## 2. Télémétrie
+## 2. Telemetry
 
-- REQ-OBS-001 (MUST) : **OpenTelemetry** de bout en bout. Un `trace_id` unique traverse
-  BFF → orchestrateur → gateway → fournisseur → outils. Chaque étape agentique est un span
-  avec : modèle, tokens (entrée / sortie / cachés), coût, latence, décision de routage,
-  résultat des guards.
-- REQ-OBS-002 (MUST) : métriques minimales exposées :
-  `llm_requests_total{tenant,task_class,model,provider,status}`,
-  `llm_tokens_total{direction,cached}`, `llm_cost_eur_total{…}`,
-  `llm_ttft_seconds`, `llm_tpot`, `prefix_cache_hit_ratio`,
-  `tool_calls_total{tool,status}`, `guard_blocks_total{stage,category}`,
-  `retrieval_latency_seconds`, `escalation_total`.
-- REQ-OBS-003 (MUST) : **logs de prompts** — traités comme des données personnelles :
-  chiffrés, accès restreint et journalisé, rétention limitée (30 j par défaut),
-  redaction des PII. Un accès aux logs de prompts en production **doit** être motivé
-  et tracé. C'est le fichier le plus sensible du système.
-- REQ-OBS-004 (MUST) : échantillonnage : 100 % des traces en erreur, 100 % des blocages de
-  guards, 1–5 % du trafic nominal (le reste en métriques agrégées).
-- REQ-OBS-005 (MUST) : dashboards standard : Qualité (L6 de `09`), Coût (`04`), Fiabilité
-  (SLO), Sécurité (guards, injections détectées).
+- REQ-OBS-001 (MUST): End-to-end **OpenTelemetry**. A unique `trace_id` traverses BFF → orchestrator → gateway → provider → tools. Each agentic step is a span with: model, tokens (input / output / cached), cost, latency, routing decision, guard results.
+- REQ-OBS-002 (MUST): Minimum exposed metrics: `llm_requests_total{tenant,task_class,model,provider,status}`, `llm_tokens_total{direction,cached}`, `llm_cost_eur_total{…}`, `llm_ttft_seconds`, `llm_tpot`, `prefix_cache_hit_ratio`, `tool_calls_total{tool,status}`, `guard_blocks_total{stage,category}`, `retrieval_latency_seconds`, `escalation_total`.
+- REQ-OBS-003 (MUST): **Prompt logs** — treated as personal data: encrypted, restricted and logged access, limited retention (30 days by default), PII redaction. Access to prompt logs in production **must** be justified and traced. This is the most sensitive file in the system.
+- REQ-OBS-004 (MUST): Sampling: 100% of error traces, 100% of guard blocks, 1–5% of nominal traffic (the rest in aggregated metrics).
+- REQ-OBS-005 (MUST): Standard dashboards: Quality (L6 of `09`), Cost (`04`), Reliability (SLO), Security (guards, detected injections).
 
-## 3. Déploiement
+## 3. Deployment
 
-- REQ-SRE-003 (MUST) : GitOps. Aucun `kubectl apply` manuel en prod. L'état désiré est
-  dans Git ; la dérive est détectée et corrigée.
-- REQ-SRE-004 (MUST) : déploiements progressifs (canary 5 % → 25 % → 100 %) avec analyse
-  automatique et rollback automatique (cf. REQ-EVA-011).
-- REQ-SRE-005 (MUST) : **feature flags** pour : modèle par classe de tâche, fournisseur,
-  activation d'un outil, seuils de guards, activation du RAG. Ils constituent le
-  kill switch (REQ-SEC-020) et permettent de réagir sans déploiement.
-- REQ-SRE-006 (MUST) : migrations de base réversibles, testées sur une copie de prod.
+- REQ-SRE-003 (MUST): GitOps. No manual `kubectl apply` in prod. Desired state is in Git; drift is detected and corrected.
+- REQ-SRE-004 (MUST): Progressive deployments (canary 5% → 25% → 100%) with automatic analysis and automatic rollback (cf. REQ-EVA-011).
+- REQ-SRE-005 (MUST): **Feature flags** for: model per task class, provider, tool activation, guard thresholds, RAG activation. They constitute the kill switch (REQ-SEC-020) and allow reacting without deployment.
+- REQ-SRE-006 (MUST): Reversible database migrations, tested on a copy of prod.
 
-## 4. Résilience
+## 4. Resilience
 
-- REQ-SRE-007 (MUST) : *circuit breaker* par fournisseur ; sur ouverture → bascule sur le
-  fallback, alerte, pas d'échec utilisateur.
-- REQ-SRE-008 (MUST) : dégradation **gracieuse** en cascade, dans cet ordre :
-  1. modèle L indisponible → M ;
-  2. RAG indisponible → répondre sans documents **en le disant explicitement** ;
-  3. outils indisponibles → répondre sans outils en le disant ;
-  4. tout indisponible → message d'erreur honnête, pas une réponse inventée.
-  Ne **jamais** dégrader silencieusement : une réponse sans RAG présentée comme fondée sur
-  les documents est pire qu'une erreur.
-- REQ-SRE-009 (MUST) : file d'attente + backpressure ; en surcharge, on met en file et on
-  informe, on ne timeout pas sauvagement.
-- REQ-SRE-010 (MUST) : sauvegardes chiffrées, restauration **testée** trimestriellement
-  (RTO 4 h / RPO 15 min, REQ-NFR-008). Une sauvegarde non restaurée n'existe pas.
+- REQ-SRE-007 (MUST): *Circuit breaker* per provider; on open → switch to fallback, alert, no user failure.
+- REQ-SRE-008 (MUST): **Graceful** cascading degradation, in this order:
+  1. L model unavailable → M;
+  2. RAG unavailable → respond without documents **stating this explicitly**;
+  3. Tools unavailable → respond without tools stating this;
+  4. Everything unavailable → honest error message, not a made-up response.
+  **Never** degrade silently: a response without RAG presented as based on documents is worse than an error.
+- REQ-SRE-009 (MUST): Queue + backpressure; under overload, we queue and inform, we do not timeout wildly.
+- REQ-SRE-010 (MUST): Encrypted backups, restoration **tested** quarterly (RTO 4 h / RPO 15 min, REQ-NFR-008). A backup that has not been restored does not exist.
 
-## 5. Runbooks (à écrire, un fichier par scénario)
+## 5. Runbooks (to be written, one file per scenario)
 
-| Id | Scénario | Déclencheur |
+| Id | Scenario | Trigger |
 |---|---|---|
-| RB-01 | Fournisseur d'inférence dégradé / indisponible | circuit breaker ouvert |
-| RB-02 | Explosion des coûts (dérive du routage, boucle d'outils, prompt géant) | budget à 80 % avant terme |
-| RB-03 | Chute du taux de hit du prefix cache | `prefix_cache_hit_ratio` < 40 % |
-| RB-04 | Régression de qualité détectée en canary | rollback auto → analyse |
-| RB-05 | Suspicion de fuite cross-tenant | **Sév 1** : coupure du tenant, gel des logs, cellule de crise |
-| RB-06 | Injection de prompt réussie avec effet de bord | **Sév 1** : kill switch outils, révocation, audit |
-| RB-07 | Index RAG corrompu ou périmé | ré-indexation, dégradation gracieuse en attendant |
-| RB-08 | Modèle retiré par son éditeur / changement de licence | bascule fournisseur ou modèle, revue juridique |
-| RB-09 | Vague de faux refus | ajustement des seuils par flag, cas d'eval ajoutés |
+| RB-01 | Inference provider degraded / unavailable | Circuit breaker open |
+| RB-02 | Cost explosion (routing drift, tool loop, giant prompt) | Budget at 80% before term |
+| RB-03 | Drop in prefix cache hit rate | `prefix_cache_hit_ratio` < 40% |
+| RB-04 | Quality regression detected in canary | Auto rollback → analysis |
+| RB-05 | Suspicion of cross-tenant leak | **Sev 1**: Tenant cutoff, log freeze, crisis cell |
+| RB-06 | Successful prompt injection with side effect | **Sev 1**: Tool kill switch, revocation, audit |
+| RB-07 | Corrupted or stale RAG index | Re-indexing, graceful degradation in the meantime |
+| RB-08 | Model withdrawn by its publisher / license change | Provider or model switch, legal review |
+| RB-09 | Wave of false refusals | Threshold adjustment via flag, added eval cases |
 
-- REQ-SRE-011 (MUST) : chaque runbook contient : détection, impact, mitigation immédiate
-  (< 5 min), correction, communication, et la référence de l'eval à ajouter après coup.
-- REQ-SRE-012 (MUST) : **game days** mensuels — bascule de fournisseur, kill switch,
-  restauration, RB-05 en simulation. Un runbook jamais joué est une fiction.
+- REQ-SRE-011 (MUST): Each runbook contains: detection, impact, immediate mitigation (< 5 min), correction, communication, and the reference of the eval to be added afterwards.
+- REQ-SRE-012 (MUST): Monthly **game days** — provider switch, kill switch, restoration, RB-05 in simulation. A runbook never played is fiction.
 
 ## 6. Post-mortem
 
-- REQ-SRE-013 (MUST) : sans blâme, sous 5 jours ouvrés, avec cause racine, chronologie,
-  actions correctives datées et **assignées**, et un cas d'eval créé (REQ-EVA-007).
+- REQ-SRE-013 (MUST): Blameless, within 5 business days, with root cause, timeline, dated and **assigned** corrective actions, and an eval case created (REQ-EVA-007).
 
-## 7. Critères d'acceptation
+## 7. Acceptance Criteria
 
-- AC-SRE-1 : une trace unique permet de reconstituer une requête complète, coût inclus.
-- AC-SRE-2 : les 9 runbooks existent ; ≥ 4 ont été joués en game day.
-- AC-SRE-3 : rollback automatique déclenché avec succès lors d'un test provoqué.
-- AC-SRE-4 : restauration testée et documentée dans les 3 derniers mois.
+- AC-SRE-1: A single trace allows reconstructing a complete request, cost included.
+- AC-SRE-2: The 9 runbooks exist; ≥ 4 have been played in a game day.
+- AC-SRE-3: Automatic rollback triggered successfully during a provoked test.
+- AC-SRE-4: Restoration tested and documented within the last 3 months.
