@@ -1,204 +1,203 @@
-# PoC v2 — Banc d'essai crédible, souverain
+# PoC v2 — Credible, Sovereign Test Bench
 
-> Objet : élargir le PoC v1 (fondation prouvée) en un **banc d'essai** qui ressemble
-> assez à un assistant frontier pour évaluer honnêtement la qualité de fond avant
-> tout investissement produit. **Ce n'est PAS le produit final** : l'UI reste basique,
-> la robustesse multi-utilisateur, la sécurité durcie et le polish sont hors périmètre.
-> Contrainte inchangée : **100 % souverain** (tout sur infrastructure Scaleway / GPU
-> loué en UE ; aucun runtime propriétaire non-européen dans le chemin d'exécution).
+> Subject: expand PoC v1 (proven foundation) into a **test bench** that resembles
+> a frontier assistant closely enough to honestly evaluate foundational quality before
+> any product investment. **This is NOT the final product**: the UI remains basic,
+> multi-user robustness, hardened security, and polish are out of scope.
+> Unchanged constraint: **100% sovereign** (everything on Scaleway infrastructure / GPU
+> rented in the EU; no non-European proprietary runtime in the execution path).
 
-## Principe directeur
+## Guiding Principle
 
-**Approcher le comportement d'un frontier, jamais se défausser.** Chaque fois qu'une
-capacité est raisonnablement attendue, le système la fournit au mieux plutôt que de
-renvoyer un message d'erreur ou une excuse. Concrètement : on ne « tronque/rejette »
-pas une grande entrée, on la **synthétise** ; on ne dit pas « je ne vois pas les
-images », on les **analyse** ; etc. Un message d'échec n'est acceptable que pour une
-impossibilité réelle (ressource indisponible, budget dépassé), jamais pour éviter un
-travail attendu.
+**Approach the behavior of a frontier, never dodge.** Whenever a capability is reasonably
+expected, the system provides it to the best of its ability rather than returning an
+error message or an excuse. Concretely: we do not "truncate/reject" a large input, we
+**synthesize** it; we do not say "I cannot see images", we **analyze** them; etc. A
+failure message is acceptable only for a real impossibility (resource unavailable,
+budget exceeded), never to avoid expected work.
 
-## Confidentialité des interactions (RÈGLE ABSOLUE)
+## Interaction Confidentiality (ABSOLUTE RULE)
 
-Les journaux d'interaction (`BRAIN/interactions/*.jsonl`) contiennent des requêtes
-réelles, potentiellement personnelles. Ils sont **strictement locaux à la VM** :
-- jamais commités (déjà dans `.gitignore` ; à re-vérifier à chaque jalon) ;
-- jamais résumés, cités, ni évoqués dans un fichier versionné, une PR, un rapport
-  ou un message ;
-- l'analyse d'observabilité produit des **métriques agrégées anonymes** (latences,
-  taux d'échec, distribution de routage, types d'erreur) — jamais le contenu ni des
-  extraits de requêtes.
-Toute violation de cette règle est un incident de sécurité (arrêt immédiat).
+Interaction logs (`BRAIN/interactions/*.jsonl`) contain real requests, potentially
+personal. They are **strictly local to the VM**:
+- never committed (already in `.gitignore`; re-verify at each milestone);
+- never summarized, quoted, or mentioned in a versioned file, a PR, a report,
+  or a message;
+- observability analysis produces **anonymous aggregated metrics** (latencies,
+  failure rates, routing distribution, error types) — never the content nor
+  excerpts of requests.
+Any violation of this rule is a security incident (immediate halt).
 
-## Jalons
+## Milestones
 
-### M8 — Modèle serverless (choix et configuration)
-**Décision d'architecture (PoC v2)** : TOUT en serverless Scaleway Generative APIs.
-Pas de GPU local pour l'inférence texte : à faible volume, le serverless est moins cher
-(paiement au token, ~0,006 €/requête) et donne accès aux gros modèles que l'on ne peut
-pas héberger soi-même. Le GPU n'est loué que PONCTUELLEMENT pour la génération d'images
-(M13). L'auto-hébergement souverain est une décision de PRODUCTION à prendre après le
-PoC, selon le volume (rentable au-delà de ~50M tokens/mois) et le niveau de qualité requis.
-**Livrables** : configuration des modèles serverless : généraliste (qwen3.5-397b),
-code (glm-5.2 ou qwen3-coder), vision (pixtral-12b), embeddings (qwen3-embedding-8b) ;
-fenêtre de contexte et function-calling vérifiés ; le routeur M4 devient un routage
-par TYPE de tâche (texte/code/vision) entre modèles serverless, plus une cascade
-local/escalade. Le fallback M4 est conservé entre modèles serverless.
-**Validation** : chaque type de tâche est servi par le modèle prévu ; function calling
-et streaming fonctionnent sur le modèle principal ; coût par requête tracé.
+### M8 — Serverless Model (selection and configuration)
+**Architecture decision (PoC v2)**: EVERYTHING on Scaleway Generative APIs serverless.
+No local GPU for text inference: at low volume, serverless is cheaper (pay-per-token,
+~€0.006/request) and provides access to large models that we cannot host ourselves.
+The GPU is rented only OCCASIONALLY for image generation (M13). Sovereign self-hosting
+is a PRODUCTION decision to be made after the PoC, depending on volume (profitable
+beyond ~50M tokens/month) and required quality level.
+**Deliverables**: configuration of serverless models: generalist (qwen3.5-397b),
+code (glm-5.2 or qwen3-coder), vision (pixtral-12b), embeddings (qwen3-embedding-8b);
+context window and function-calling verified; the M4 router becomes a routing by
+TASK TYPE (text/code/vision) between serverless models, plus a local/escalade cascade.
+The M4 fallback is preserved between serverless models.
+**Validation**: each task type is served by the intended model; function calling
+and streaming work on the main model; cost per request is traced.
 
-### M9 — Mémoire + projets
-**But** : contexte consolidé et partagé entre conversations (manque n°1 pour l'usage réel).
-**Livrables** :
-- notion de **projet** (regroupe conversations + documents ingérés + notes) ;
-- **mémoire de conversation** persistée (l'assistant se souvient des échanges passés
-  d'une même conversation et d'un même projet) ;
-- **consolidation** : résumés/faits persistés par projet, injectés dans le contexte
-  des requêtes du projet (via le RAG existant, étendu au contexte projet) ;
-- UI : sélection de projet, mémoire visible/effaçable (basique, non soignée).
-**Architecture (modèle Claude/ChatGPT), deux couches** :
-- **Projet** : espace regroupant conversations + documents ingérés + instructions
-  permanentes ; contexte documentaire partagé entre toutes les conversations du projet
-  (extension du RAG M2 à un scope projet).
-- **Mémoire de faits** : extraction AUTOMATIQUE de faits durables et saillants depuis
-  les échanges (préférences, contexte de travail, décisions), stockés séparément,
-  **éditables et effaçables par l'utilisateur**, réinjectés dans le contexte quand
-  pertinents. PAS de résumé brut ni de réinjection de tout l'historique : des faits
-  sélectionnés, comme le font Claude (memory) et ChatGPT (memory).
-**Principe frontier** : le système exploite le contexte accumulé sans qu'on ait à tout
-répéter ; il distingue clairement « ceci vient de ta mémoire » de « ceci vient d'une
-source ». La mémoire est inspectable et corrigeable par l'utilisateur.
-**Validation** : une info donnée dans une conversation d'un projet est réutilisée dans
-une autre conversation du même projet ; l'effacement de la mémoire est effectif ;
-isolation entre projets (pas de fuite de contexte d'un projet à l'autre).
-Le chat projet réserve la configuration serverless M8 et sélectionne les passages
-scopés sous le même budget de contexte ; les huit résultats restent observables.
+### M9 — Memory + Projects
+**Goal**: consolidated context shared between conversations (missing #1 for real usage).
+**Deliverables**:
+- concept of **project** (groups conversations + ingested documents + notes);
+- persisted **conversation memory** (the assistant remembers past exchanges within
+  the same conversation and the same project);
+- **consolidation**: summaries/facts persisted per project, injected into the context
+  of project requests (via existing RAG, extended to project context);
+- UI: project selection, memory visible/erasable (basic, unpolished).
+**Architecture (Claude/ChatGPT model), two layers**:
+- **Project**: space grouping conversations + ingested documents + permanent
+  instructions; documentary context shared between all conversations in the project
+  (extension of M2 RAG to a project scope).
+- **Fact memory**: AUTOMATIC extraction of durable and salient facts from exchanges
+  (preferences, work context, decisions), stored separately, **editable and erasable
+  by the user**, reinjected into context when relevant. NO raw summary nor reinjection
+  of the entire history: selected facts, as done by Claude (memory) and ChatGPT (memory).
+**Frontier principle**: the system exploits accumulated context without having to repeat
+everything; it clearly distinguishes "this comes from your memory" from "this comes from
+a source". Memory is inspectable and correctable by the user.
+**Validation**: information given in one conversation of a project is reused in another
+conversation of the same project; memory erasure is effective; isolation between projects
+(no context leakage from one project to another).
+The project chat reserves the M8 serverless configuration and selects scoped passages
+under the same context budget; the eight results remain observable.
 
-### M10 — Grandes entrées gérées par synthèse
-**But** : absorber les grandes entrées (pages web volumineuses, longs documents)
-comme un frontier, par synthèse hiérarchique / retrieval, **jamais par troncature-excuse**.
-**Livrables** :
-- pour le contenu web : découpe en chunks + sélection des passages pertinents
-  (retrieval sur le contenu fetché) OU résumé hiérarchique avant génération ;
-- pour les longs documents : même logique ;
-- gestion propre du plafond de contexte du modèle (REQ-MOD-004), avec un budget de
-  synthèse borné.
-**Principe frontier** : une requête sur un contenu volumineux produit une réponse utile
-et sourcée, pas un message « contexte dépassé ».
-**Validation** : une question sur une page web longue (qui faisait échouer le PoC v1)
-produit une réponse correcte et sourcée, sous le budget temps/coût.
+### M10 — Large Inputs Handled by Synthesis
+**Goal**: absorb large inputs (bulky web pages, long documents) like a frontier, via
+hierarchical synthesis / retrieval, **never by truncation-excuse**.
+**Deliverables**:
+- for web content: chunking + selection of relevant passages (retrieval on fetched
+  content) OR hierarchical summary before generation;
+- for long documents: same logic;
+- proper handling of the model's context ceiling (REQ-MOD-004), with a bounded
+  synthesis budget.
+**Frontier principle**: a query on bulky content produces a useful and sourced answer,
+not a "context exceeded" message.
+**Validation**: a question on a long web page (which caused PoC v1 to fail) produces
+a correct and sourced answer, within the time/cost budget.
 
-### M11 — Streaming + réflexion visible
-**But** : réponses affichées au fur et à mesure ; trace de raisonnement pour les
-réponses longues.
-**Livrables** :
-- l'adaptateur relaie le flux SSE token-par-token à l'UI (fin du « bloc après attente ») ;
-- si le modèle expose une trace de raisonnement (reasoning_effort), l'afficher
-  séparément quand pertinent, avec le surcoût tokens signalé/borné.
-**Cible d'évaluation** : latence perçue fortement réduite ; ressenti proche d'un frontier.
-**Validation** : les tokens s'affichent progressivement ; le budget par requête reste tenu.
-Le transport SSE applique la politique serverless M8 avant I/O ; un fallback reste
-possible avant tout fragment visible, jamais après émission de contenu/réflexion.
+### M11 — Streaming + Visible Reasoning
+**Goal**: responses displayed as they arrive; reasoning trace for long answers.
+**Deliverables**:
+- the adapter relays the SSE stream token-by-token to the UI (end of "block after wait");
+- if the model exposes a reasoning trace (reasoning_effort), display it separately
+  when relevant, with the token overhead signaled/bounded.
+**Evaluation target**: perceived latency strongly reduced; feel close to a frontier.
+**Validation**: tokens display progressively; budget per request is maintained.
+The SSE transport applies the M8 serverless policy before I/O; a fallback remains
+possible before any visible fragment, never after emitting content/reasoning.
 
-Le client relaie aussi les réponses de projet progressivement : seul le champ réponse
-est affiché ; le JSON de consolidation reste interne et la réponse finale est validée.
+The client also relays project responses progressively: only the response field is
+displayed; the consolidation JSON remains internal and the final response is validated.
 
-Les citations diffusées utilisent les passages récupérés et les routes propres au
-projet ; le préambule mémoire reste identique entre JSON et SSE.
-Contrat : `contracts/m11.md` ; protocole et limites : `reports/M11.md`.
-`make verify-m11` vérifie la progression avec une barrière fournisseur sur HTTP réel.
+Diffused citations use retrieved passages and routes specific to the project; the
+memory preamble remains identical between JSON and SSE.
+Contract: `contracts/m11.md`; protocol and limits: `reports/M11.md`.
+`make verify-m11` verifies progression with a provider barrier on real HTTP.
 
-### M12 — Description d'image (multimodal entrée)
-**But** : le système voit et analyse les images envoyées.
-**Livrables** : routage des requêtes contenant une image vers un modèle vision
-souverain (pixtral-12b, Scaleway) ; intégration dans le gateway et l'UI (upload image).
-**Principe frontier** : une image + une question produit une réponse pertinente sur
-le contenu de l'image, pas « je ne traite pas les images ».
-**Validation** : description correcte d'une image de test ; réponse à une question
-portant sur son contenu.
-Implémentation et mesures : `contracts/m12.md`, `reports/M12.md` ; `make verify-m12`
-exerce le trajet HTTP avec transport enregistré en CI, renouvelable en mode record.
+### M12 — Image Description (multimodal input)
+**Goal**: the system sees and analyzes sent images.
+**Deliverables**: routing of requests containing an image to a sovereign vision model
+(pixtral-12b, Scaleway); integration into the gateway and UI (image upload).
+**Frontier principle**: an image + a question produces a relevant answer about the
+image content, not "I do not process images".
+**Validation**: correct description of a test image; answer to a question regarding
+its content.
+Implementation and measurements: `contracts/m12.md`, `reports/M12.md`; `make verify-m12`
+exercises the HTTP path with transport recorded in CI, renewable in record mode.
 
-### M13 — Génération d'image (local sur GPU, souverain)
-**But** : produire des images à partir d'une description, **en local sur GPU**.
-**Livrables** :
-- sélection d'un modèle open-weight de génération d'images (Flux / SDXL) et de son
-  serveur (diffusers/ComfyUI), hébergé sur le **GPU déjà loué** (partagé avec vLLM).
-  Pour un banc d'essai à usage séquentiel (un seul utilisateur, pas de chat + image
-  simultanés), le partage VRAM est acceptable : SDXL (~12 Go) cohabite avec le modèle
-  texte sur un L40S 48 Go. **Modèle retenu : Flux** (qualité proche des références
-  grand public). Comme Flux est lourd en VRAM, prévoir une **bascule séquentielle**
-  sur le GPU partagé : décharger/mettre en veille le modèle texte pendant une
-  génération d'image, puis recharger (acceptable en mono-utilisateur banc d'essai).
-  GPU dédié réservé au produit. Le même GPU pourra porter un STT plus tard ;
-- intégration : une requête de génération route vers ce service ; l'image revient
-  dans l'UI ;
-- garde-fous : budget GPU, extinction, pas de contenu illicite (filtre minimal).
-**Contrainte** : 100 % local/souverain — aucun service de génération d'images externe.
-**Validation** : une requête « génère une image de X » produit une image cohérente,
-servie par le GPU local, sous budget.
+### M13 — Image Generation (local on GPU, sovereign)
+**Goal**: produce images from a description, **locally on GPU**.
+**Deliverables**:
+- selection of an open-weight image generation model (Flux / SDXL) and its server
+  (diffusers/ComfyUI), hosted on the **already rented GPU** (shared with vLLM).
+  For a sequential usage test bench (single user, no simultaneous chat + image),
+  VRAM sharing is acceptable: SDXL (~12 GB) coexists with the text model on an
+  L40S 48 GB. **Selected model: Flux** (quality close to mainstream references).
+  As Flux is heavy on VRAM, plan a **sequential switch** on the shared GPU: unload/
+  sleep the text model during image generation, then reload (acceptable in single-user
+  test bench). Dedicated GPU reserved for the product. The same GPU may carry an STT
+  later;
+- integration: a generation request routes to this service; the image returns in the UI;
+- safeguards: GPU budget, shutdown, no illicit content (minimal filter).
+**Constraint**: 100% local/sovereign — no external image generation service.
+**Validation**: a request "generate an image of X" produces a coherent image, served
+by the local GPU, within budget.
 
-## Organisation en deux phases
+## Organization in Two Phases
 
-**Phase A — l'assistant** : M8 (serverless), M9 (mémoire/projets), M10 (synthèse),
-M11 (streaming/raisonnement), M12 (vision), M13 (génération d'images).
-→ **TEST INTERMÉDIAIRE** : l'utilisateur re-teste l'assistant complet ; analyse des
-journaux d'interaction (métriques agrégées, jamais le contenu) ; corrections.
+**Phase A — the assistant**: M8 (serverless), M9 (memory/projects), M10 (synthesis),
+M11 (streaming/reasoning), M12 (vision), M13 (image generation).
+→ **INTERMEDIATE TEST**: the user re-tests the complete assistant; analysis of
+interaction logs (aggregated metrics, never content); corrections.
 
-**Phase B — les intégrations** : M14 (client MCP), M15 (API OpenAI-compatible durcie).
-→ Test final.
+**Phase B — integrations**: M14 (MCP client), M15 (hardened OpenAI-compatible API).
+→ Final test.
 
-### M14 — Client MCP (agir sur les outils de l'entreprise)
-**But** : l'assistant se connecte à des serveurs MCP (GitLab, WordPress, etc.) et peut
-lire/agir dessus (lister/créer des issues, publier, rechercher…).
-**Livrables** : client MCP dans le harness d'outils (extension de M3) ; configuration
-des serveurs MCP autorisés ; les actions à effet de bord (créer, publier, modifier)
-passent par une confirmation utilisateur ; journalisation des actions.
-**Principe frontier** : l'assistant enchaîne lecture + action sur les outils comme un
-collaborateur, avec confirmation avant tout effet de bord.
-Le contrat `contracts/m14.md` fixe le transport stdio et la configuration autorisée ;
-les écritures ouvrent un formulaire local sur le port8020 (tunnel SSH existant),
-avec prévisualisation et confirmation unique. Les attentes expirent après10minutes
-ou au redémarrage du processus ; aucun POST de confirmation n’est exposé au modèle.
-**Validation** : lecture d'une ressource GitLab via MCP ; création d'une issue après
-confirmation ; refus d'une action non confirmée ; aucun secret MCP exposé.
+### M14 — MCP Client (act on company tools)
+**Goal**: the assistant connects to MCP servers (GitLab, WordPress, etc.) and can
+read/act on them (list/create issues, publish, search...).
+**Deliverables**: MCP client in the tool harness (extension of M3); configuration of
+authorized MCP servers; side-effect actions (create, publish, modify) go through user
+confirmation; action logging.
+**Frontier principle**: the assistant chains reading + action on tools like a collaborator,
+with confirmation before any side effect.
+The contract `contracts/m14.md` sets the stdio transport and authorized configuration;
+writes open a local form on port8020 (existing SSH tunnel), with preview and single
+confirmation. Expectations expire after 10 minutes or upon process restart; no confirmation
+POST is exposed to the model.
+**Validation**: reading a GitLab resource via MCP; creating an issue after confirmation;
+refusal of an unconfirmed action; no MCP secret exposed.
 
-### M15 — API OpenAI-compatible durcie (pour les développeurs)
-**But** : exposer l'assistant comme fournisseur de modèle utilisable par Codex, Claude
-Code et tout client OpenAI, afin que les développeurs le testent dans leurs outils.
-**Livrables** : durcissement de l'adaptateur M7 : authentification par clé API,
-multi-utilisateur (clés/quotas par dev), function-calling et streaming complets et
-conformes, grande fenêtre de contexte (les outils de dev envoient des dépôts entiers),
-modèle code par défaut. Documentation d'intégration Codex / Claude Code.
-**Validation** : Codex ET Claude Code configurés sur l'API réalisent une tâche de code
-de bout en bout ; une clé invalide est refusée ; quotas appliqués ; coût par clé tracé.
+### M15 — Hardened OpenAI-Compatible API (for developers)
+**Goal**: expose the assistant as a model provider usable by Codex, Claude Code, and
+any OpenAI client, so developers can test it in their tools.
+**Deliverables**: hardening of the M7 adapter: API key authentication, multi-user
+(keys/quotas per dev), complete and compliant function-calling and streaming, large
+context window (dev tools send entire repositories), code model by default. Codex /
+Claude Code integration documentation.
+**Validation**: Codex AND Claude Code configured on the API perform an end-to-end code
+task; an invalid key is refused; quotas applied; cost per key traced.
 
-## Ce qui reste HORS périmètre (produit, plus tard)
-UI soignée/ergonomique, reconnaissance vocale de qualité, multi-utilisateur de l'UI de chat,
-authentification/HTTPS/exposition publique, haute disponibilité, sécurité durcie
-production, observabilité SRE complète, calibration humaine du juge.
+## What Remains OUT of Scope (product, later)
+Polished/ergonomic UI, quality voice recognition, multi-user chat UI,
+authentication/HTTPS/public exposure, high availability, production-hardened security,
+complete SRE observability, human calibration of the judge.
 
-> Note STT (phase produit) : une brique de reconnaissance vocale offline temps-réel, déjà éprouvée sur /e/OS (repos publics), pourra être intégrée en phase produit sur le même GPU. Choix technique validé côté /e/OS : **Parakeet TDT (ONNX) via transcribe-rs**, streaming temps-réel, préféré à Whisper. Hors périmètre PoC v2.
+> Note STT (product phase): an offline real-time speech recognition brick, already
+> proven on /e/OS (public repos), can be integrated in the product phase on the same GPU.
+> Technical choice validated on the /e/OS side: **Parakeet TDT (ONNX) via transcribe-rs**,
+> real-time streaming, preferred over Whisper. Out of scope for PoC v2.
 
-## Méthode (inchangée depuis v1)
-Specs d'abord ; l'agent implémente sous contrat + CI ; `verify-mN` testé en amont ;
-jalons mergés via PR à CI verte ; auto-merge autorisé à CI verte ; contradictions
-mineures tranchées en autonomie, sécurité/budget = arrêt. Logs d'interaction locaux
-uniquement (règle ci-dessus).
+## Method (unchanged since v1)
+Specs first; the agent implements under contract + CI; `verify-mN` tested upstream;
+milestones merged via PR with green CI; auto-merge allowed on green CI; minor
+contradictions resolved autonomously, security/budget = halt. Local interaction logs
+only (rule above).
 
-M8 : le contrat `contracts/m8.md` précise le routage serverless. La politique dans
-le gateway valide tarifs et capacités avant transport et réserve primaire + fallback
-sous 0,05 EUR. Les fenêtres fournisseur sont bornées par ce budget applicatif ;
-les identifiants alternatifs nécessitent une entrée de capacités et de prix validée.
-Le chat sans GPU conserve le délai et la réserve en cas de fallback sans usage connu.
-Les logs distinguent coût mesuré et réserve inconnue. Le contexte RAG sélectionne
-les passages entiers les mieux classés sous 4 KiB ; retrieval@8 reste inchangé.
-Le gate `make verify-m8` et `reports/M8.md` documentent les sondes synthétiques et
-leurs limites, notamment les erreurs de couleur sur images entièrement uniformes.
+M8: the contract `contracts/m8.md` specifies serverless routing. The policy in the
+gateway validates rates and capabilities before transport and reserves primary + fallback
+under €0.05. Provider windows are bounded by this application budget; alternative
+credentials require a validated capacity and price entry. Chat without GPU retains the
+delay and reserve in case of fallback without known usage. Logs distinguish measured cost
+and unknown reserve. The RAG context selects the best-ranked entire passages under 4 KiB;
+retrieval@8 remains unchanged. The gate `make verify-m8` and `reports/M8.md` document
+synthetic probes and their limits, notably color errors on entirely uniform images.
 
-M13 : le contrat `contracts/m13.md` définit la branche image du chat. Les demandes
-explicites FR/EN passent par `/images/generate` sur le gateway ; sortie PNG intégrée
-au Markdown/SSE et masquée dans les journaux. L’adresse GPU est configurée par
-`ATLAS_IMAGE_GPU_IP`, son tarif réel par `ATLAS_IMAGE_GPU_EUR_H` ; réservation
-90 secondes au plus 0,05 EUR. Le déploiement GPU fait l’objet d’un cycle séparé.
+M13: the contract `contracts/m13.md` defines the chat image branch. Explicit FR/EN
+requests go through `/images/generate` on the gateway; PNG output integrated into
+Markdown/SSE and masked in logs. The GPU address is configured by `ATLAS_IMAGE_GPU_IP`,
+its real rate by `ATLAS_IMAGE_GPU_EUR_H`; reservation 90 seconds at most €0.05. The GPU
+deployment is subject to a separate cycle.
 
-M15 : contrat `contracts/m15.md`, OpenAPI `contracts/m15.openapi.json` et ADR-0001 ; clés/quotas SQLite locaux dans l'entrée développeur8030, indépendante des données du chat8020.
+M15: contract `contracts/m15.md`, OpenAPI `contracts/m15.openapi.json` and ADR-0001;
+local SQLite keys/quotas in the developer entry8030, independent of chat8020 data.
