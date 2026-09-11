@@ -65,7 +65,7 @@ def bootstrap(volume: str, model: str, fresh: bool) -> str:
     revision = os.environ.get("LOCAL_MODEL_REVISION", "main")
     if not re.fullmatch(r"[a-zA-Z0-9_-]+", revision):
         raise ValueError("Invalid model revision")
-    return f"""#!/bin/bash
+    script = f"""#!/bin/bash
 set -Eeuo pipefail
 mkdir -p /root/.ssh
 printf '%s\\n' {shlex.quote(public_key)} >> /root/.ssh/authorized_keys
@@ -83,6 +83,11 @@ docker run -d --restart unless-stopped --gpus all --ipc=host --name vllm \\
  vllm/vllm-openai:v0.10.2 --model {shlex.quote(model)} --revision {shlex.quote(revision)} --served-model-name local \\
  --enable-prefix-caching --max-model-len 8192
 """
+    return (
+        script.split("docker run -d", 1)[0]
+        if os.environ.get("GPU_WORKLOAD") == "image"
+        else script
+    )
 
 
 def down() -> None:
@@ -155,6 +160,7 @@ def up() -> None:
     price = chosen["hourly_price"]["units"] + chosen["hourly_price"]["nanos"] / 1e9
     if price > float(os.environ["GPU_MAX_EUR_H"]):
         raise RuntimeError("Available GPU exceeds recorded hourly budget")
+    Path("BRAIN/gpu-cost.json").write_text(json.dumps({"hourly_eur": price}))
     print(
         f"[gpu-up] {chosen['name']} at {price} EUR/h excluding storage/IP", flush=True
     )
@@ -193,7 +199,8 @@ def up() -> None:
             "server",
             "name=atlas-gpu",
             "type=" + chosen["name"],
-            "image=8063548b-7ade-4faa-8be1-f48f8d3ba3ea",
+            "image="
+            + os.environ.get("GPU_IMAGE", "8063548b-7ade-4faa-8be1-f48f8d3ba3ea"),
             "root-volume=sbs:80GB:5000",
             "additional-volumes.0=" + weight["id"],
             "security-group-id=" + group["id"],

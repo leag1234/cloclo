@@ -16,4 +16,5 @@ if [[ "${GITHUB_ACTIONS:-}" == true && "${ATLAS_VERIFY_M0:-}" != 1 ]]; then
   make verify-m10
   make verify-m11
   SCW_GENERATIVE_API_KEY=test-only ATLAS_M12_MODE=replay make verify-m12
+  make verify-m13
 fi
