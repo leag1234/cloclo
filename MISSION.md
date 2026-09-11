@@ -220,3 +220,12 @@ code, file names, or test semantics. Keep commit messages and future PR titles i
 **verify-m16** checks: README.md exists and is structured; no French function words in
 docs/contracts/runbooks/README/MISSION/AGENTS; no French in code comments/messages;
 and the multilingual corpus and golden sets are still intact (not translated away).
+
+### M16 — Translation method (mandatory)
+Do NOT build a segmentation/numbered-transport pipeline for translation. Translate
+each file DIRECTLY: read the file, produce the English version, write it back, one
+file at a time. No invariant validation, no concurrent calls, no cache layer. If a
+file is large, translate it in a few sequential passes over its sections, still
+writing plain text. Keep markdown structure, code blocks, links and anchors intact.
+Files to translate, in this order: README.md (create), runbooks/*.md, AGENTS.md,
+MISSION.md, contracts/*.md, docs/*.md. Commit after each file or small group.
