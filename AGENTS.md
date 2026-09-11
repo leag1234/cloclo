@@ -57,3 +57,9 @@ Je détruis toute ressource d'expérimentation en fin de session. Le GPU s'étei
 Lire → planifier (fichiers, contrats, tests, risques) → poser les questions bloquantes
 maintenant → implémenter par petits incréments testés → PR → CI verte → mettre à jour
 BRAIN/ → m'arrêter (je n'enchaîne pas sur le jalon suivant sans mandat).
+
+## Risque budgétaire GPU (règle permanente, PoC)
+Le risque GPU est plafonné (2 €/h, 30 €/jalon, alertes actives) et ASSUMÉ par l'humain.
+Un défaut théorique d'extinction n'est PAS un motif d'arrêt : consigne-le en note et
+continue. Ne bloque un jalon que sur : dépassement effectif du plafond, fuite de secret,
+action destructrice hors projet, fichier protégé. Provisionne, teste, éteins, signale.
