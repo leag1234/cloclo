@@ -1,114 +1,110 @@
-# 03 — Modèles et couche d'inférence
+# 03 — Models and Inference Layer
 
-> **Avertissement de fraîcheur.** Le classement des modèles open-weight change tous les
-> 4 à 8 semaines. Ce document fixe une **méthode de sélection** et un **portefeuille au
-> 14/07/2026**. Le portefeuille est révisé mensuellement (rituel `model-review`, cf. `12`).
-> Aucun composant hors `model-gateway` ne doit dépendre d'un nom de modèle (REQ-ARC-006).
+> **Freshness Warning.** The ranking of open-weight models changes every
+> 4 to 8 weeks. This document establishes a **selection method** and a **portfolio as of
+> 14/07/2026**. The portfolio is reviewed monthly (ritual `model-review`, cf. `12`).
+> No component outside `model-gateway` must depend on a model name (REQ-ARC-006).
 
-## 1. Vocabulaire — à ne pas confondre
+## 1. Vocabulary — do not confuse
 
-- **Open source (OSI)** : poids + code + données + pipeline d'entraînement publiés.
-  Quasiment aucun modèle frontier n'y répond.
-- **Open weight** : poids téléchargeables, licence variable, données non publiées.
-  C'est ce que nous utilisons. Les modèles cités (Qwen, GLM, DeepSeek, Kimi, Llama, Gemma)
-  sont **open-weight**, pas open source.
-- **REQ-MOD-001 (MUST)** : la communication interne et externe emploie « open-weight ».
-  Une revendication « open source » exposerait l'entreprise à une critique fondée.
+- **Open source (OSI)**: weights + code + data + training pipeline published.
+  Almost no frontier models meet this criteria.
+- **Open weight**: downloadable weights, variable license, unpublished data.
+  This is what we use. The cited models (Qwen, GLM, DeepSeek, Kimi, Llama, Gemma)
+  are **open-weight**, not open source.
+- **REQ-MOD-001 (MUST)**: internal and external communication must use "open-weight".
+  Claiming "open source" would expose the company to well-founded criticism.
 
-## 2. Grille de sélection (pondérée)
+## 2. Selection Matrix (Weighted)
 
-| Critère | Poids | Note |
+| Criterion | Weight | Score |
 |---|---|---|
-| Licence (Apache-2.0 / MIT = 1,0 ; licence custom avec plafonds = 0,5 ; NC = 0) | 25 % | Bloquant si 0 |
-| Score sur **nos** évals métier (pas les benchmarks publics) | 30 % | cf. `09` |
-| Coût par requête à qualité constante | 20 % | cf. `04` |
-| Disponibilité chez ≥ 2 fournisseurs UE + hébergeable | 10 % | REQ-NFR-009 |
-| Qualité du tool-calling et du suivi de format | 10 % | eval dédiée |
-| Support vLLM/SGLang, quantization FP8 | 5 % | |
+| License (Apache-2.0 / MIT = 1.0; custom license with caps = 0.5; NC = 0) | 25% | Blocking if 0 |
+| Score on **our** business evals (not public benchmarks) | 30% | cf. `09` |
+| Cost per request at constant quality | 20% | cf. `04` |
+| Availability at ≥ 2 EU providers + self-hostable | 10% | REQ-NFR-009 |
+| Quality of tool-calling and format adherence | 10% | dedicated eval |
+| Support for vLLM/SGLang, FP8 quantization | 5% | |
 
-- **REQ-MOD-002 (MUST)** : la licence est validée par le juridique **avant** tout POC.
-  Vérifier : usage commercial, plafonds d'utilisateurs, restrictions géographiques,
-  clauses sur les sorties du modèle, obligations d'attribution.
-  Llama et certaines licences « custom » imposent des conditions ; Apache-2.0 (Qwen) et
-  MIT (GLM, DeepSeek, Phi) sont les plus propres.
-- **REQ-MOD-003 (MUST)** : un modèle n'entre en production qu'après avoir passé la suite
-  d'évals `09` avec un score ≥ au champion en place, ou meilleur ratio qualité/coût.
-- **REQ-MOD-005 (MUST)** : la qualité **dans chacune des langues cibles (FR, DE, ES, IT,
-  EN)** et l'efficacité du tokenizer dans ces langues (tokens/mot mesurés sur un corpus
-  interne de référence par langue) font partie de la grille §2. Un modèle excellent en
-  anglais mais faible dans une langue cible est disqualifié pour la classe M/L
-  conversationnelle. À qualité égale, un tokenizer 25 % plus efficace sur nos langues =
-  25 % de coût d'entrée en moins : critère économique, pas cosmétique (REQ-NFR-011).
-- **REQ-MOD-006 (MUST)** : le modèle d'embedding est versionné et **figé par corpus**
-  (`embedding_model_version` dans les métadonnées de chaque chunk). Changer de modèle
-  d'embedding impose une ré-indexation complète : la migration se fait par **double
-  indexation** (ancien + nouveau index en parallèle, bascule après validation des évals de
-  retrieval, puis suppression de l'ancien). Interdiction de mélanger deux espaces
-  d'embedding dans un même index.
+- **REQ-MOD-002 (MUST)**: the license must be validated by legal **before** any POC.
+  Verify: commercial use, user caps, geographic restrictions,
+  clauses on model outputs, attribution obligations.
+  Llama and certain "custom" licenses impose conditions; Apache-2.0 (Qwen) and
+  MIT (GLM, DeepSeek, Phi) are the cleanest.
+- **REQ-MOD-003 (MUST)**: a model enters production only after passing the
+  `09` eval suite with a score ≥ the current champion, or a better quality/cost ratio.
+- **REQ-MOD-005 (MUST)**: quality **in each target language (FR, DE, ES, IT,
+  EN)** and tokenizer efficiency in these languages (tokens/word measured on an internal
+  reference corpus per language) are part of the matrix in §2. A model excellent in
+  English but weak in a target language is disqualified for the M/L conversational class. At equal quality, a tokenizer 25% more efficient on our languages =
+  25% lower input cost: an economic criterion, not cosmetic (REQ-NFR-011).
+- **REQ-MOD-006 (MUST)**: the embedding model is versioned and **frozen per corpus**
+  (`embedding_model_version` in the metadata of each chunk). Changing the
+  embedding model requires complete re-indexing: migration is done via **double
+  indexing** (old + new index in parallel, switch after validation of retrieval evals,
+  then deletion of the old one). Mixing two embedding spaces in a single index is forbidden.
 
-## 3. Portefeuille de référence (juillet 2026 — à revalider)
+## 3. Reference Portfolio (July 2026 — to be revalidated)
 
-| Classe | Rôle | Candidats | Taille / archi | Licence |
+| Class | Role | Candidates | Size / Arch | License |
 |---|---|---|---|---|
-| **XS** | classification, routage, garde-fous, réécriture de requête | Qwen3-4B/8B, Gemma-class, Phi-4 | dense, 4–15B | Apache/MIT |
-| **S** | chat simple, extraction, résumé | Qwen3-30B-A3B (MoE) | ~30B tot / 3B actifs | Apache-2.0 |
-| **M** | défaut conversationnel, RAG | Qwen3-235B-A22B | 235B tot / 22B actifs, ctx 1M | Apache-2.0 |
-| **L** | raisonnement, code, agentique long | GLM-5.x, Kimi K2.5/K2.6, DeepSeek | MoE ~750B–1T tot / 32–40B actifs | MIT / MIT modifiée |
-| **Embeddings** | RAG | modèle multilingue open-weight, dim ≤ 1024 | — | Apache |
-| **Reranker** | RAG | cross-encoder open-weight | — | Apache |
+| **XS** | classification, routing, guardrails, query rewriting | Qwen3-4B/8B, Gemma-class, Phi-4 | dense, 4–15B | Apache/MIT |
+| **S** | simple chat, extraction, summarization | Qwen3-30B-A3B (MoE) | ~30B total / 3B active | Apache-2.0 |
+| **M** | default conversational, RAG | Qwen3-235B-A22B | 235B total / 22B active, ctx 1M | Apache-2.0 |
+| **L** | reasoning, code, long-horizon agentic | GLM-5.x, Kimi K2.5/K2.6, DeepSeek | MoE ~750B–1T total / 32–40B active | MIT / Modified MIT |
+| **Embeddings** | RAG | open-weight multilingual model, dim ≤ 1024 | — | Apache |
+| **Reranker** | RAG | open-weight cross-encoder | — | Apache |
 
-Notes d'ingénierie :
-- Les **MoE** (peu de paramètres actifs par token) sont l'élément décisif pour le coût :
-  un 235B-A22B coûte à l'inférence approximativement comme un dense ~22–30B, tout en
-  gardant la capacité d'un très gros modèle. **Privilégier systématiquement les MoE.**
-- Les modèles L (≈1T paramètres totaux) exigent des nœuds 8×H100/H200. Ne pas les
-  auto-héberger avant la phase 3 (cf. `04` §4).
-- Le contexte long (200k–1M) est disponible mais **coûteux** : chaque token d'entrée est
-  payé. Le RAG bien fait reste moins cher que « tout mettre dans le contexte ».
-  REQ-MOD-004 (SHOULD) : plafonner le contexte servi à 32k tokens par défaut ; au-delà,
-  passer par la synthèse hiérarchique ou le RAG.
+Engineering notes:
+- **MoE** (few active parameters per token) are the decisive element for cost:
+  a 235B-A22B costs approximately the same at inference as a dense ~22–30B, while
+  retaining the capacity of a very large model. **Systematically prefer MoE.**
+- L models (≈1T total parameters) require 8×H100/H200 nodes. Do not
+  self-host them before phase 3 (cf. `04` §4).
+- Long context (200k–1M) is available but **expensive**: every input token is
+  paid for. Well-implemented RAG remains cheaper than "putting everything in the context".
+  REQ-MOD-004 (SHOULD): cap the served context at 32k tokens by default; beyond that,
+  use hierarchical synthesis or RAG.
 
-## 4. Modes de déploiement — décision par phase
+## 4. Deployment Modes — decision by phase
 
-| Mode | Quand | Avantages | Inconvénients |
+| Mode | When | Advantages | Disadvantages |
 |---|---|---|---|
-| **A. Serverless open-weight (par token)** chez un fournisseur UE | **Phase 1 et 2** | Zéro capex, élasticité, aucune ops GPU | €/token plus élevé à forte charge ; dépendance ; nécessite clause ZDR |
-| **B. Endpoint dédié managé** (GPU réservés chez le fournisseur) | Phase 2–3, charge stable | Perf prévisible, prefix cache stable | Facturation à l'heure même à vide |
-| **C. Auto-hébergement** (nos GPU, vLLM/SGLang) | Phase 3+, si seuil `04` §4 franchi ou contrainte de souveraineté absolue | Coût marginal le plus bas à forte utilisation ; contrôle total | Ops lourde (drivers, pannes, capacity planning), SRE 24/7 |
+| **A. Serverless open-weight (per token)** at an EU provider | **Phase 1 and 2** | Zero capex, elasticity, no GPU ops | Higher €/token at high load; dependency; requires ZDR clause |
+| **B. Managed dedicated endpoint** (reserved GPUs at provider) | Phase 2–3, stable load | Predictable perf, stable prefix cache | Hourly billing even when idle |
+| **C. Self-hosting** (our GPUs, vLLM/SGLang) | Phase 3+, if threshold `04` §4 crossed or absolute sovereignty constraint | Lowest marginal cost at high utilization; total control | Heavy ops (drivers, failures, capacity planning), 24/7 SRE |
 
-- **REQ-INF-001 (MUST)** : quel que soit le mode, l'interface reste celle du
-  `model-gateway`. Le passage A→B→C ne doit avoir **aucun impact applicatif**.
-- **REQ-INF-002 (MUST)** : contrat fournisseur avec **rétention zéro**, hébergement UE,
-  et interdiction d'entraînement sur nos données (REQ-NFR-006/007). Sans ces clauses,
-  le fournisseur est disqualifié, quel que soit son prix.
-- **REQ-INF-014 (MUST)** : au-delà de la protection des données, le contrat fournisseur
-  couvre : **SLA** de disponibilité et de latence avec pénalités ; **garanties de quota**
-  (rate limits contractuels, procédure d'augmentation) ; **préavis sur les changements**
-  de prix (≥ 60 j) et de modèle (dépréciation ≥ 90 j) ; **plan de réversibilité** (export,
-  fin de contrat). Ces clauses sont vérifiées par le juridique avant qualification, au
-  même titre que la ZDR. Le fallback (REQ-INF-004) protège techniquement ; ce contrat
-  protège économiquement.
+- **REQ-INF-001 (MUST)**: regardless of the mode, the interface remains that of the
+  `model-gateway`. The transition A→B→C must have **no application impact**.
+- **REQ-INF-002 (MUST)**: provider contract with **zero retention**, EU hosting,
+  and prohibition of training on our data (REQ-NFR-006/007). Without these clauses,
+  the provider is disqualified, regardless of price.
+- **REQ-INF-014 (MUST)**: beyond data protection, the provider contract covers: **SLA**
+  for availability and latency with penalties; **quota guarantees**
+  (contractual rate limits, increase procedure); **notice on changes**
+  in pricing (≥ 60 days) and models (deprecation ≥ 90 days); **reversibility plan** (export,
+  end of contract). These clauses are verified by legal before qualification, just like the ZDR. The fallback (REQ-INF-004) provides technical protection; this contract provides economic protection.
 
-## 5. Routage et cascade — le principal levier de coût
+## 5. Routing and Cascade — the main cost lever
 
-`model-gateway` implémente une **cascade** :
+`model-gateway` implements a **cascade**:
 
 ```
-requête → classifieur XS (coût ~0,00001 €)
-        → estime: complexité, besoin d'outils, besoin de raisonnement
-        → route vers S / M / L
-        → si le modèle S produit une réponse dont la confiance (juge XS) < seuil
-          → escalade vers M, puis L  (au plus une escalade par requête)
+request → XS classifier (cost ~€0.00001)
+        → estimates: complexity, tool need, reasoning need
+        → routes to S / M / L
+        → if model S produces a response whose confidence (XS judge) < threshold
+          → escalate to M, then L (max one escalation per request)
 ```
 
-- REQ-INF-003 (MUST) : le classifieur de routage est lui-même évalué (`09`) ; sa matrice
-  de confusion est suivie. Une erreur « L classé S » (sous-routage) est bien plus coûteuse
-  en qualité qu'une erreur inverse en €. Optimiser le seuil sur cette asymétrie.
-- REQ-INF-004 (MUST) : chaque classe de tâche a un modèle **par défaut** et un **fallback**
-  chez un autre fournisseur, déclarés en config :
+- REQ-INF-003 (MUST): the routing classifier is itself evaluated (`09`); its confusion
+  matrix is monitored. An error "L classified as S" (sous-routage) is much more costly
+  in quality than the reverse error in €. Optimize the threshold based on this asymmetry.
+- REQ-INF-004 (MUST): each task class has a **default** model and a **fallback**
+  at another provider, declared in config:
 
 ```yaml
-# config/routing.yaml — source de vérité, versionnée
+# config/routing.yaml — source of truth, versioned
 task_classes:
   chat_simple:
     primary:  { provider: prov_a, model: model_s, quant: fp8 }
@@ -119,58 +115,45 @@ task_classes:
     fallback: { provider: prov_b, model: model_l_alt }
     max_cost_eur_per_call: 0.05
 ```
-- REQ-INF-005 (SHOULD) : *speculative decoding* (modèle brouillon XS + vérification par le
-  modèle cible) en auto-hébergement — gain typique 1,5–2,5× sur la latence, sans perte de
-  qualité (la sortie reste exactement celle du modèle cible).
+- REQ-INF-005 (SHOULD): *speculative decoding* (draft model XS + verification by the
+  target model) in self-hosting — typical gain 1.5–2.5× on latency, without quality loss (the output remains exactly that of the target model).
 
-## 6. Auto-hébergement — spécification technique (à activer en phase 3)
+## 6. Self-hosting — technical specification (to activate in phase 3)
 
-- REQ-INF-006 (MUST) : serveur = **vLLM** ou **SGLang**. Pas d'inférence « naïve »
-  (`transformers.generate` en prod est interdit).
-  *Veille (pas une option de prod à ce jour)* : **ZML** (Apache-2.0, Zig/MLIR) — stack
-  d'inférence compilée visant le découplage matériel (NVIDIA/AMD/TPU/Trainium), alignée
-  avec notre logique anti-lock-in mais un niveau plus bas. Critères d'entrée pour ouvrir
-  un ADR : (a) support de nos classes de modèles M/L (MoE), (b) serveur OpenAI-compatible
-  avec continuous batching **et** prefix caching, (c) un différentiel de coût matériel
-  démontré (ex. AMD MI3xx à −30 % vs NVIDIA à débit égal), (d) maturité opérationnelle
-  (releases, adoption). Revue au rituel `model-review` trimestriel. Grâce à REQ-ARC-006,
-  une adoption future n'impacterait que ce composant.
-- REQ-INF-007 (MUST) : activer *continuous batching*, *paged attention* et
-  **automatic prefix caching**. Avec un system prompt + définitions d'outils longs et
-  partagés, le prefix caching réduit massivement le coût du prefill (A-5 : > 70 % de hit
-  attendu). C'est le premier réglage à vérifier, avant toute autre optimisation.
-- REQ-INF-008 (MUST) : quantization **FP8** (poids + KV cache) par défaut ; INT4/AWQ
-  uniquement si une eval démontre une perte < 1 point sur nos tâches.
-- REQ-INF-009 (MUST) : parallélisme — tensor parallel intra-nœud, expert parallel pour les
-  MoE ; ne pas franchir la frontière du nœud sans interconnect (NVLink/InfiniBand).
-- REQ-INF-010 (MUST) : autoscaling sur la profondeur de file d'attente, **pas** sur le
-  taux d'occupation GPU (qui est trompeur : un GPU peut être à 100 % en attente mémoire).
-- REQ-INF-011 (SHOULD) : séparer les pools **interactif** (faible batch, latence) et
-  **batch** (gros batch, spot instances, jusqu'à −70 % de coût, tolérant à l'éviction).
-- REQ-INF-012 (MUST) : chargement des poids depuis un cache local/NVMe ou un registre
-  d'artefacts interne — pas de téléchargement depuis Internet au démarrage du pod
-  (temps de démarrage + risque de supply chain).
-- REQ-INF-013 (MUST) : vérifier l'empreinte (checksum/signature) des poids ; les modèles
-  téléchargés sont un vecteur de supply chain. Miroir interne obligatoire.
+- REQ-INF-006 (MUST): server = **vLLM** or **SGLang**. No "naive" inference
+  (`transformers.generate` in prod is forbidden).
+  *Watchlist (not a prod option to date)*: **ZML** (Apache-2.0, Zig/MLIR) — compiled
+  inference stack aiming for hardware decoupling (NVIDIA/AMD/TPU/Trainium), aligned
+  with our anti-lock-in logic but at a lower level. Entry criteria to open an ADR: (a) support for our M/L model classes (MoE), (b) OpenAI-compatible server with continuous batching **and** prefix caching, (c) a demonstrated hardware cost differential (e.g., AMD MI3xx at −30% vs NVIDIA at equal throughput), (d) operational maturity (releases, adoption). Review at the quarterly `model-review` ritual. Thanks to REQ-ARC-006, future adoption would only impact this component.
+- REQ-INF-007 (MUST): enable *continuous batching*, *paged attention*, and
+  **automatic prefix caching**. With a system prompt + long and shared tool definitions, prefix caching massively reduces the prefill cost (A-5: > 70% hit rate expected). This is the first setting to verify, before any other optimization.
+- REQ-INF-008 (MUST): **FP8** quantization (weights + KV cache) by default; INT4/AWQ
+  only if an eval demonstrates a loss < 1 point on our tasks.
+- REQ-INF-009 (MUST): parallelism — intra-node tensor parallel, expert parallel for
+  MoE; do not cross the node boundary without interconnect (NVLink/InfiniBand).
+- REQ-INF-010 (MUST): autoscaling on queue depth, **not** on GPU
+  utilization rate (which is misleading: a GPU can be at 100% waiting on memory).
+- REQ-INF-011 (SHOULD): separate **interactive** pools (low batch, latency) and
+  **batch** pools (large batch, spot instances, up to −70% cost, eviction-tolerant).
+- REQ-INF-012 (MUST): load weights from a local/NVMe cache or an internal artifact
+  registry — no downloading from the Internet at pod startup (startup time + supply chain risk).
+- REQ-INF-013 (MUST): verify the footprint (checksum/signature) of weights; downloaded models are a supply chain vector. Internal mirroring is mandatory.
 
-### Capacity planning — formules à utiliser (ne pas deviner)
+### Capacity planning — formulas to use (do not guess)
 
 ```
-VRAM ≈ poids_quantifiés + KV_cache + activations + overhead(~10%)
+VRAM ≈ quantized_weights + KV_cache + activations + overhead(~10%)
 
-KV_cache_par_token ≈ 2 × n_layers × n_kv_heads × head_dim × bytes_par_élément
-KV_cache_total     ≈ KV_cache_par_token × contexte_moyen × requêtes_concurrentes
+KV_cache_per_token ≈ 2 × n_layers × n_kv_heads × head_dim × bytes_per_element
+KV_cache_total     ≈ KV_cache_per_token × average_context × concurrent_requests
 ```
-Le KV cache, et non les poids, est ce qui limite la concurrence en pratique. Les modèles
-récents réduisent son empreinte (attention parcimonieuse, fenêtres glissantes, GQA/MLA) :
-c'est un **critère de sélection à part entière** pour l'auto-hébergement, souvent plus
-déterminant que 2 points de benchmark.
+The KV cache, not the weights, is what limits concurrency in practice. Recent models reduce its footprint (sparse attention, sliding windows, GQA/MLA): this is a **selection criterion in its own right** for self-hosting, often more decisive than 2 benchmark points.
 
-## 7. Critères d'acceptation
+## 7. Acceptance Criteria
 
-- AC-INF-1 : benchmark de charge reproductible (script versionné) produisant TTFT, TPOT,
-  débit, coût/1k req, pour chaque configuration candidate.
-- AC-INF-2 : le taux de hit du prefix cache est exposé en métrique et > 60 % en prod.
-- AC-INF-3 : bascule fournisseur testée et chronométrée < 1 h (REQ-NFR-009).
-- AC-INF-4 : la cascade de routage réduit le coût/requête d'au moins 40 % vs « tout sur L »,
-  à qualité d'eval ≥ 97 % du « tout sur L ».
+- AC-INF-1: Reproducible load benchmark (versioned script) producing TTFT, TPOT,
+  throughput, cost/1k req, for each candidate configuration.
+- AC-INF-2: Prefix cache hit rate is exposed as a metric and > 60% in prod.
+- AC-INF-3: Provider switch tested and timed < 1 h (REQ-NFR-009).
+- AC-INF-4: The routing cascade reduces cost/request by at least 40% vs "all on L",
+  at an eval quality ≥ 97% of "all on L".
