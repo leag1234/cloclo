@@ -72,3 +72,5 @@ M15 : dev_input traduit les historiques Responses/Messages vers les mêmes messa
 M15 : POST /v1/responses fournit les événements nommés texte/fonctions, les identifiants d'items et la terminaison completed/incomplete ; store=false. Le même quota est réservé avant le flux et réconcilié sur l'usage fournisseur.
 
 M15 : POST /v1/messages traduit texte/tool_use/tool_result et les événements SSE message/content_block. Une sortie tronquée reste max_tokens ; les coûts viennent du même registre par clé. Compatibilité expérimentale pour les clients configurés sans thinking ni outils hébergés.
+
+M15 : make test-devapi vérifie les six critères du gate avec les flux réels enregistrés. Le cas grand contexte transmet 24 616 octets de fonctions utiles et vérifie trois valeurs distantes ; le double est refusé avant inférence pour budget. Le registre conserve coûts connus et réservations inconnues par clé.

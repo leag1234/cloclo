@@ -129,3 +129,13 @@ verify-m14: ## lecture et écriture confirmée, gate protégé intact
 .PHONY: serve-devapi
 serve-devapi: ## API développeurs locale, clés et quotas individuels ; sans GPU
 	@bash scripts/serve-devapi.sh
+
+.PHONY: test-devapi verify-m15
+test-devapi: ## API développeurs : HTTP réel local et flux fournisseur enregistrés
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/devapi_gate.py
+verify-m15: ## gate protégé auth/quotas/outils/streaming/contexte/coût
+	@bash scripts/verify-m15.sh
+
+.PHONY: test-devapi-e2e
+test-devapi-e2e: ## fournisseur réel : fonction puis réponse et contexte utile >=24KiB
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/devapi_live.py
