@@ -68,3 +68,5 @@ M15 protocole Chat : dev_chat normalise les messages texte et assemble les delta
 Sélection M10 : les contributions de pertinence sont additionnées avec math.fsum pour conserver les égalités indépendamment du hash seed Python. Le départage existant par position reste déterministe ; la cassette fournisseur exacte est inchangée.
 
 M15 : dev_input traduit les historiques Responses/Messages vers les mêmes messages validés, sans stockage de conversations. Métadonnées et cache sont des indications sans effet d'identité ni garantie de cache ; l'effort Messages sans thinking ne l'active pas. Les images, outils hébergés, stockage Responses et thinking Messages sont refusés explicitement.
+
+M15 : POST /v1/responses fournit les événements nommés texte/fonctions, les identifiants d'items et la terminaison completed/incomplete ; store=false. Le même quota est réservé avant le flux et réconcilié sur l'usage fournisseur.
