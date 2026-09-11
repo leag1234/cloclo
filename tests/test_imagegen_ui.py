@@ -1,0 +1,60 @@
+"""Synthetic adapter requests prove image delivery and redacted observations."""
+
+import json
+import os
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import AsyncMock, patch
+from fastapi.testclient import TestClient
+from services.orchestrator.chat_api import app
+from test_imagegen import png
+
+
+class ImageUITests(unittest.TestCase):
+    def test_chat_and_sse_return_image_without_logging_bytes(self) -> None:
+        url = png()
+        upstream = AsyncMock(return_value={"image": url, "cost_eur": 0.001})
+        with (
+            tempfile.TemporaryDirectory() as root,
+            patch.dict(os.environ, {"ATLAS_INTERACTION_DIR": root}),
+            patch("services.orchestrator.model.GatewayModel.post", new=upstream),
+            TestClient(app) as client,
+        ):
+            for stream in (False, True):
+                response = client.post(
+                    "/v1/chat/completions",
+                    json={
+                        "messages": [
+                            {"role": "user", "content": "génère une image de cube"}
+                        ],
+                        "stream": stream,
+                    },
+                )
+                self.assertEqual(response.status_code, 200)
+                if stream:
+                    self.assertIn("data: [DONE]", response.text)
+                    events = [
+                        json.loads(line[6:])
+                        for line in response.text.splitlines()
+                        if line.startswith("data: ") and line != "data: [DONE]"
+                    ]
+                    self.assertFalse(any("error" in e for e in events))
+                    text = "".join(
+                        e["choices"][0]["delta"].get("content", "") for e in events
+                    )
+                else:
+                    text = response.json()["choices"][0]["message"]["content"]
+                self.assertEqual(text, f"![Image générée]({url})")
+            self.assertEqual(upstream.await_count, 2)
+            assert upstream.await_args is not None
+            self.assertTrue(upstream.await_args.args[0].endswith("/images/generate"))
+            rows = [
+                json.loads(line)
+                for p in Path(root).glob("*.jsonl")
+                for line in p.read_text().splitlines()
+            ]
+            self.assertEqual(len(rows), 2)
+            self.assertTrue(all(r["task_type"] == "imagegen" for r in rows))
+            self.assertTrue(all(r["cout_eur"] == 0.001 for r in rows))
+            self.assertNotIn(url.split(",", 1)[1], json.dumps(rows))

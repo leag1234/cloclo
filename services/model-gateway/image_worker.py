@@ -1,0 +1,85 @@
+"""M13 GPU-only worker; no remote inference and no request logging."""
+
+import base64
+import importlib
+import io
+import json
+import os
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from threading import Lock, Timer
+from time import monotonic
+
+
+def main() -> None:
+    torch = importlib.import_module("torch")
+    config = json.loads(Path(__file__).with_name("image-model.json").read_text())
+    pipeline = (
+        importlib.import_module("diffusers")
+        .FluxPipeline.from_pretrained(
+            config["repository"],
+            revision=config["revision"],
+            torch_dtype=torch.bfloat16,
+        )
+        .to("cuda")
+    )
+    lock = Lock()
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+        def do_GET(self) -> None:
+            self.send_response(200 if self.path == "/health" else 404)
+            self.end_headers()
+
+        def do_POST(self) -> None:
+            if self.path != "/generate" or not lock.acquire(blocking=False):
+                self.send_error(409)
+                return
+            timer = Timer(85, lambda: os._exit(124))
+            try:
+                self.connection.settimeout(5)
+                length = int(self.headers.get("Content-Length", "0"))
+                if not 0 < length <= 16000:
+                    raise ValueError("invalid_input")
+                data = json.loads(self.rfile.read(length))
+                prompt = data["prompt"]
+                if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 2000:
+                    raise ValueError("invalid_input")
+                started = monotonic()
+                timer.start()  # Kill CUDA work too, even if a client disconnects.
+                result = pipeline(
+                    prompt,
+                    height=512,
+                    width=512,
+                    guidance_scale=0.0,
+                    num_inference_steps=4,
+                    max_sequence_length=256,
+                    generator=torch.Generator("cuda").manual_seed(42),
+                )
+                output = io.BytesIO()
+                result.images[0].save(output, format="PNG")
+                body = json.dumps(
+                    {
+                        "image": "data:image/png;base64,"
+                        + base64.b64encode(output.getvalue()).decode(),
+                        "seconds": monotonic() - started,
+                    }
+                ).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except (ValueError, KeyError, TypeError, OSError, RuntimeError):
+                self.send_error(502, "image_generation_failed")
+            finally:
+                timer.cancel()
+                lock.release()
+
+    ThreadingHTTPServer(("0.0.0.0", 8000), Handler).serve_forever()
+
+
+if __name__ == "__main__":
+    main()

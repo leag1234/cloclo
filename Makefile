@@ -109,3 +109,13 @@ test-vision: ## M12 : HTTP adaptateur/gateway, transport vision enregistré ou r
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/vision_gate.py
 verify-m12: ## vérificateur protégé multimodal
 	@bash scripts/verify-m12.sh
+
+.PHONY: test-imagegen verify-m13
+test-imagegen: ## génération GPU réelle et extinction en fin de cycle
+	@timeout 1500 bash infra/imagegen.sh 2>&1
+verify-m13: ## gate protégé génération souveraine
+	@bash scripts/verify-m13.sh
+
+.PHONY: serve-imagegen
+serve-imagegen: ## active le GPU pour le chat durant dix minutes après chargement
+	@timeout 2400 bash infra/imagegen.sh serve 2>&1
