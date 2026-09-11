@@ -125,7 +125,7 @@ Versioned golden set in Git: **minimum 140 cases**, distributed across **FR, DE,
 |---|---|---|---|
 | POC-E1 retrieval | 40 questions → expected doc/chunk (corpus and questions multilingual, including question in a language ≠ document language) | **deterministic**: recall@8, MRR | recall@8 ≥ 0.70 (PoC gate; target 0.85) |
 | POC-E2 RAG end-to-end | 30 Q/A on corpus | LLM judge (accuracy/completeness rubric) + presence of citation | ≥ 4.0/5 average |
-| POC-E3 honest refusal | 10 questions with no answer in corpus | deterministic (regex "does not find") + judge | 10/10: zero hallucination |
+| POC-E3 honest refusal | 10 questions with no answer in corpus | deterministic (regex "cannot find") + judge | 10/10: zero hallucination |
 | POC-E4 tool-calling | 20 scenarios (correct tool, correct args, recovery on injected error) | deterministic (assertions on trace) | ≥ 90% |
 | POC-E5 citation fidelity | sample of E2 + web responses | NLI/judge verifier: each citation supports the sentence | ≥ 0.90 |
 | POC-E6 **web Q/A** | ≥5 stable web facts verified, multilingual (LIGHTENED PoC set; SerpApi quota spared; extension 20 cases + post-PoC current affairs) | judge + source citation | executable, sourced facts |
@@ -143,7 +143,7 @@ Execution rules:
   Duration < 20 min, cost < €3.
 - POC-R2 (PoC): the production judge (glm-5.2) is calibrated by CROSS-AGREEMENT with a
   reference judge from another family (gpt-oss-120b): Cohen's κ calculated on an
-  eval sample. HUMAN calibration (30 notes, κ≥0.7) remains a pre-GA action.
+  eval sample. HUMAN calibration (30 scores, κ≥0.7) remains a pre-GA action.
 - POC-R3: E6 cases (web) include the creation date of the correction key; an
   expired case (reality has changed) is marked `stale`, not counted as failure.
 - POC-R4: CI: `make eval-smoke` (15 representative cases covering ≥ 3 languages, < 3 min,
@@ -178,4 +178,4 @@ evals + 3–4 days of H100 at end of PoC) + VM ~€30 + serverless L (escalation
   (< 10 min, weights on persistent volume).
 
 
-> **Clarification M5 (PoC)**: the judge calibration in M5 is a CROSS-MODEL inter-model calibration (production judge glm-5.2 vs reference judge gpt-oss-120b, family distinct from judge glm-5.2 AND tested system Qwen), not a human calibration. Human calibration (30 notes, κ≥0.7) remains a **pre-GA** action, non-blocking for the PoC. See verify-m5.
+> **Clarification M5 (PoC)**: the judge calibration in M5 is a CROSS-MODEL calibration (production judge glm-5.2 vs reference judge gpt-oss-120b, family distinct from judge glm-5.2 AND tested system Qwen), not a human calibration. Human calibration (30 scores, κ≥0.7) remains a **pre-GA** action, non-blocking for the PoC. See verify-m5.

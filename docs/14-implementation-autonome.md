@@ -16,7 +16,7 @@ agent → commit → CI (tests + evals + lint) → green? → next milestone
 ```
 
 **The human does not monitor the work; they define milestones and validate at checkpoints.**
-Everything below serves to make this loop hermetic: if a success criterion is not
+Everything below serves to make this loop enforceable: if a success criterion is not
 executable by a machine, the agent cannot know it is finished, and autonomy
 collapses into back-and-forth exchanges.
 
@@ -98,10 +98,10 @@ Operational summary of doc `11`, adapted for the PoC:
 |---|---|---|
 | **M0** | CI + skeleton + empty but functional eval-harness | lint+tests green on CI; `make eval-smoke` runs (0 cases); secrets loaded; hello-world deployed on app VM |
 | **M1** | Reproducible GPU node + vLLM + gateway | script `infra/gpu-up.sh` creates node from scratch; `curl gateway /v1/models` OK; TTFT/tok-s bench executed and archived; `infra/gpu-down.sh` destroys everything; **full re-creation < 20 min** timed |
-| **M2** | Ingestion + RAG | test corpus ingested; POC-E1 ≥ 0.85; citations_resolues resolvable (automatic test) |
+| **M2** | Ingestion + RAG | test corpus ingested; POC-E1 ≥ 0.85; resolvable citations (automatic test) |
 | **M3** | Agentic harness + web tools | POC-E4 ≥ 90%; SSRF/robots.txt/budgets tests pass; POC-E6 executable |
 | **M4** | Cascade + UI connected | POC-E8 ≥ 85%; serverless fallback tested (simulated GPU failure: `gpu-down` under traffic → UI still responds) |
-| **M5** | Full eval suite + telemetry | `make eval` complete < 20 min; HTML report with diff; cost/latence_ms dashboard fed |
+| **M5** | Full eval suite + telemetry | `make eval` complete < 20 min; HTML report with diff; cost/latency dashboard fed |
 | **M6** | Hardening + final bench + report | POC-P1..P9 measured; `make demo` runs full scenario; GO/NO-GO report generated with figures |
 
 - AUTO-4 (MUST): each `verify-mN` is a repo script, written (or validated) **before**

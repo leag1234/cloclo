@@ -40,13 +40,13 @@ beyond ~50M tokens/month) and required quality level.
 **Deliverables**: configuration of serverless models: generalist (qwen3.5-397b),
 code (glm-5.2 or qwen3-coder), vision (pixtral-12b), embeddings (qwen3-embedding-8b);
 context window and function-calling verified; the M4 router becomes a routing by
-TASK TYPE (text/code/vision) between serverless models, plus a local/escalade cascade.
+TASK TYPE (text/code/vision) between serverless models instead of a local/escalade cascade.
 The M4 fallback is preserved between serverless models.
 **Validation**: each task type is served by the intended model; function calling
 and streaming work on the main model; cost per request is traced.
 
 ### M9 — Memory + Projects
-**Goal**: consolidated context shared between conversations (missing #1 for real usage).
+**Goal**: consolidated context shared between conversations (the largest gap for real usage).
 **Deliverables**:
 - concept of **project** (groups conversations + ingested documents + notes);
 - persisted **conversation memory** (the assistant remembers past exchanges within
@@ -99,7 +99,7 @@ possible before any visible fragment, never after emitting content/reasoning.
 The client also relays project responses progressively: only the response field is
 displayed; the consolidation JSON remains internal and the final response is validated.
 
-Diffused citations use retrieved passages and routes specific to the project; the
+Streamed citations use retrieved passages and routes specific to the project; the
 memory preamble remains identical between JSON and SSE.
 Contract: `contracts/m11.md`; protocol and limits: `reports/M11.md`.
 `make verify-m11` verifies progression with a provider barrier on real HTTP.
@@ -153,7 +153,7 @@ confirmation; action logging.
 with confirmation before any side effect.
 The contract `contracts/m14.md` sets the stdio transport and authorized configuration;
 writes open a local form on port8020 (existing SSH tunnel), with preview and single
-confirmation. Expectations expire after 10 minutes or upon process restart; no confirmation
+confirmation. Pending actions expire after 10 minutes or upon process restart; no confirmation
 POST is exposed to the model.
 **Validation**: reading a GitLab resource via MCP; creating an issue after confirmation;
 refusal of an unconfirmed action; no MCP secret exposed.
@@ -173,7 +173,7 @@ Polished/ergonomic UI, quality voice recognition, multi-user chat UI,
 authentication/HTTPS/public exposure, high availability, production-hardened security,
 complete SRE observability, human calibration of the judge.
 
-> Note STT (product phase): an offline real-time speech recognition brick, already
+> Note STT (product phase): an offline real-time speech recognition component, already
 > proven on /e/OS (public repos), can be integrated in the product phase on the same GPU.
 > Technical choice validated on the /e/OS side: **Parakeet TDT (ONNX) via transcribe-rs**,
 > real-time streaming, preferred over Whisper. Out of scope for PoC v2.
@@ -187,7 +187,7 @@ only (rule above).
 M8: the contract `contracts/m8.md` specifies serverless routing. The policy in the
 gateway validates rates and capabilities before transport and reserves primary + fallback
 under €0.05. Provider windows are bounded by this application budget; alternative
-credentials require a validated capacity and price entry. Chat without GPU retains the
+identifiers require a validated capacity and price entry. Chat without GPU retains the
 delay and reserve in case of fallback without known usage. Logs distinguish measured cost
 and unknown reserve. The RAG context selects the best-ranked entire passages under 4 KiB;
 retrieval@8 remains unchanged. The gate `make verify-m8` and `reports/M8.md` document
