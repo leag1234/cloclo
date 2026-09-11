@@ -59,3 +59,10 @@ async def completions(request: Request) -> Response:
     from services.orchestrator.dev_inference import chat
 
     return await chat(request)
+
+
+@app.post("/v1/responses")
+async def responses(request: Request) -> Response:
+    from services.orchestrator.dev_inference import chat
+
+    return await chat(request, "responses")

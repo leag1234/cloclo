@@ -77,7 +77,11 @@ def responses(value: dict[str, Any]) -> ChatInput:
             else:
                 messages.append({"role": "assistant", "tool_calls": [call]})
         elif kind == "function_call_output":
-            fields(item, "type call_id output")
+            fields(item, "type call_id output id")
+            if "id" in item and (
+                not isinstance(item["id"], str) or len(item["id"]) > 1048576
+            ):
+                raise ValueError("invalid_item_id")
             messages.append(
                 {
                     "role": "tool",
