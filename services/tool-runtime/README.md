@@ -1,7 +1,7 @@
 # tool-runtime
 
-Responsable : `OWNERS`.
+Owner: `OWNERS`.
 
-Squelette M0 sans processus actif.
-SLO, runbook et dashboard : non applicables avant activation du service
-au jalon correspondant dans MISSION.md.
+M0 skeleton without active processes.
+SLO, runbook, and dashboard: not applicable before service activation
+at the corresponding milestone in MISSION.md.
