@@ -10,7 +10,7 @@ Do not log the output: it contains documents. No source data is deleted. The CLI
 administrative and never exposed to the end user.
 
 Each sync replaces the entire index within a transaction: uniform revision/dimension,
-finite non-null vectors, consistent metadata, SQL constraints.
+finite non-zero vectors, consistent metadata, SQL constraints.
 A failure restores the previous index. Missing sources are deleted.
 Full replacement favors simplicity for the small PoC corpus;
 stable identifiers preserve citations during identical ingestion.

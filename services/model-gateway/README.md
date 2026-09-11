@@ -23,12 +23,12 @@ RAG SLO/dashboard not attested before integration; /answer remains to be impleme
 POST /answer follows contracts/m2-gateway.schema.json. Injected configuration:
 SCW_GENERATIVE_BASE_URL (HTTPS), SCW_GENERATIVE_API_KEY, ESCALATION_MODEL.
 The Scaleway L model receives delimited sources as untrusted data,
-with versioned prompts/rag.txt. Provider delay 25 s, 1024 tokens maximum,
+with versioned prompts/rag.txt. Provider timeout 25 s, 1024 tokens maximum,
 reasoning_effort none, no automatic retry. Numerical references from the
 model are resolved to the provided chunk_id; absence or invention is rejected.
 HTTP 400 invalid input, 413 context exceeded, 502 provider/citation invalid,
 504 timeout. Logs without text or keys: duration and number of citations.
-Operational SLO: response or error bounded by provider delay; the target
+Operational SLO: response or error bounded by the provider timeout; the target
 RAG <12 s will be measured at the performance milestone. Serverless ceiling confirmed in
 MISSION; no GPU created, billing by usage and not hourly.
 Source: https://www.scaleway.com/en/docs/generative-apis/api-cli/using-chat-api/
@@ -53,4 +53,4 @@ M12: `/vision/complete` validates images with `packages/images.py`, reserves the
 budget before inference, and uses `vision.yaml` for the sovereign model and its
 rate. The transport performs neither image URL lookup nor text fallback.
 
-M15: dev_gateway prepares an immutable code request and reserves UTF8 bytes +512 and maximum outgoing under50000microEUR. Single TLS transport, no redirection or resumption; SSE bounded to 2Mo and mandatory terminal usage. Tests replay real Scaleway deltas (provider metadata removed), without external SDK dependency.
+M15: dev_gateway prepares an immutable code request and reserves UTF8 bytes +512 and maximum output under 50000 microEUR. Single TLS transport, no redirection or resumption; SSE bounded to 2 MB and mandatory terminal usage. Tests replay real Scaleway deltas (provider metadata removed), without external SDK dependency.

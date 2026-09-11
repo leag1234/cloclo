@@ -6,7 +6,7 @@ REQ-HAR-001/002/006, REQ-TOOL-001/002/004/012/013/014/015, REQ-FIN-002.
 The model selects tools, the harness validates arguments and reserves cost/tokens
 before each I/O. Ceilings trigger a `stopped` result with an explicit reason;
 tool errors are returned to the model for bounded recovery.
-Web/RAG results are unreliable; instructions remain in prompts/.
+Web/RAG results are untrusted; instructions remain in prompts/.
 
 ## Local Operation
 
@@ -44,14 +44,14 @@ No mocks are imported by the runtime. Cassettes are exclusively under tests/.
 E6 measures executability here with URL/date; no quality GO without key review
 and human calibration of the judge. The fidelity of each sentence falls under gate E5.
 
-M7: chat_pipeline uses harness budgets, HTTP retrieval, and resolved citations (citations_resolues).
+M7: chat_pipeline uses harness budgets, HTTP retrieval, and resolved citations.
 interactions writes received measurements and stop codes in private JSONL;
 full contract and limits documented in contracts/m7.md.
 
 M12: `packages/images.py` defines valid image messages from contract `contracts/m12.md`.
 PNG/JPEG are decoded by Pillow after dimension checks; remote URLs,
 unsupported formats, and cumulative overruns are rejected. This first
-building block is common to future vision adapter/gateway frontiers.
+building block is common to future vision adapter/gateway boundaries.
 The chat now accepts `text` and `image_url` parts in PNG/JPEG data URI.
 Any image in history selects `/vision/complete`; text exchanges
 retain the harness. The log contains metadata, tokens/cost, and vision route,
@@ -61,9 +61,9 @@ remain distinct and retain a 0.05 EUR reservation.
 Vision relays its complete validated response via SSE; it does not claim
 to produce upstream progressive tokens. Text/project retains M11 transport.
 
-M15: developer entry `PYTHONPATH=.:services/model-gateway uvicorn services.orchestrator.devapi:app --host 127.0.0.1 --port 8030 --no-access-log`; keys via `python -m services.orchestrator.dev_auth create <dev> --key-file <private-file>`, revocation via `revoke <dev>`. ATLAS_DEVAPI_DB retains daily quotas and unknown reservations; contract contracts/m15.md. POST /v1/chat/completions now exposes text and functions in JSON or SSE, without access to private chat tools/data.
+M15: developer entry `PYTHONPATH=.:services/model-gateway uvicorn services.orchestrator.devapi:app --host 127.0.0.1 --port 8030 --no-access-log`; keys via `python -m services.orchestrator.dev_auth create <dev> --key-file <fichier-privé>`, revocation via `revoke <dev>`. ATLAS_DEVAPI_DB retains daily quotas and unknown reservations; contract contracts/m15.md. POST /v1/chat/completions now exposes text and functions in JSON or SSE, without access to private chat tools/data.
 
-M15 Chat Protocol: dev_chat normalizes text messages and assembles deltas without executing functions. Identifiers must remain stable, complete arguments must be finished JSON objects, and names must come from declared tools. Provider stop with complete call becomes tool_calls; length remains a truncation.
+M15 Chat Protocol: dev_chat normalizes text messages and assembles deltas without executing functions. Identifiers must remain stable, complete arguments must be finite JSON objects, and names must come from declared tools. Provider stop with complete call becomes tool_calls; length remains a truncation.
 
 M10 Selection: relevance contributions are summed using math.fsum to preserve ties regardless of Python hash seed. Existing tie-breaking by position remains deterministic; the exact provider cassette is unchanged.
 

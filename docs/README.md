@@ -29,8 +29,8 @@ The default decision is therefore *not to host GPUs unless the load justifies it
 | `10-sre-observabilite.md` | SLOs, telemetry, runbooks | SRE |
 | `11-standards-ingenierie-agents.md` | Rules for implementing agents | **To be read first by any agent** |
 | `12-roadmap.md` | Phases, milestones, exit criteria | Management |
-| `13-poc-spec.md` | PoC ATLAS-0: scope, targets, self-validation, leased infra | All / agents |
-| `14-implementation-autonome.md` | "Turnkey" playbook: access, milestones, checkpoints | Human pilot + agents |
+| `13-poc-spec.md` | PoC ATLAS-0: scope, targets, automated validation, leased infra | All / agents |
+| `14-implementation-autonome.md` | Delegated control playbook: access, milestones, checkpoints | Human pilot + agents |
 
 ## 2. Normative Conventions (RFC 2119)
 
@@ -47,7 +47,7 @@ and tickets **MUST** reference the identifier (`// covers: REQ-INF-004`).
    protobuf) is merged. Agents generate code *from* the contract.
 2. **The model is replaceable.** No component outside the `model-gateway` layer
    knows the name of a model. A provider change = a config change.
-3. **Cost = first-class function.** Any PR touching the inference path
+3. **Cost is a first-class concern.** Any PR touching the inference path
    declares its impact `€/1k requests` (cf. `04-finops.md`).
 4. **Nothing goes to prod without eval.** The quality gate (`09`) is blocking.
 5. **Determinism and reproducibility.** Seeds, pinned versions, immutable artifacts.

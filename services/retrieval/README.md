@@ -10,7 +10,7 @@ without document text. Do not expose stdout in shared logs.
 
 Formats: Textual PDF (no OCR), DOCX (paragraphs/tables in order),
 UTF-8 Markdown and HTML without script/style/template. No external links followed.
-File <= 10 MiB; text <= 1 million characters; decompressed DOCX <= 1 MiB.
+File <= 10 MiB; text <= 1 million characters; decompressed DOCX <= 1 MB.
 The CLI also limits memory space to 512 MiB and CPU time to 15 seconds.
 Future ingestion calls must use this process with a wall-clock timeout,
 not call the parser directly in a server exposed to untrusted documents.

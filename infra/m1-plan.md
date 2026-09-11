@@ -25,11 +25,11 @@ before implementation. No migration, new UI, RAG, or M2 realization.
    reformat an existing volume. Bootstrap via cloud-init, without SSH installation.
    Pin the GPU image and container after compatibility verification.
    Enable prefix caching, serve the `local` alias, mount the weights cache on
-   the persistent volume. Bound expectations and propagate errors.
+   the persistent volume. Bound waits and propagate errors.
    Clean up all owned temporary resources, including partial failures;
    retain only the weights volume agreed upon in the contract.
 3. `services/model-gateway/`: local configuration and Scaleway fallback,
-   model credentials exclusively in this service or the environment.
+   model identifiers exclusively in this service or the environment.
    Local URL from provisioning; alias/URL consistency tests.
    Document usage, cost, errors, and recovery in the README.
 4. `infra/inventory.sh`: inventory explicitly bounded to the dedicated project,
@@ -58,7 +58,7 @@ before implementation. No migration, new UI, RAG, or M2 realization.
   (docs/13 POC-I1/I2, docs/14 AUTO-2/3).
 - GPU configured: L40S-1-48G, fr-par-2, 1.469916 EUR/h excl. tax in the API catalog
   consulted on 2026-09-09. Announced availability: shortage.
-- Encrypt weights volume, system disk, and IP separately before creation,
+- Estimate costs for the weights volume, system disk, and IP separately before creation,
   record the total and persistent cost in BRAIN/STATUS.md.
 - Protect the inference port with a network rule limited to the verification VM.
 - Verify real CLI signatures, Block Storage mounting, GPU/vLLM versions
