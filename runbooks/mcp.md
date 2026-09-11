@@ -20,7 +20,7 @@ Restart `make serve`. With the existing SSH tunnel for 3000 and 8020, request a
 GitLab read or an issue creation. For a write operation, open the local link 8020,
 verify the displayed arguments, then click "Confirm and execute once".
 No effect on GET. Authorization valid for 10 minutes, single-use, linked to the config
-and token; maximum 100 requests. Process restart = invalidation of pending expectations.
+and token; maximum 100 requests. Process restart = invalidation of pending actions.
 Single-user UI, single process; no public exposure of this confirmation.
 If the result indicates an uncertain write, verify GitLab before a new
 request; ATLAS never automatically retries a write.

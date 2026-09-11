@@ -1,231 +1,131 @@
 # MISSION — ATLAS-0
 
-Construire le PoC défini dans `docs/13-poc-spec.md`, jalon par jalon, chaque jalon
-prouvé par `make verify-mN` **vert sur la CI GitHub** (pas seulement en local).
+Build the PoC defined in `docs/13-poc-spec.md`, milestone by milestone, with each milestone proven by `make verify-mN` **green on GitHub CI** (not just locally).
 
-Règle d'or : un jalon n'existe que lorsque sa CI est verte. Ta parole ne vaut rien ;
-le job `ci` vaut tout. Tu ne modifies jamais `.github/workflows/` ni `scripts/verify-*`
-(protégés par CODEOWNERS).
+Golden rule: a milestone only exists when its CI is green. Your word means nothing; the `ci` job means everything. You never modify `.github/workflows/` or `scripts/verify-*` (protected by CODEOWNERS).
 
-L'ordre est **impératif**. M0 puis M1 d'abord : sans CI et sans infra reproductible,
-tout le reste est invérifiable.
+The order is **mandatory**. M0 then M1 first: without CI and without reproducible infrastructure, everything else is unverifiable.
 
 ---
 
-## M0 — Cadre vérifiable
-**But** : la boucle de vérification tourne de bout en bout sur un projet vide.
-**Livrables** : structure des services (squelettes), `make` cible, CI qui exécute
-lint+typecheck+tests+scan-secrets, `eval-harness` capable de tourner à vide.
-**verify-m0** vérifie : `make lint test` vert ; `make eval-smoke` s'exécute (0 cas ok) ;
-un healthcheck `edge-bff` répond 200 ; le scan de secrets passe ; le grep anti-nom-de-modèle
-(docs/02 AC-ARC-4) ne trouve rien hors `services/model-gateway`.
+## M0 — Verifiable Framework
+**Goal**: the verification loop runs end-to-end on an empty project.
+**Deliverables**: service structure (skeletons), `make` target, CI executing lint+typecheck+tests+secret-scan, `eval-harness` capable of running empty.
+**verify-m0** verifies: `make lint test` green; `make eval-smoke` executes (0 cases ok); an `edge-bff` healthcheck responds 200; the secret scan passes; the anti-model-name grep (docs/02 AC-ARC-4) finds nothing outside `services/model-gateway`.
 
-## M1 — Infra GPU reproductible + gateway
+## M1 — Reproducible GPU Infra + Gateway
 
-**But** : prouver qu'un nœud GPU se crée par script, sert un modèle via
-vLLM, puis se détruit. Livrables : `infra/gpu-up.sh`, `infra/gpu-down.sh`,
-config `services/model-gateway/`.
+**Goal**: prove that a GPU node is created by script, serves a model via vLLM, then is destroyed. Deliverables: `infra/gpu-up.sh`, `infra/gpu-down.sh`, config `services/model-gateway/`.
 
-**verify-m1** se valide SUR LA VM (accès GPU + creds Scaleway), PAS en CI
-GitHub (ni GPU ni secrets). En CI : contrôle statique des scripts. Sur la VM,
-`make verify-m1` fait UN cycle : crée le nœud, vérifie que vLLM répond sur
-/v1/models, lance une inférence de contrôle, archive un bench simple sous
-BRAIN/bench/, détruit le nœud, le tout en moins de 20 min. La preuve de M1
-est l'exécution réussie de `make verify-m1` sur la VM. Voir contracts/m1.md.
+**verify-m1** validates ON THE VM (GPU access + Scaleway creds), NOT on GitHub CI (no GPU nor secrets). On CI: static control of scripts. On the VM, `make verify-m1` runs ONE cycle: creates the node, verifies vLLM responds on /v1/models, launches a control inference, archives a simple bench under BRAIN/bench/, destroys the node, all in under 20 min. The proof of M1 is the successful execution of `make verify-m1` on the VM. See contracts/m1.md.
+
 ## M2 — Ingestion + RAG
-**But** : RAG hybride avec citations résolvables.
-**Livrables** : ingestion (pdf/docx/md/html) → chunks + métadonnées + embeddings ;
-recherche BM25+dense+reranker ; génération avec citations `chunk_id`.
-Si `evals/golden/` ne contient pas encore E1/E2/E3, exécuter `generation/KIT-E1-E2-E3.md`
-sur le corpus fourni (statut `genere-a-valider`, en attente de validation humaine).
-**verify-m2** vérifie sur le corpus multilingue (corpus/) : l'ingestion produit des chunks avec métadonnées ; le retrieval atteint **recall@8 ≥ 0,70** sur le jeu doré E1 (gate M2 ; cible 0,85 à terme, relevable via M2_RECALL_MIN) ; chaque citation d'une réponse pointe vers un chunk réellement récupérable. M2 ne crée pas de GPU.
+**Goal**: Hybrid RAG with resolvable citations.
+**Deliverables**: ingestion (pdf/docx/md/html) → chunks + metadata + embeddings; BM25+dense+reranker search; generation with `chunk_id` citations.
+If `evals/golden/` does not yet contain E1/E2/E3, run `generation/KIT-E1-E2-E3.md` on the provided corpus (status `genere-a-valider`, awaiting human validation).
+**verify-m2** verifies on the multilingual corpus (corpus/): ingestion produces chunks with metadata; retrieval achieves **recall@8 ≥ 0.70** on the E1 golden set (M2 gate; target 0.85 eventually, adjustable via M2_RECALL_MIN); every citation in a response points to a chunk actually retrievable. M2 does not create a GPU.
 
-## M3 — Harness agentique + outils web
-**But** : boucle d'outils bornée, recherche + lecture web sûres.
-**Livrables** : machine à états (budgets durs POC-P6), outils `web_search` (SerpApi),
-`web_fetch` (trafilatura, robots.txt, anti-SSRF), `rag_search`, `calculator`.
-**verify-m3** vérifie : POC-E4 ≥ 90 % ; tests SSRF (IP privées refusées) + robots.txt +
-plafond de fetches ; les 4 budgets déclenchent un arrêt propre (test d'intégration) ;
-POC-E6 exécutable de bout en bout.
+## M3 — Agentic Harness + Web Tools
+**Goal**: bounded tool loop, safe web search + reading.
+**Deliverables**: state machine (hard budgets POC-P6), tools `web_search` (SerpApi), `web_fetch` (trafilatura, robots.txt, anti-SSRF), `rag_search`, `calculator`.
+**verify-m3** verifies: POC-E4 ≥ 90%; SSRF tests (private IPs refused) + robots.txt + fetch ceiling; the 4 budgets trigger a clean stop (integration test); POC-E6 executable end-to-end.
 
-## M4 — Cascade + UI + escalade
-**But** : routage S→L, fallback en cas de panne GPU, UI branchée.
-**Livrables** : classifieur de routage, escalade vers Generative APIs Scaleway, UI
-(Open WebUI/LibreChat) connectée au gateway.
-**verify-m4** vérifie : POC-E8 ≥ 85 %, zéro sous-routage sur les cas critiques ;
-fallback : si le modèle local est injoignable (panne simulée en coupant l'endpoint
-local, SANS créer de GPU payant), le gateway bascule sur l'escalade Scaleway et répond
-quand même. L'UI (Open WebUI/LibreChat) est un PLUS visuel, NON bloquant pour ce gate PoC.
+## M4 — Cascade + UI + Escalation
+**Goal**: S→L routing, fallback on GPU failure, UI connected.
+**Deliverables**: routing classifier, escalation to Scaleway Generative APIs, UI (Open WebUI/LibreChat) connected to the gateway.
+**verify-m4** verifies: POC-E8 ≥ 85%, zero under-routing on critical cases; fallback: if the local model is unreachable (simulated failure by cutting the local endpoint, WITHOUT creating a paid GPU), the gateway switches to Scaleway escalation and still responds. The UI (Open WebUI/LibreChat) is a visual PLUS, NON-blocking for this PoC gate.
 
-## M5 — Évals complètes + télémétrie
-**But** : mesurer, comparer, tracer.
-**Livrables** : `make eval` (toutes suites, rapport HTML avec diff + ventilation par
-langue, < 20 min), juge calibré (POC-R2), dashboard coût/latence, prefix-cache hit exposé.
-**verify-m5** vérifie : `make eval` complet vert et sous budget/temps ; rapport généré ;
-métriques de télémétrie présentes (tokens, coût, TTFT, tok/s, cache hit).
+## M5 — Full Evals + Telemetry
+**Goal**: measure, compare, trace.
+**Deliverables**: `make eval` (all suites, HTML report with diff + breakdown by language, < 20 min), calibrated judge (POC-R2), cost/latency dashboard, prefix-cache hit exposed.
+**verify-m5** verifies: `make eval` complete green and under budget/time; report generated; telemetry metrics present (tokens, cost, TTFT, tok/s, cache hit).
 
-## M6 — Durcissement + bench final + rapport GO/NO-GO
-**But** : preuve chiffrée pour la décision.
-**Livrables** : bench de charge (POC-P1..P9), filtre d'entrée minimal, `make demo`
-(scénario complet), rapport GO/NO-GO auto-généré depuis les mesures.
-**verify-m6** vérifie : POC-P1..P9 mesurés et archivés ; `make demo` déroule un parcours
-RAG + web + escalade sans erreur ; `reports/GO-NOGO.md` généré avec les chiffres réels.
+## M6 — Hardening + Final Bench + GO/NO-GO Report
+**Goal**: quantified proof for decision making.
+**Deliverables**: load bench (POC-P1..P9), minimal input filter, `make demo` (full scenario), GO/NO-GO report auto-generated from measurements.
+**verify-m6** verifies: POC-P1..P9 measured and archived; `make demo` runs a RAG + web + escalation journey without error; `reports/GO-NOGO.md` generated with real figures.
 
 ---
 
-### Checkpoints humains (hors de ta responsabilité, l'humain les fait)
-Après M1 (infra/budget), après M3 (10 requêtes à la main), après M5 (calibration juge),
-après M6 (décision). Entre ces points, tu avances seul et consignes dans BRAIN/.
+### Human Checkpoints (outside your responsibility, humans do these)
+After M1 (infra/budget), after M3 (10 manual requests), after M5 (judge calibration), after M6 (decision). Between these points, you advance alone and log in BRAIN/.
 
-### M1 — Confirmation des protections (levée du prérequis AUTO-2 / POC-I1/I2)
-Protections budget CONFIRMÉES et ACTIVES : alertes Scaleway à 50% et 80% de 800€
-(SMS + email), vérifiées en console. Extinction du GPU garantie par le trap de
-verify-m1.sh (destruction en fin de test quoi qu'il arrive) et par l'appel explicite
-à gpu-down.sh. Type GPU : sélection automatique par gpu-up.sh (L40S-1-48G en priorité, disponible). L'agent est AUTORISÉ à créer un GPU
-facturé pour exécuter make verify-m1. Cette confirmation ne doit plus être redemandée.
+### M1 — Protection Confirmation (Prerequisite AUTO-2 / POC-I1/I2 lifted)
+Budget protections CONFIRMED and ACTIVE: Scaleway alerts at 50% and 80% of €800 (SMS + email), verified in console. GPU shutdown guaranteed by the trap in verify-m1.sh (destruction at end of test no matter what) and by the explicit call to gpu-down.sh. GPU type: automatic selection by gpu-up.sh (L40S-1-48G priority, available). The agent is AUTHORIZED to create a billed GPU to execute make verify-m1. This confirmation must not be requested again.
 
-### M2 — Moteur de génération confirmé
-Pour l'étape de GÉNÉRATION du RAG (rédaction des réponses avec citations), utilise le
-modèle L via Scaleway Generative APIs (ESCALATION_MODEL, déjà configuré dans .env,
-endpoint SCW_GENERATIVE_BASE_URL). Le plafond budget est ACTIF et confirmé. Le petit
-modèle CPU sert UNIQUEMENT aux embeddings/reranking, pas à la génération. Tu es autorisé
-à appeler Generative APIs pour générer et produire des citations fiables.
+### M2 — Generation Engine Confirmed
+For the RAG GENERATION step (drafting responses with citations), use the L model via Scaleway Generative APIs (ESCALATION_MODEL, already configured in .env, endpoint SCW_GENERATIVE_BASE_URL). The budget ceiling is ACTIVE and confirmed. The small CPU model serves ONLY for embeddings/reranking, not for generation. You are authorized to call Generative APIs to generate and produce reliable citations.
 
-### M3 — Autorisation de reprise (diagnostic provider_error)
-Les erreurs provider_error sur E4-004/013/018 viennent probablement d'une réponse
-tronquée (limite de tokens de sortie trop basse) quand le contexte est long (page web
-fetchée). Tu es AUTORISÉ à : (1) augmenter la limite de tokens de sortie du gateway
-(ex. 512 -> 2048), (2) tronquer/résumer les contenus web volumineux AVANT de les
-passer au modèle (respect du plafond de contexte, docs/03 REQ-MOD-004), (3) relancer
-les essais E4/E6 autant que nécessaire dans la limite du budget par requête (0,05 €).
-Le function-calling Scaleway est supporté (doc officielle vérifiée). Continue jusqu'à
-E4 >= 90% puis merge. Ne baisse pas le seuil E4, ne modifie pas les clés de correction.
+### M3 — Resumption Authorization (provider_error diagnosis)
+The provider_error errors on E4-004/013/018 likely come from a truncated response (output token limit too low) when the context is long (fetched web page). You are AUTHORIZED to: (1) increase the gateway output token limit (e.g., 512 -> 2048), (2) truncate/summarize large web contents BEFORE passing them to the model (respecting context ceiling, docs/03 REQ-MOD-004), (3) retry E4/E6 attempts as many times as necessary within the per-request budget limit (€0.05). Scaleway function-calling is supported (official doc verified). Continue until E4 >= 90% then merge. Do not lower the E4 threshold, do not modify correction keys.
 
-### M5 — Juge de référence pour la calibration croisée
-Le juge de référence pour la calibration croisée est **gpt-oss-120b** (Scaleway
-Generative APIs, famille OpenAI, distincte du juge de production glm-5.2 ET du système
-testé Qwen — l'indépendance des 3 familles est respectée). Utilise l'endpoint Scaleway
-déjà configuré (SCW_GENERATIVE_BASE_URL, même clé). Calcule le κ de Cohen entre les
-notes de glm-5.2 et celles de gpt-oss-120b sur l'échantillon d'éval. Aucun accès externe
-ni juge humain requis pour le PoC ; la calibration humaine reste pré-GA.
+### M5 — Reference Judge for Cross-Calibration
+The reference judge for cross-calibration is **gpt-oss-120b** (Scaleway Generative APIs, OpenAI family, distinct from the production judge glm-5.2 AND the system under test Qwen — independence of the 3 families is respected). Use the already configured Scaleway endpoint (SCW_GENERATIVE_BASE_URL, same key). Calculate Cohen's κ between glm-5.2 scores and gpt-oss-120b scores on the eval sample. No external access nor human judge required for the PoC; human calibration remains pre-GA.
 
-### M5 — E9 traduction sans FLORES (PoC)
-Le téléchargement de FLORES-200 échoue (miroir indisponible/authentification). Pour le
-PoC, la suite E9 utilise UNIQUEMENT les cas déjà présents dans evals/golden/e9_traduction.yaml
-(cas métier écrits et validés, faux amis + terminologie). N'exécute PAS fetch_flores.py,
-ne bloque pas sur FLORES. L'extension FLORES-200 est une action post-PoC. E9 est évalué
-sur les cas 'valide' disponibles.
+### M5 — E9 Translation without FLORES (PoC)
+Downloading FLORES-200 fails (mirror unavailable/authentication). For the PoC, the E9 suite uses ONLY cases already present in evals/golden/e9_traduction.yaml (written and validated business cases, false friends + terminology). Do NOT run fetch_flores.py, do not block on FLORES. The FLORES-200 extension is a post-PoC action. E9 is evaluated on available 'valide' cases.
 
-### M5 — Correctif calibration (transport JSON du juge)
-Le mode structured-output strict de Scaleway (response_format=json_object / json_schema)
-produit un JSON doublement encapsulé (préfixe `{"{"`) invalide. Tu es AUTORISÉ à :
-1. NE PAS utiliser le mode json_schema/json_object strict pour les appels juge ;
-   demander le JSON dans le prompt (sortie texte) et le parser côté client de façon
-   TOLÉRANTE (extraire le premier objet JSON valide {...} de la réponse, ignorer
-   l'enrobage éventuel). Ceci n'est PAS "réparer une note" : c'est du parsing de
-   transport, la note du juge n'est jamais modifiée.
-2. Relancer une série d'appels bornée (budget < 3 EUR) pour produire la calibration.
-3. Si un appel juge reste non parsable après extraction tolérante, l'exclure du calcul
-   du κ et le SIGNALER dans le rapport (calibration best-effort sur cas valides).
-Le juge de référence reste gpt-oss-120b (indépendance des familles préservée).
+### M5 — Calibration Fix (Judge JSON transport)
+Scaleway's strict structured-output mode (response_format=json_object / json_schema) produces invalid doubly-encapsulated JSON (prefix `{"{"`). You are AUTHORIZED to:
+1. NOT use strict json_schema/json_object mode for judge calls; request JSON in the prompt (text output) and parse it on the client side in a TOLERANT manner (extract the first valid JSON object {...} from the response, ignore potential wrapping). This is NOT "fixing a score": it is transport parsing, the judge's score is never modified.
+2. Retry a bounded series of calls (budget < 3 EUR) to produce the calibration.
+3. If a judge call remains unparsable after tolerant extraction, exclude it from the κ calculation and SIGNAL it in the report (best-effort calibration on valid cases).
+The reference judge remains gpt-oss-120b (family independence preserved).
 
-## M7 — UI de test + observabilité des interactions
-**But** : rendre le système interrogeable via une UI de chat, avec un logging
-structuré et exploitable de CHAQUE interaction, pour analyser qualité/latence/routage.
+## M7 — Test UI + Interaction Observability
+**Goal**: make the system queryable via a chat UI, with structured and exploitable logging of EVERY interaction, to analyze quality/latency/routing.
 
-**Livrables** :
-- `make serve` : démarre tous les services nécessaires en une commande (gateway
-  http + retrieval + adaptateur), sans GPU par défaut (tout passe par l'escalade
-  Scaleway ; le GPU local est activé seulement si GPU_LOCAL=1).
-- **Adaptateur OpenAI-compatible** : expose `POST /v1/chat/completions` (protocole
-  OpenAI standard) et le route vers le pipeline interne (RAG /answer, recherche web,
-  ou escalade selon la nature de la requête). Permet de brancher n'importe quel
-  client OpenAI, dont Open WebUI.
-- **Open WebUI** en Docker, pointé sur l'adaptateur, accessible sur le port 3000 de
-  la VM. L'utilisateur ouvre http://<ip-vm>:3000 et discute avec le système.
-- **Logging structuré par interaction** : chaque requête produit une ligne JSON dans
-  `BRAIN/interactions/<date>.jsonl` avec AU MINIMUM : timestamp, question, réponse,
-  modèle_utilisé (local|escalade), route_decision (simple|complexe), latence_ms
-  (retrieval, génération, total), chunks_récupérés (doc_id + score), citations
-  (chunk_id résolus), tokens (in/out), coût_eur, erreurs/timeouts éventuels.
-  Aucun secret ni clé dans les logs.
+**Deliverables**:
+- `make serve`: starts all necessary services in one command (http gateway + retrieval + adapter), without GPU by default (everything goes through Scaleway escalation; local GPU is activated only if GPU_LOCAL=1).
+- **OpenAI-compatible Adapter**: exposes `POST /v1/chat/completions` (standard OpenAI protocol) and routes it to the internal pipeline (RAG /answer, web search, or escalation depending on request nature). Allows connecting any OpenAI client, including Open WebUI.
+- **Open WebUI** in Docker, pointed at the adapter, accessible on port 3000 of the VM. The user opens http://<vm-ip>:3000 and chats with the system.
+- **Structured logging per interaction**: each request produces a JSON line in `BRAIN/interactions/<date>.jsonl` with AT LEAST: timestamp, question, réponse, modèle_utilisé (local|escalade), route_decision (simple|complexe), latence_ms (retrieval, génération, total), chunks_récupérés (doc_id + score), citations (resolved chunk_id), tokens (in/out), coût_eur, any errors/timeouts. No secrets nor keys in logs.
 
-**verify-m7** vérifie : `make serve` démarre les services ; l'adaptateur répond à une
-requête `/v1/chat/completions` de bout en bout (réponse + citation) ; une ligne de log
-structurée est produite dans BRAIN/interactions/ avec les champs requis ; Open WebUI
-est joignable (HTTP 200 sur le port 3000). Sans GPU (escalade seule) par défaut.
+**verify-m7** verifies: `make serve` starts services; the adapter responds to a `/v1/chat/completions` request end-to-end (response + citation); a structured log line is produced in BRAIN/interactions/ with required fields; Open WebUI is reachable (HTTP 200 on port 3000). Without GPU (escalation only) by default.
 
-**Hors périmètre** : authentification multi-utilisateur, HTTPS, exposition publique
-(le port reste sur la VM ; accès via SSH tunnel ou IP directe selon config réseau).
+**Out of scope**: multi-user authentication, HTTPS, public exposure (port remains on VM; access via SSH tunnel or direct IP depending on network config).
 
-## PoC v2 (M8→M13) — voir docs/15-poc-v2.md
+## PoC v2 (M8→M13) — see docs/15-poc-v2.md
 
-### Incident jeton GitHub — RISQUE ASSUMÉ (décision humaine, 2026-09-10)
-Le jeton GitHub a été exposé hors de la VM. Le propriétaire du projet a examiné le
-risque et DÉCIDE de ne pas le révoquer pour la durée du PoC : portée limitée à un
-dépôt privé sans données sensibles, contexte de prototypage, coût de rotation jugé
-supérieur au risque résiduel. L'incident est donc CLOS en tant que blocage : ce n'est
-pas une révocation, c'est une acceptation de risque explicite et tracée.
-Action reportée : rotation du jeton avant toute mise en production.
-L'agent NE DOIT PLUS bloquer sur ce point ni redemander de confirmation.
+### GitHub Token Incident — ASSUMED RISK (human decision, 2026-09-10)
+The GitHub token was exposed outside the VM. The project owner examined the risk and DECIDES not to revoke it for the duration of the PoC: scope limited to a private repo without sensitive data, prototyping context, rotation cost judged higher than residual risk. The incident is thus CLOSED as a blocker: this is not a revocation, it is an explicit and tracked risk acceptance.
+Deferred action: rotate token before any production deployment.
+The agent MUST NO LONGER block on this point nor ask for confirmation again.
 
-### M13 — Budget GPU attesté (décision humaine, 2026-09-11)
-L'API de consommation Scaleway n'est pas lisible par le jeton IAM du projet ; le budget
-est donc ATTESTÉ ici par le propriétaire :
-- Budget mensuel global : 800 € ; consommation à ce jour : < 5 € ; marge disponible : > 795 €.
-- Plafond horaire GPU : GPU_MAX_EUR_H=2.00 €/h (le L40S est à ~1,47 €/h).
-- Plafond de dépense GPU pour M13 : **30 € maximum** pour l'ensemble du jalon.
-- Alertes budget Scaleway actives à 50 % et 80 % (SMS + e-mail).
-Tu es AUTORISÉ à créer un GPU pour M13 dans ces limites, à condition de l'éteindre après
-chaque test (trap déjà en place). N'interroge plus l'API billing : cette attestation fait foi.
+### M13 — GPU Budget Attested (human decision, 2026-09-11)
+The Scaleway consumption API is not readable by the project's IAM token; the budget is therefore ATTESTED here by the owner:
+- Global monthly budget: €800; consumption to date: < €5; available margin: > €795.
+- Hourly GPU ceiling: GPU_MAX_EUR_H=€2.00/h (the L40S is ~€1.47/h).
+- GPU spending ceiling for M13: **€30 maximum** for the entire milestone.
+- Active Scaleway budget alerts at 50% and 80% (SMS + email).
+You are AUTHORIZED to create a GPU for M13 within these limits, provided you shut it down after each test (trap already in place). Do not query the billing API anymore: this attestation stands as proof.
 
-### RÈGLE DE RISQUE BUDGÉTAIRE (remplace toute interprétation antérieure) — 2026-09-11
-Le risque financier lié au GPU est BORNÉ et ACCEPTÉ par le propriétaire :
-- plafond horaire GPU_MAX_EUR_H = 2 €/h ; plafond M13 = 30 € ; budget mensuel 800 € ;
-  alertes SMS+e-mail actives à 50 % et 80 %. Pire cas d'un GPU oublié une nuit : ~15 €.
-- Ce risque est CONSCIEMMENT ASSUMÉ. Un défaut théorique dans l'extinction (cas limite
-  d'inventaire, homonyme improbable, etc.) N'EST PAS un motif d'arrêt : c'est une note
-  d'amélioration à consigner dans le rapport, puis tu CONTINUES.
-- Tu es AUTORISÉ et REQUIS de provisionner le GPU pour M13, de déployer Flux, de tester,
-  puis d'éteindre avec infra/gpu.py down. Si l'extinction renvoie une erreur, tu la
-  journalises et tu la signales — tu ne bloques pas le jalon avant de l'avoir tenté.
-- Seuls restent des motifs d'ARRÊT : dépassement effectif du plafond (30 €), fuite de
-  secret, action destructrice hors du projet strike-poc, modification d'un fichier
-  protégé. L'audit préventif de scripts d'extinction n'en fait PAS partie.
-Toute nouvelle objection de sécurité sur gpu.py/gpu-down doit être PROPOSÉE dans le
-rapport, jamais utilisée pour bloquer. Provisionne.
+### BUDGET RISK RULE (replaces any prior interpretation) — 2026-09-11
+The financial risk related to the GPU is BOUNDED and ACCEPTED by the owner:
+- hourly ceiling GPU_MAX_EUR_H = €2/h; M13 ceiling = €30; monthly budget €800;
+  SMS+email alerts active at 50% and 80%. Worst case of a GPU forgotten overnight: ~€15.
+- This risk is CONSCIOUSLY ASSUMED. A theoretical defect in shutdown (edge case of inventory, unlikely homonym, etc.) IS NOT a reason to stop: it is an improvement note to log in the report, then you CONTINUE.
+- You are AUTHORIZED and REQUIRED to provision the GPU for M13, deploy Flux, test, then shut down with infra/gpu.py down. If shutdown returns an error, you log it and signal it — you do not block the milestone before having attempted it.
+- Only remaining reasons to STOP: effective breach of ceiling (€30), secret leak, destructive action outside the strike-poc project, modification of a protected file. Preventive audit of shutdown scripts is NOT part of this.
+Any new security objection regarding gpu.py/gpu-down must be PROPOSED in the report, never used to block. Provision.
 
 ## M16 — English localization of the public repository (PRIORITY)
-**Context**: the repository is now PUBLIC. All documentation and code intended for
-external readers must be in English. This is a blocking presentation issue for an
-open-source project.
+**Context**: the repository is now PUBLIC. All documentation and code intended for external readers must be in English. This is a blocking presentation issue for an open-source project.
 
 **Scope — TO TRANSLATE into English**:
-- `README.md` — **to CREATE** (currently missing): project overview, architecture
-  summary, quickstart (install, `make serve`, tunnel, UI), milestones, licence note.
-  This is the first thing a visitor sees.
+- `README.md` — **to CREATE** (currently missing): project overview, architecture summary, quickstart (install, `make serve`, tunnel, UI), milestones, licence note. This is the first thing a visitor sees.
 - `docs/*.md` (~2200 lines), `contracts/*.md` (~940), `runbooks/*.md` (~150)
 - `MISSION.md`, `AGENTS.md`
-- All comments, docstrings, log and error messages in `services/`, `scripts/`,
-  `infra/`, `tests/` (~65 files contain French)
+- All comments, docstrings, log and error messages in `services/`, `scripts/`, `infra/`, `tests/` (~65 files contain French)
 
 **Scope — MUST NOT be translated (French is intentional there)**:
 - `corpus/` — the multilingual test corpus (7 languages) is the point of the test set
 - `evals/golden/` — questions in FR/DE/ES/IT/AR/ZH are deliberate
 - `BRAIN/` — local working journal, not tracked by git
 
-**Constraints**: translation only — do NOT change behaviour, identifiers used by other
-code, file names, or test semantics. Keep commit messages and future PR titles in English.
+**Constraints**: translation only — do NOT change behaviour, identifiers used by other code, file names, or test semantics. Keep commit messages and future PR titles in English.
 
-**verify-m16** checks: README.md exists and is structured; no French function words in
-docs/contracts/runbooks/README/MISSION/AGENTS; no French in code comments/messages;
-and the multilingual corpus and golden sets are still intact (not translated away).
+**verify-m16** checks: README.md exists and is structured; no French function words in docs/contracts/runbooks/README/MISSION/AGENTS; no French in code comments/messages; and the multilingual corpus and golden sets are still intact (not translated away).
 
 ### M16 — Translation method (mandatory)
-Do NOT build a segmentation/numbered-transport pipeline for translation. Translate
-each file DIRECTLY: read the file, produce the English version, write it back, one
-file at a time. No invariant validation, no concurrent calls, no cache layer. If a
-file is large, translate it in a few sequential passes over its sections, still
-writing plain text. Keep markdown structure, code blocks, links and anchors intact.
-Files to translate, in this order: README.md (create), runbooks/*.md, AGENTS.md,
-MISSION.md, contracts/*.md, docs/*.md. Commit after each file or small group.
+Do NOT build a segmentation/numbered-transport pipeline for translation. Translate each file DIRECTLY: read the file, produce the English version, write it back, one file at a time. No invariant validation, no concurrent calls, no cache layer. If a file is large, translate it in a few sequential passes over its sections, still writing plain text. Keep markdown structure, code blocks, links and anchors intact. Files to translate, in this order: README.md (create), runbooks/*.md, AGENTS.md, MISSION.md, contracts/*.md, docs/*.md. Commit after each file or small group.
