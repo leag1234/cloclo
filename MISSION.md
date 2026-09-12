@@ -217,3 +217,87 @@ You are AUTHORISED and REQUIRED to fix this yourself: `chat_pipeline.py` and `vi
 are your own, unprotected files. Finding a leak in your own code is not a reason to stop —
 it is the work. Only stop if a PROTECTED file would have to change, or if fixing it would
 require weakening isolation. Fix it, prove it with J5, then continue M17.
+
+## M18 — Conversation integrity and image fidelity (user-test corrections)
+
+Source: real user session of 2026-09-12. Capabilities now work individually, but the
+**conversation breaks as soon as a non-text capability is involved**, and image
+generation ignores explicit user constraints. Text-only multi-turn conversation is
+confirmed working and must not regress.
+
+### D1 — Follow-up after retrieval is treated as a new request (blocking)
+Observed: after a RAG answer on an uploaded PDF, "traduis ce que tu viens d'écrire en
+allemand" triggered a NEW retrieval ("Retrieved 1 source") then failed.
+Required: a follow-up that refers to the assistant's previous answer ("translate that",
+"summarise it", "shorter", "in German") must operate on the **previous turn**, not
+re-enter retrieval/web/vision routing. Classify follow-ups before routing.
+
+### D2 — `context_exceeded` after image generation (blocking)
+Observed: after an image was generated, "tu as oublié les patins à roulettes" returned
+`context_exceeded`.
+Cause: the generated image (base64 data URI) is kept in the conversation history sent to
+the model. Required: store images **by reference**, never re-inject base64 into the model
+context. A user must be able to iterate on a generated image ("add X", "same but Y").
+
+### D3 — Intent ignored when an image is present
+Observed: "tu saurais modifier cette image ?" produced an unsolicited description.
+Required: the presence of an image must not force description. Read the request:
+describe / analyse a specific point / extract text / compare / edit. Editing an existing
+image is NOT supported by the current model: say so explicitly and offer what is
+possible (describe, or generate a new image from a description). Never answer something
+that was not asked.
+
+### D4 — Premature give-up on web search timeout
+Observed: a first web attempt timed out; the assistant answered "I could not obtain the
+information" and redirected the user to news sites. On a second explicit request it
+searched again and found a correct, sourced answer.
+Required: at least one automatic retry (different phrasing or source) before giving up.
+Only report failure after retries are exhausted, stating what was attempted.
+
+### D5 — Interface labels in a random language
+Observed: status labels ("Étape intermédiaire terminée : appel d'outil") appeared in
+French then in German within the same conversation.
+Required: interface/status labels are FIXED strings, never produced or translated by the
+model. Language of labels follows the UI locale, not the model output.
+
+### D6 — Image generation ignores explicit constraints
+Observed: "chat qui danse avec un chien, patins à roulettes, lunettes de soleil roses"
+produced the animals and the pink glasses, no roller skates.
+Diagnosis (confirmed in `services/model-gateway/image_worker.py` and `image-model.json`):
+`unsloth/FLUX.1-schnell` with `guidance_scale=0.0`, `num_inference_steps=4`,
+`512x512`, `max_sequence_length=256` (which TRUNCATES longer prompts), fixed
+`manual_seed(42)` (same prompt always yields the same image). These settings disable
+prompt adherence by design.
+Required:
+- switch to **`black-forest-labs/FLUX.1-dev`** (pinned revision), `guidance_scale=3.5`,
+  `num_inference_steps=24..28`, `1024x1024`, `max_sequence_length=512`;
+- **random seed** per generation, returned with the image so a user can reproduce one;
+- raise the worker watchdog from 85 s to **180 s** (dev is slower);
+- keep VRAM within the L40S budget; if `dev` does not fit alongside other services,
+  unload them sequentially rather than degrading the settings;
+- **rewrite the user request into a structured image prompt** before generation
+  (subjects, attributes, scene), as mainstream systems do, and log both.
+**LICENCE NOTE (must appear in the report and in `runbooks/`)**: FLUX.1-dev is released
+under a **non-commercial licence**. It is acceptable for this evaluation PoC. Any
+production use requires either a commercial licence from Black Forest Labs, a return to
+FLUX.1-schnell (Apache-2.0), or another model. This decision is explicitly deferred.
+
+### Non-regression
+Text-only multi-turn conversation, RAG with resolvable citations, web search with a final
+sourced answer, vision description in the conversation language, dev API auth/quotas and
+MCP confirmation must all keep working.
+
+### Journeys (extend `tests/journeys/`, same rules as M17: public chat API only)
+J9  RAG answer, then "traduis ta réponse en allemand" → German translation of the
+    PREVIOUS answer, no new retrieval, no error.
+J10 image generated, then "ajoute X" → a new image is returned, no `context_exceeded`.
+J11 image sent with "peux-tu la modifier ?" → explicit statement that editing is not
+    supported + what is possible; NOT an unsolicited description.
+J12 web search whose first attempt fails → automatic retry, final sourced answer.
+J13 status labels are fixed strings in the UI locale across a whole conversation.
+J14 image generation with three explicit constraints → all three present
+    (automatic check: generate, then have the vision model verify each constraint;
+    record the prompt, the rewritten prompt and the seed).
+
+**Definition of done**: `make verify-m18` passes; J1–J14 all pass through the public chat
+API; the licence note is present.
