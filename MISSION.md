@@ -227,21 +227,20 @@ generation ignores explicit user constraints. Text-only multi-turn conversation 
 confirmed working and must not regress.
 
 ### D1 — Follow-up after retrieval is treated as a new request (blocking)
-Observed: after a RAG answer on an uploaded PDF, "traduis ce que tu viens d'écrire en
-allemand" triggered a NEW retrieval ("Retrieved 1 source") then failed.
+Observed: after a RAG answer on an uploaded PDF, "translate what you just wrote into German" (asked in French) triggered a NEW retrieval ("Retrieved 1 source") then failed.
 Required: a follow-up that refers to the assistant's previous answer ("translate that",
 "summarise it", "shorter", "in German") must operate on the **previous turn**, not
 re-enter retrieval/web/vision routing. Classify follow-ups before routing.
 
 ### D2 — `context_exceeded` after image generation (blocking)
-Observed: after an image was generated, "tu as oublié les patins à roulettes" returned
+Observed: after an image was generated, "you forgot the roller skates" (asked in French) returned
 `context_exceeded`.
 Cause: the generated image (base64 data URI) is kept in the conversation history sent to
 the model. Required: store images **by reference**, never re-inject base64 into the model
 context. A user must be able to iterate on a generated image ("add X", "same but Y").
 
 ### D3 — Intent ignored when an image is present
-Observed: "tu saurais modifier cette image ?" produced an unsolicited description.
+Observed: "could you edit this image?" (asked in French) produced an unsolicited description.
 Required: the presence of an image must not force description. Read the request:
 describe / analyse a specific point / extract text / compare / edit. Editing an existing
 image is NOT supported by the current model: say so explicitly and offer what is
@@ -256,13 +255,13 @@ Required: at least one automatic retry (different phrasing or source) before giv
 Only report failure after retries are exhausted, stating what was attempted.
 
 ### D5 — Interface labels in a random language
-Observed: status labels ("Étape intermédiaire terminée : appel d'outil") appeared in
+Observed: status labels ("Intermediate step completed: tool call" (displayed in French)) appeared in
 French then in German within the same conversation.
 Required: interface/status labels are FIXED strings, never produced or translated by the
 model. Language of labels follows the UI locale, not the model output.
 
 ### D6 — Image generation ignores explicit constraints
-Observed: "chat qui danse avec un chien, patins à roulettes, lunettes de soleil roses"
+Observed: "cat dancing with a dog, roller skates, pink sunglasses" (asked in French)
 produced the animals and the pink glasses, no roller skates.
 Diagnosis (confirmed in `services/model-gateway/image_worker.py` and `image-model.json`):
 `unsloth/FLUX.1-schnell` with `num_inference_steps=4`, `512x512`,
@@ -296,10 +295,10 @@ sourced answer, vision description in the conversation language, dev API auth/qu
 MCP confirmation must all keep working.
 
 ### Journeys (extend `tests/journeys/`, same rules as M17: public chat API only)
-J9  RAG answer, then "traduis ta réponse en allemand" → German translation of the
+J9  RAG answer, then "translate your answer into German" (asked in French) → German translation of the
     PREVIOUS answer, no new retrieval, no error.
-J10 image generated, then "ajoute X" → a new image is returned, no `context_exceeded`.
-J11 image sent with "peux-tu la modifier ?" → explicit statement that editing is not
+J10 image generated, then "add X" (asked in French) → a new image is returned, no `context_exceeded`.
+J11 image sent with "can you edit it?" (asked in French) → explicit statement that editing is not
     supported + what is possible; NOT an unsolicited description.
 J12 web search whose first attempt fails → automatic retry, final sourced answer.
 J13 status labels are fixed strings in the UI locale across a whole conversation.

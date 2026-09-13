@@ -19,6 +19,7 @@ from agent_provider import AgentProvider
 from gateway_cpu import CPUModels
 from http_gateway import serve
 from services.orchestrator.chat_api import app
+from services.orchestrator.interactions import Interaction, write_interaction
 
 
 class StreamingNetworkTests(unittest.IsolatedAsyncioTestCase):
@@ -30,6 +31,12 @@ class StreamingNetworkTests(unittest.IsolatedAsyncioTestCase):
             threading.Event(),
             threading.Event(),
         )
+        journalled = threading.Event()
+
+        def write_and_signal(item: Interaction, directory: Path) -> None:
+            write_interaction(item, directory)
+            journalled.set()
+
         observed: list[dict[str, Any]] = []
 
         async def provider(
@@ -67,6 +74,10 @@ class StreamingNetworkTests(unittest.IsolatedAsyncioTestCase):
                     "ATLAS_INTERACTION_DIR": directory,
                     "ATLAS_WEB_CACHE": str(Path(directory) / "cache.sqlite"),
                 },
+            ),
+            patch(
+                "services.orchestrator.chat_stream.write_interaction",
+                side_effect=write_and_signal,
             ),
             patch.object(AgentProvider, "configuration", return_value=configuration),
             patch.object(AgentProvider, "stream", provider, create=True),
@@ -145,6 +156,9 @@ class StreamingNetworkTests(unittest.IsolatedAsyncioTestCase):
                         if c.get("delta", {}).get("content")
                     ]
                     self.assertEqual(deltas, ["Bon", "jour"])
+                    # DONE can reach the client before the server generator's
+                    # finally block writes telemetry. Await that real write.
+                    self.assertTrue(await asyncio.to_thread(journalled.wait, 5))
                     rows = [
                         json.loads(line)
                         for path in Path(directory).glob("*.jsonl")
