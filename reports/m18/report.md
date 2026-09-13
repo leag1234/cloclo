@@ -36,7 +36,10 @@ The combined rewrite/generation request remains capped at EUR0.05 and 120 second
 
 The owner confirmed credential rotation in MISSION.md; that incident is closed.
 J8 completed both successive starts and orderly cleanup with exit 0. GitHub CI
-is pending. Local final checks ran
+is pending. The first CI run exposed the M7 cassette's outdated system prompt.
+M7 was recorded again against the real provider (EUR0.0115213), preserving exact
+request matching and all assertions; its local replay completed with exit 0.
+Local final checks ran
 322 tests, lint, strict type checking and secret scanning successfully. These
 local results do not establish milestone completion without green GitHub CI.
 
