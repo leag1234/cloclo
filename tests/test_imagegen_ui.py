@@ -1,6 +1,7 @@
 """Synthetic adapter requests prove image delivery and redacted observations."""
 
 import json
+import base64
 import os
 from pathlib import Path
 import tempfile
@@ -45,7 +46,14 @@ class ImageUITests(unittest.TestCase):
                     )
                 else:
                     text = response.json()["choices"][0]["message"]["content"]
-                self.assertEqual(text, f"![Image générée]({url})")
+                self.assertNotIn("base64", text)
+                reference = text.partition("](")[2].removesuffix(")")
+                self.assertEqual(text, f"![Image générée]({reference})")
+                image_response = client.get(reference)
+                self.assertEqual(image_response.status_code, 200)
+                self.assertEqual(
+                    image_response.content, base64.b64decode(url.split(",", 1)[1])
+                )
             self.assertEqual(upstream.await_count, 2)
             assert upstream.await_args is not None
             self.assertTrue(upstream.await_args.args[0].endswith("/images/generate"))

@@ -100,7 +100,7 @@ async def attempt(
         "model": model,
         "messages": request.messages,
         "tools": request.tools,
-        "tool_choice": "auto",
+        **({"tool_choice": "auto"} if request.tools else {}),
         "max_tokens": 2048,
         "temperature": 0,
         "reasoning_effort": request.reasoning_effort,

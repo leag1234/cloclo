@@ -100,6 +100,7 @@ async def run(
     limits: Limits = Limits(),
     clock: Callable[[], float] = time.monotonic,
     history: list[Message] | None = None,
+    retry_web: bool = False,
 ) -> Result:
     result = Result()
     deadline = clock() + limits.wall_clock
@@ -170,7 +171,26 @@ async def run(
                     ],
                 }
             )
-            for call in turn.calls:
+            pending_calls = list(turn.calls)
+            retried = False
+            for call in pending_calls:
+                if call not in turn.calls:
+                    messages.append(
+                        {
+                            "role": "assistant",
+                            "content": "",
+                            "tool_calls": [
+                                {
+                                    "id": call.id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": call.name,
+                                        "arguments": call.arguments,
+                                    },
+                                }
+                            ],
+                        }
+                    )
                 result.state = "tool"
                 remaining()
                 if result.tool_calls >= limits.tool_calls:
@@ -192,6 +212,21 @@ async def run(
                 output = await invoke(tools.execute(call, min(15, remaining())))
                 if not isinstance(output, dict):
                     raise ValueError("invalid_tool_response")
+                if (
+                    retry_web
+                    and not retried
+                    and call.name == "web_search"
+                    and output.get("error") in {"timeout", "search_unavailable"}
+                ):
+                    arguments = json.loads(call.arguments)
+                    arguments["query"] = str(arguments["query"]) + " official source"
+                    retry = Call(
+                        call.id + "-retry",
+                        call.name,
+                        json.dumps(arguments, ensure_ascii=False),
+                    )
+                    pending_calls.append(retry)
+                    retried = True
                 event: Message = {
                     "tool": call.name,
                     "arguments": call.arguments,

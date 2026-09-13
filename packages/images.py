@@ -2,6 +2,7 @@
 
 import base64
 import io
+import re
 from typing import Annotated, Literal, Self
 
 from PIL import Image
@@ -70,6 +71,20 @@ class VisionMessage(BaseModel):
     model_config = ConfigDict(extra="ignore", strict=True)
     role: Literal["system", "user", "assistant"]
     content: str | list[Annotated[TextPart | ImagePart, Field(discriminator="type")]]
+
+    @model_validator(mode="before")
+    @classmethod
+    def strip_legacy_images(cls, value: object) -> object:
+        if isinstance(value, dict) and value.get("role") == "assistant":
+            content = value.get("content")
+            if isinstance(content, str):
+                value = {
+                    **value,
+                    "content": re.sub(
+                        r"data:image/[^,\s]+,[A-Za-z0-9+/=]+", "[IMAGE]", content
+                    ),
+                }
+        return value
 
     @model_validator(mode="after")
     def valid_content(self) -> Self:

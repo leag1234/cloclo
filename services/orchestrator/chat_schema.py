@@ -2,7 +2,7 @@
 
 from typing import Literal, Self
 from uuid import UUID
-from pydantic import ConfigDict, model_validator
+from pydantic import ConfigDict, Field, model_validator
 from packages.images import VisionInput, VisionMessage
 
 ChatMessage = VisionMessage
@@ -15,6 +15,8 @@ class ChatRequest(VisionInput):
     conversation_id: str | None = None
     stream: bool = False
     reasoning_effort: Literal["none", "low"] = "none"
+    seed: int | None = Field(default=None, ge=0, le=2**32 - 1)
+    ui_locale: Literal["fr", "de", "es", "it", "en"] = "fr"
     lang: Literal["fr", "de", "es", "it", "en"] = "fr"
 
     @model_validator(mode="after")

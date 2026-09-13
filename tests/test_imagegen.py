@@ -6,7 +6,8 @@ import os
 import unittest
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
+from decimal import Decimal
 from threading import Thread
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -19,7 +20,7 @@ from services.orchestrator.interactions import Interaction, write_interaction
 from services.orchestrator.model import GatewayModel
 
 
-def png(size: int = 512) -> str:
+def png(size: int = 1024) -> str:
     output = io.BytesIO()
     Image.new("RGB", (size, size), "red").save(output, "PNG")
     return "data:image/png;base64," + base64.b64encode(output.getvalue()).decode()
@@ -57,7 +58,7 @@ class ImageTests(unittest.IsolatedAsyncioTestCase):
     async def test_real_http_png_boundary(self) -> None:
         import json
 
-        payload = {"image": png(), "seconds": 0.1}
+        payload = {"image": png(), "seconds": 0.1, "seed": 123, "steps": 4}
 
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, format: str, *args: object) -> None:
@@ -65,7 +66,7 @@ class ImageTests(unittest.IsolatedAsyncioTestCase):
 
             def do_POST(self) -> None:
                 data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-                assert data == {"prompt": "a cube"}
+                assert data == {"prompt": "Subjects: a cube", "seed": None}
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(json.dumps(payload).encode())
@@ -75,12 +76,18 @@ class ImageTests(unittest.IsolatedAsyncioTestCase):
             thread = Thread(target=server.serve_forever, daemon=True)
             thread.start()
             try:
-                with patch.dict(
-                    os.environ,
-                    {
-                        "ATLAS_IMAGE_GPU_IP": "127.0.0.1",
-                        "ATLAS_IMAGE_GPU_EUR_H": "1.46988",
-                    },
+                with (
+                    patch.object(
+                        imagegen, "rewrite", AsyncMock(return_value="Subjects: a cube")
+                    ),
+                    patch.object(imagegen, "reservation", return_value=Decimal("0.01")),
+                    patch.dict(
+                        os.environ,
+                        {
+                            "ATLAS_IMAGE_GPU_IP": "127.0.0.1",
+                            "ATLAS_IMAGE_GPU_EUR_H": "1.46988",
+                        },
+                    ),
                 ):
                     result = await imagegen.complete({"prompt": "a cube"})
                     self.assertEqual(result["image"], png())
@@ -100,7 +107,13 @@ class ImageTests(unittest.IsolatedAsyncioTestCase):
             await process_image("génère une image de cube", item)
         self.assertEqual(item.task_type, "imagegen")
         self.assertEqual(item.state, "done")
-        self.assertIn(png(), item.reponse)
+        self.assertNotIn("base64", item.reponse)
+        from services.orchestrator.image_store import generated_image
+
+        key = item.reponse.rsplit("/", 1)[1].removesuffix(")")
+        self.assertEqual(
+            generated_image(key).body, base64.b64decode(png().split(",", 1)[1])
+        )
         self.assertTrue(transport.call_args.args[0].endswith("/images/generate"))
 
     async def test_image_bytes_never_enter_journal(self) -> None:

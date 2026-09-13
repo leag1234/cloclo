@@ -9,7 +9,6 @@ import re
 import time
 
 from fastapi.responses import StreamingResponse
-from packages.language import question_language
 
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.interactions import Interaction, write_interaction
@@ -23,7 +22,7 @@ def response(
     process: Callable[[ChatRequest, Interaction], Awaitable[None]],
 ) -> StreamingResponse:
     labels = json.loads(Path("prompts/progress.json").read_text())
-    language = question_language(payload.messages[-1].text, payload.lang)
+    language = payload.ui_locale
     progress = str(labels.get(language, labels["en"]))
 
     async def generate() -> AsyncIterator[str]:
@@ -99,7 +98,11 @@ def response(
                 raise ValueError("invalid_delta")
             if "reasoning_content" in delta:
                 await queue.put(event)
-            if event.get("memory") is True or item.task_type in {"vision", "imagegen"}:
+            if event.get("memory") is True or item.task_type in {
+                "vision",
+                "imagegen",
+                "followup",
+            }:
                 await queue.put({"delta": {"content": delta["content"]}})
                 return
             if "content" in delta:
@@ -163,6 +166,7 @@ def response(
                             "total_tokens": sum(item.tokens.values()),
                         }
                         output["atlas"] = {
+                            "images": item.images,
                             "cost_eur": item.cout_eur,
                             "reasoning_effort": payload.reasoning_effort,
                             "max_output_tokens": 2048,

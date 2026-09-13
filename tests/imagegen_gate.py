@@ -14,6 +14,7 @@ from packages.images import image_info
 from services.orchestrator.chat_pipeline import process
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.interactions import Interaction
+from services.orchestrator.image_store import generated_image
 
 
 def main() -> None:
@@ -41,9 +42,13 @@ def main() -> None:
             assert item.state == "done" and item.task_type == "imagegen"
             assert item.modele_utilise == "local" and 0 < item.cout_eur <= 0.05
             url = item.reponse.partition("](")[2].removesuffix(")")
-            metadata = image_info(url)
-            assert metadata["width"] == metadata["height"] == 512
-            raw = base64.b64decode(url.split(",", 1)[1], validate=True)
+            response = generated_image(url.rsplit("/", 1)[1])
+            assert response.status_code == 200
+            raw = bytes(response.body)
+            metadata = image_info(
+                "data:image/png;base64," + base64.b64encode(raw).decode()
+            )
+            assert metadata["width"] == metadata["height"] == 1024
             Path("BRAIN/eval/imagegen.png").write_bytes(raw)
             report = {
                 "image_produced": True,

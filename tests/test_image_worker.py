@@ -17,7 +17,7 @@ class WorkerTests(unittest.TestCase):
         servers: list[ThreadingHTTPServer] = []
         modules = MagicMock()
         modules.FluxPipeline.from_pretrained.return_value.to.return_value.return_value.images = [
-            Image.new("RGB", (512, 512), "red")
+            Image.new("RGB", (1024, 1024), "red")
         ]
 
         def server(
@@ -44,6 +44,30 @@ class WorkerTests(unittest.TestCase):
                 ) as response:
                     result = json.load(response)
                 self.assertTrue(result["image"].startswith("data:image/png;base64,"))
+                self.assertIs(type(result["seed"]), int)
+                pipeline = (
+                    modules.FluxPipeline.from_pretrained.return_value.to.return_value
+                )
+                settings = pipeline.call_args.kwargs
+                self.assertEqual((settings["width"], settings["height"]), (1024, 1024))
+                self.assertEqual(settings["max_sequence_length"], 512)
+                self.assertEqual(settings["num_inference_steps"], 4)
+                self.assertEqual(settings["guidance_scale"], 0.0)
+                with urlopen(
+                    Request(url + "/generate", data=b'{"prompt":"a cube","seed":123}'),
+                    timeout=5,
+                ) as response:
+                    self.assertEqual(json.load(response)["seed"], 123)
+                from urllib.error import HTTPError
+
+                pipeline.tokenizer_2.return_value = {"input_ids": list(range(513))}
+                count = pipeline.call_count
+                with self.assertRaises(HTTPError):
+                    urlopen(
+                        Request(url + "/generate", data=b'{"prompt":"a long prompt"}'),
+                        timeout=5,
+                    )
+                self.assertEqual(pipeline.call_count, count)
                 modules.FluxPipeline.from_pretrained.return_value.to.assert_called_once_with(
                     "cuda"
                 )

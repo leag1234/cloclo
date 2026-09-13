@@ -1,21 +1,19 @@
 """User journeys use only the same HTTP API and SSE responses as Open WebUI."""
 
 import base64
-import io
 import json
 import os
 from pathlib import Path
 import re
 from urllib.request import Request, urlopen
 
-from PIL import Image
 from journey_language import matches
 
 API = os.environ.get("ATLAS_CHAT_API", "http://127.0.0.1:8020")
 
 
 def ask(
-    messages: list[dict[str, object]], stream: bool = True
+    messages: list[dict[str, object]], stream: bool = True, ui_locale: str = "fr"
 ) -> tuple[str, list[dict[str, object]]]:
     request = Request(
         API + "/v1/chat/completions",
@@ -24,6 +22,7 @@ def ask(
                 "model": "atlas",
                 "messages": messages,
                 "stream": stream,
+                "ui_locale": ui_locale,
             }
         ).encode(),
         headers={"Content-Type": "application/json"},
@@ -53,6 +52,8 @@ def main() -> None:
     report: dict[str, object] = {
         "mode": "live" if os.environ.get("JOURNEYS_LIVE") == "1" else "replay"
     }
+    if os.environ.get("JOURNEYS_RESUME"):
+        report["resumed_same_session_exchanges"] = True
     report["image_mode"] = report["mode"]
     report["web_mode"] = (
         "live" if os.environ.get("JOURNEYS_REFRESH") == "1" else report["mode"]
@@ -80,6 +81,7 @@ def main() -> None:
             with urlopen(link, timeout=5) as response:
                 assert response.status == 200 and len(response.read()) > 100
         report["J2_citation_resolvable"] = True
+        rag_answer = answer
         encoded = base64.b64encode(
             Path("tests/cassettes/vision/shapes.png").read_bytes()
         ).decode()
@@ -114,13 +116,9 @@ def main() -> None:
         answer, _ = ask(
             [user("crée moi une image d'un chien qui danse sur une table bleue")]
         )
-        match = re.search(r"!\[[^\]]*\]\((data:image/png;base64,[^)]+)\)", answer)
-        assert match, answer
-        with Image.open(
-            io.BytesIO(base64.b64decode(match[1].split(",", 1)[1], validate=True))
-        ) as image:
-            assert image.size == (512, 512)
-            image.verify()
+        from journeys.m18 import picture, run_m18
+
+        picture(answer)
         report["J4_image_returned"] = True
         command = user("/project create JourneyAlpha")
         selected, _ = ask([command])
@@ -213,6 +211,7 @@ def main() -> None:
             assert config[name] == "False"
         assert "auxiliary" in Path("runbooks/chat.md").read_text().lower()
         report["J7_auxiliary_ok"] = True
+        run_m18(report, rag_answer, encoded)
     finally:
         path.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))

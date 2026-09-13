@@ -19,6 +19,7 @@ from services.orchestrator.chat_schema import ChatMessage, ChatRequest
 from services.orchestrator.vision import process_vision
 from services.orchestrator.imagegen import process_image
 from packages.imagegen import image_request
+from services.orchestrator.followup import is_followup, image_iteration
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.loop import Call, Limits, Message, Query, run
 from services.orchestrator.memory import consolidated
@@ -113,13 +114,25 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
         )
     ]
     scoped_messages.append(request.messages[-1])
-    if request.messages[-1].images or image_request(question):
-        scoped = request.model_copy(update={"messages": scoped_messages})
-        if request.messages[-1].images:
+    scoped = request.model_copy(
+        update={
+            "messages": scoped_messages,
+            "project_id": None,
+            "conversation_id": None,
+        }
+    )
+    followup = is_followup(scoped_messages)
+    iteration = image_iteration(scoped_messages)
+    if followup or request.messages[-1].images or image_request(question) or iteration:
+        if followup:
+            from services.orchestrator.chat_pipeline import process
+
+            await process(scoped, item)
+        elif request.messages[-1].images:
             await process_vision(scoped, item)
         else:
-            await process_image(question, item)
-        if item.state == "done" and request.messages[-1].images:
+            await process_image(iteration or question, item, request.seed)
+        if item.state == "done":
             await GatewayModel.post(
                 base + "/turns",
                 {

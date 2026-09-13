@@ -7,6 +7,7 @@ from services.guardrails.input_filter import validate_input
 
 
 class ImagePrompt(Strict):
+    seed: int | None = Field(default=None, ge=0, le=2**32 - 1)
     prompt: str = Field(min_length=1, max_length=2000, pattern=r"\S")
 
     @field_validator("prompt")

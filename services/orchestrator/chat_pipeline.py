@@ -19,6 +19,7 @@ from services.orchestrator.model import GatewayModel
 from services.orchestrator.tools import Rag, Runtime
 from services.orchestrator.stream_client import sink_context
 from services.orchestrator.vision import process_vision
+from services.orchestrator.followup import is_followup, image_iteration
 from packages.imagegen import image_request
 from services.orchestrator.imagegen import process_image
 
@@ -75,7 +76,8 @@ async def source(key: str) -> dict[str, object]:
 
 
 async def render_citations(item: Interaction) -> None:
-    keys = list(dict.fromkeys(re.findall(r"\b[a-f0-9]{64}\b", item.reponse)))
+    uncited = re.sub(r"\[[^\]]*\]\([^)]*/sources/[a-f0-9]{64}\)", "", item.reponse)
+    keys = list(dict.fromkeys(re.findall(r"\b[a-f0-9]{64}\b", uncited)))
     retrieved = {str(p["chunk_id"]): p for p in item.chunks_recuperes}
     if not set(keys) <= retrieved.keys():
         raise ValueError("invalid_citation")
@@ -158,10 +160,14 @@ async def process(request: ChatRequest, item: Interaction) -> None:
 
         await process_project(request, item)
         return
-    if image_request(request.messages[-1].text):
-        await process_image(request.messages[-1].text, item)
+    followup = is_followup(request.messages)
+    if followup:
+        item.task_type = "followup"
+    iteration = image_iteration(request.messages)
+    if not followup and (iteration or image_request(request.messages[-1].text)):
+        await process_image(iteration or request.messages[-1].text, item, request.seed)
         return
-    if any(m.images for m in request.messages):
+    if not followup and request.messages[-1].images:
         await process_vision(request, item)
         return
     started = time.monotonic()
@@ -169,6 +175,8 @@ async def process(request: ChatRequest, item: Interaction) -> None:
         os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"),
         local_enabled=os.environ.get("GPU_LOCAL", "0") == "1",
     )
+    if followup:
+        model.tools = []
     model.observing = True
     model.sink = sink_context.get()
     model.reasoning_effort = request.reasoning_effort
@@ -182,9 +190,13 @@ async def process(request: ChatRequest, item: Interaction) -> None:
             tools,
             Path("prompts/agent.txt").read_text()
             + Path("prompts/chat.txt").read_text()
-            + Path("prompts/web-chat.txt").read_text(),
+            + Path("prompts/web-chat.txt").read_text()
+            + (Path("prompts/followup.txt").read_text() if followup else ""),
             Limits(wall_clock=max(0, 120 - (time.monotonic() - started))),
-            history=[m.model_dump() for m in request.messages[:-1]],
+            history=[
+                {"role": m.role, "content": m.text} for m in request.messages[:-1]
+            ],
+            retry_web=True,
         )
         item.reponse, item.state, item.cout_eur = (
             result.text,
@@ -193,7 +205,7 @@ async def process(request: ChatRequest, item: Interaction) -> None:
         )
         if result.reason:
             item.erreurs.append(result.reason)
-        if result.state == "done":
+        if result.state == "done" and not followup:
             await render_citations(item)
     finally:
         item.tokens = {"in": model.input_tokens, "out": model.output_tokens}
