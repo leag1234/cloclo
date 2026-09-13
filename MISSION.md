@@ -310,3 +310,19 @@ J14 image generation with three explicit constraints → the prompt is NOT trunc
 
 **Definition of done**: `make verify-m18` passes; J1–J14 all pass through the public chat
 API; the licence note is present.
+
+### M18 — SerpApi availability confirmed (2026-09-13)
+The three recorded SerpApi failures (timeout, search_unavailable, timeout) are
+HISTORICAL evidence from an earlier session, not a current outage. Availability has been
+verified by the owner: the account is healthy (Free plan, 244 searches remaining, 6 used
+this month). The provider is WORKING.
+
+Therefore: the "three technical failures" stop rule is RESET for SerpApi. Delete or
+ignore BRAIN/m18-serpapi-failure.json as a blocking record, run the live journeys again
+(fresh attempt counter), and continue. Never treat a stored failure from a previous
+session as a reason to refuse a first attempt in the current session: the counter is
+per-session, not permanent.
+
+If SerpApi fails three times WITHIN THIS SESSION, record it and validate J6/J12 from
+cassettes instead, then continue M18 — a transient search outage must not block the
+whole milestone.
