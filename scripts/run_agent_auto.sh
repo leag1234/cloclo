@@ -33,7 +33,7 @@ Stop and write to BRAIN/BLOCKERS.md ONLY for:
 Definition of done for ${MILESTONE} :
   1. make verify-${MILESTONE,,} passes LOCALLY, then
   2. branch ${MILESTONE,,}-<topic>, commit, push, PR, then
-  3. wait for GREEN CI 'ci' (poll GitHub API, max 60 attempts × 15s = 15 min), then
+  3. wait for GREEN CI 'ci' (poll GitHub API, max 180 attempts × 15s = 45 min (this repo's CI is slow, be patient)), then
   4. if CI is green, MERGE yourself via the GitHub API (squash), then update BRAIN/.
 
 MERGE AUTHORIZATION: allowed if and only if the 'ci' job is green. Never modify
