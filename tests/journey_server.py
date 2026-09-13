@@ -32,13 +32,24 @@ def main() -> None:
     logger.setLevel(logging.INFO)
     live = os.environ.get("JOURNEYS_LIVE") == "1"
     refresh = os.environ.get("JOURNEYS_REFRESH") == "1"
-    previous = json.loads(gzip.decompress(ARCHIVE.read_bytes())) if not live else []
+    resume = os.environ.get("JOURNEYS_RESUME")
+    previous = (
+        json.loads(gzip.decompress(Path(resume).read_bytes()))
+        if resume
+        else (json.loads(gzip.decompress(ARCHIVE.read_bytes())) if not live else [])
+    )
     saved_image = next((r for r in previous if r["kind"] == "image"), None)
-    rows: list[dict[str, Any]] = [] if live or refresh else previous
+    rows: list[dict[str, Any]] = previous if resume or not (live or refresh) else []
+    prefix_count = len(previous) if resume else 0
     position = 0
+    generating = False
+    injected_timeout = False
 
     def recording() -> bool:
         return live or refresh
+
+    def replaying() -> bool:
+        return not recording() or position < prefix_count
 
     def replay(kind: str, request: object) -> Any:
         nonlocal position
@@ -65,14 +76,28 @@ def main() -> None:
         original = getattr(cls, name)
 
         async def transport(self: Any, request: Any, *args: Any) -> Any:
+            nonlocal injected_timeout
+            if generating:
+                return await original(self, request, *args)
             value = request.model_dump() if hasattr(request, "model_dump") else request
             if isinstance(value, dict):
                 value = {k: v for k, v in value.items() if k != "timeout"}
-            if not recording():
+            if replaying():
                 result = replay(kind, value)
                 if isinstance(result, dict) and result.get("recorded_timeout") is True:
                     raise TimeoutError
                 return result
+            if kind == "search" and "Python" in str(value) and not injected_timeout:
+                injected_timeout = True
+                record(
+                    kind,
+                    value,
+                    {
+                        "recorded_timeout": True,
+                        "fault_injected": "J12 first search timeout",
+                    },
+                )
+                raise TimeoutError
             try:
                 result = await original(self, request, *args)
             except (TimeoutError, asyncio.CancelledError):
@@ -87,7 +112,7 @@ def main() -> None:
 
     async def stream(request: Any, model: str, timeout: float) -> Any:
         payload = request.model_dump(exclude={"timeout"})
-        if not recording():
+        if replaying():
             for event in replay("stream", payload):
                 yield event
             return
@@ -101,13 +126,18 @@ def main() -> None:
     original_image = imagegen.generate
 
     async def generate(request: Any) -> Any:
-        if not recording():
+        nonlocal generating
+        if replaying():
             return replay("image", request)
         if refresh:
             assert saved_image and saved_image["request"] == request
             result = copy.deepcopy(saved_image["response"])
         else:
-            result = await original_image(request)
+            generating = True
+            try:
+                result = await original_image(request)
+            finally:
+                generating = False
         record("image", request, result)
         return result
 
@@ -119,6 +149,7 @@ def main() -> None:
                     **({} if live or refresh else environment()),
                     "GPU_LOCAL": "0",
                     "ATLAS_PROJECT_DB": directory + "/projects.sqlite",
+                    "ATLAS_IMAGE_DIR": directory + "/images",
                     "ATLAS_WEB_CACHE": directory + "/web.sqlite",
                     "ATLAS_INTERACTION_DIR": directory + "/interactions",
                 },
@@ -128,6 +159,12 @@ def main() -> None:
             patch(
                 "services.retrieval.projects.uuid4",
                 side_effect=(UUID(int=n) for n in range(1, 100)),
+            )
+        )
+        contexts.enter_context(
+            patch(
+                "services.orchestrator.image_store.uuid4",
+                side_effect=(UUID(int=n) for n in range(1000, 2000)),
             )
         )
         for cls, name, kind in (

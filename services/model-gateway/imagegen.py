@@ -10,6 +10,7 @@ from pathlib import Path
 import aiohttp
 from packages.imagegen import ImagePrompt
 from packages.images import image_info
+from image_prompt import reservation, rewrite
 
 
 async def generate(request: object) -> dict[str, object]:
@@ -23,15 +24,24 @@ async def generate(request: object) -> dict[str, object]:
     )
     address = str(ipaddress.IPv4Address(configured_ip))
     rate = Decimal(configured_rate)
-    if not rate.is_finite() or not 0 < rate <= 2 or rate * 90 / 3600 > Decimal("0.05"):
+    if not rate.is_finite() or not 0 < rate <= 2:
         raise RuntimeError("cost_budget")
     started = monotonic()
+    reserved = reservation(prompt.prompt)
+    available = Decimal("0.05") - reserved
+    if available <= 0:
+        raise RuntimeError("cost_budget")
+    rewritten = await rewrite(prompt.prompt, min(30, float(available * 3600 / rate)))
+    timeout = min(115 - (monotonic() - started), float(available * 3600 / rate))
+    if timeout <= 0:
+        raise RuntimeError("cost_budget")
+    gpu_started = monotonic()
     async with aiohttp.ClientSession(
-        timeout=aiohttp.ClientTimeout(total=90), trust_env=False
+        timeout=aiohttp.ClientTimeout(total=timeout), trust_env=False
     ) as client:
         async with client.post(
             f"http://{address}:8000/generate",
-            json=prompt.model_dump(),
+            json={"prompt": rewritten, "seed": prompt.seed},
             allow_redirects=False,
         ) as response:
             if response.status != 200:
@@ -45,11 +55,27 @@ async def generate(request: object) -> dict[str, object]:
     if not isinstance(data, dict) or not isinstance(data.get("image"), str):
         raise ValueError("invalid_provider_image")
     metadata = image_info(data["image"])
-    if (metadata["format"], metadata["width"], metadata["height"]) != ("PNG", 512, 512):
+    if (metadata["format"], metadata["width"], metadata["height"]) != (
+        "PNG",
+        1024,
+        1024,
+    ):
         raise ValueError("invalid_provider_image")
+    seed = data.get("seed")
+    if type(seed) is not int or not 0 <= seed < 2**32:
+        raise ValueError("invalid_provider_seed")
     return {
+        "seed": seed,
+        "prompt": prompt.prompt,
+        "rewritten_prompt": rewritten,
+        "width": 1024,
+        "height": 1024,
+        "max_sequence_length": 512,
+        "steps": data["steps"],
         "image": data["image"],
-        "cost_eur": float(rate * Decimal(str(monotonic() - started)) / 3600),
+        "cost_eur": float(
+            reserved + rate * Decimal(str(monotonic() - gpu_started)) / 3600
+        ),
     }
 
 

@@ -19,7 +19,11 @@ from services.orchestrator.interactions import Interaction, write_interaction
 from services.orchestrator.project_ui import router as project_router
 from services.orchestrator.mcp_confirmation import router as mcp_router
 
+from services.orchestrator.image_store import router as image_router
+
 app = FastAPI(title="ATLAS chat")
+
+app.include_router(image_router)
 app.include_router(project_router)
 
 app.include_router(mcp_router)
@@ -141,5 +145,6 @@ async def chat(request: Request) -> Response:
             "object": "chat.completion",
             "choices": [{"index": 0, "message": message, "finish_reason": "stop"}],
             "usage": usage,
+            "atlas": {"images": item.images},
         }
     )

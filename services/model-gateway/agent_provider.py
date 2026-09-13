@@ -68,7 +68,7 @@ class Completion(BaseModel):
 class AgentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     messages: list[dict[str, object]] = Field(min_length=1, max_length=100)
-    tools: list[dict[str, object]] = Field(min_length=1, max_length=5)
+    tools: list[dict[str, object]] = Field(min_length=0, max_length=5)
     timeout: float = Field(gt=0, le=120)
     local_enabled: bool = True
     observe: bool = False
@@ -261,7 +261,7 @@ class AgentProvider:
             "model": model,
             "messages": request.messages,
             "tools": request.tools,
-            "tool_choice": "auto",
+            **({"tool_choice": "auto"} if request.tools else {}),
             "max_tokens": 2048,
             "temperature": 0,
             "reasoning_effort": "none",

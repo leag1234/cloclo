@@ -5,6 +5,7 @@ import importlib
 import io
 import json
 import os
+import secrets
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock, Timer
@@ -37,7 +38,7 @@ def main() -> None:
             if self.path != "/generate" or not lock.acquire(blocking=False):
                 self.send_error(409)
                 return
-            timer = Timer(85, lambda: os._exit(124))
+            timer = Timer(180, lambda: os._exit(124))
             try:
                 self.connection.settimeout(5)
                 length = int(self.headers.get("Content-Length", "0"))
@@ -47,16 +48,29 @@ def main() -> None:
                 prompt = data["prompt"]
                 if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 2000:
                     raise ValueError("invalid_input")
+                seed = data.get("seed")
+                if seed is None:
+                    seed = secrets.randbits(32)
+                if type(seed) is not int or not 0 <= seed < 2**32:
+                    raise ValueError("invalid_seed")
+                steps = data.get("steps", 4)
+                if steps not in (4, 8):
+                    raise ValueError("invalid_steps")
+                if (
+                    len(pipeline.tokenizer_2(prompt, truncation=False)["input_ids"])
+                    > 512
+                ):
+                    raise ValueError("prompt_too_long")
                 started = monotonic()
                 timer.start()  # Kill CUDA work too, even if a client disconnects.
                 result = pipeline(
                     prompt,
-                    height=512,
-                    width=512,
+                    height=1024,
+                    width=1024,
                     guidance_scale=0.0,
-                    num_inference_steps=4,
-                    max_sequence_length=256,
-                    generator=torch.Generator("cuda").manual_seed(42),
+                    num_inference_steps=steps,
+                    max_sequence_length=512,
+                    generator=torch.Generator("cuda").manual_seed(seed),
                 )
                 output = io.BytesIO()
                 result.images[0].save(output, format="PNG")
@@ -64,6 +78,9 @@ def main() -> None:
                     {
                         "image": "data:image/png;base64,"
                         + base64.b64encode(output.getvalue()).decode(),
+                        "seed": seed,
+                        "steps": steps,
+                        "max_sequence_length": 512,
                         "seconds": monotonic() - started,
                     }
                 ).encode()

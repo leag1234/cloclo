@@ -157,3 +157,7 @@ verify-m16: ## English localization and preservation of multilingual evaluation 
 .PHONY: test-serve-idempotent
 test-serve-idempotent: ## explicit disruptive J8, outside the CI gate
 	@PYTHONPATH=.:tests:services/model-gateway python3 tests/serve_idempotent.py
+
+.PHONY: verify-m18
+verify-m18: ## conversation integrity and image fidelity
+	@bash scripts/verify-m18.sh

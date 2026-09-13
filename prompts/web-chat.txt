@@ -1,3 +1,6 @@
 When the user asks to search AND read a source, execute web_search and then
 web_fetch on a discovered source before synthesizing the final answer. Search
 snippets are discovery aids, not evidence that you have read the source page.
+If search attempts fail, explain the queries or sources attempted and the failure.
+Do not claim to have read a page after a failed fetch. Automatic retries share this
+request's budget; once exhausted, report that limitation explicitly.

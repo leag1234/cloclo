@@ -1,6 +1,10 @@
 """Vision branch uses the gateway and never persists uploaded image bytes."""
 
 import os
+import json
+import re
+from pathlib import Path
+from packages.language import question_language
 import time
 from decimal import Decimal
 from typing import Literal
@@ -31,6 +35,17 @@ class VisionReply(BaseModel):
 
 
 async def process_vision(request: ChatRequest, item: Interaction) -> None:
+    if re.search(
+        r"(?i)\b(edit\w*|modifi\w*|retouch\w*|bearbeit\w*|modificar)\b",
+        request.messages[-1].text,
+    ):
+        labels = json.loads(Path("prompts/image-edit.json").read_text())
+        language = question_language(request.messages[-1].text, request.lang)
+        item.reponse, item.state, item.task_type = labels[language], "done", "vision"
+        sink = sink_context.get()
+        if sink:
+            await sink({"delta": {"content": item.reponse}})
+        return
     started = time.monotonic()
     item.cout_eur = 0.05  # Retain reservation on missing/invalid provider usage.
     item.task_type = "vision"
