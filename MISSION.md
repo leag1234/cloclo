@@ -326,3 +326,9 @@ per-session, not permanent.
 If SerpApi fails three times WITHIN THIS SESSION, record it and validate J6/J12 from
 cassettes instead, then continue M18 — a transient search outage must not block the
 whole milestone.
+
+### Credential rotation completed (2026-09-13)
+CONFIRMED by the owner: the exposed GitHub token has been REVOKED and replaced. The new
+token is in secrets.env and in the git remote, with write access verified (API write
+returned 201, delete returned 200). The incident is CLOSED. The new token was never
+transmitted in clear text. Resume PR/CI/merge for M18; do not ask for this again.
