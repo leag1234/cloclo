@@ -218,6 +218,7 @@ are your own, unprotected files. Finding a leak in your own code is not a reason
 it is the work. Only stop if a PROTECTED file would have to change, or if fixing it would
 require weakening isolation. Fix it, prove it with J5, then continue M17.
 
+
 ## M18 — Conversation integrity and image fidelity (user-test corrections)
 
 Source: real user session of 2026-09-12. Capabilities now work individually, but the
@@ -264,23 +265,30 @@ model. Language of labels follows the UI locale, not the model output.
 Observed: "chat qui danse avec un chien, patins à roulettes, lunettes de soleil roses"
 produced the animals and the pink glasses, no roller skates.
 Diagnosis (confirmed in `services/model-gateway/image_worker.py` and `image-model.json`):
-`unsloth/FLUX.1-schnell` with `guidance_scale=0.0`, `num_inference_steps=4`,
-`512x512`, `max_sequence_length=256` (which TRUNCATES longer prompts), fixed
-`manual_seed(42)` (same prompt always yields the same image). These settings disable
-prompt adherence by design.
-Required:
-- switch to **`black-forest-labs/FLUX.1-dev`** (pinned revision), `guidance_scale=3.5`,
-  `num_inference_steps=24..28`, `1024x1024`, `max_sequence_length=512`;
+`unsloth/FLUX.1-schnell` with `num_inference_steps=4`, `512x512`,
+`max_sequence_length=256` (which **TRUNCATES longer prompts** — the roller skates were at
+the end of the sentence), fixed `manual_seed(42)` (same prompt always yields the same
+image), and no prompt rewriting.
+
+**DECISION: stay on FLUX.1-schnell** (Apache-2.0, freely usable commercially, no gated
+download). FLUX.1-dev was considered and rejected for this PoC: it is gated on Hugging
+Face and released under a **non-commercial licence**, which would block any production
+use. Document this trade-off in `runbooks/`.
+
+Required, within schnell's design:
+- `max_sequence_length=512` — stop truncating prompts (primary suspected cause);
+- `1024x1024` instead of 512x512;
+- `num_inference_steps`: raise to the highest value that still helps on a distilled
+  model (schnell is trained for few steps; measure 4 vs 8 and keep the better);
 - **random seed** per generation, returned with the image so a user can reproduce one;
-- raise the worker watchdog from 85 s to **180 s** (dev is slower);
-- keep VRAM within the L40S budget; if `dev` does not fit alongside other services,
-  unload them sequentially rather than degrading the settings;
-- **rewrite the user request into a structured image prompt** before generation
-  (subjects, attributes, scene), as mainstream systems do, and log both.
-**LICENCE NOTE (must appear in the report and in `runbooks/`)**: FLUX.1-dev is released
-under a **non-commercial licence**. It is acceptable for this evaluation PoC. Any
-production use requires either a commercial licence from Black Forest Labs, a return to
-FLUX.1-schnell (Apache-2.0), or another model. This decision is explicitly deferred.
+- **rewrite the user request into a structured English image prompt** before generation
+  (subjects, attributes, scene, style), as mainstream systems do. This is the main lever
+  left on a distilled model: log both the original and the rewritten prompt;
+- `guidance_scale` stays 0.0: this is schnell's documented setting, NOT a defect;
+- raise the worker watchdog from 85 s to 180 s to accommodate 1024x1024.
+If, after these changes, explicit constraints are still dropped, report it with evidence
+(prompt, rewritten prompt, seed, image) so the human can decide whether the licence cost
+of FLUX.1-dev is worth paying. Do not silently accept a truncated prompt.
 
 ### Non-regression
 Text-only multi-turn conversation, RAG with resolvable citations, web search with a final
@@ -295,9 +303,11 @@ J11 image sent with "peux-tu la modifier ?" → explicit statement that editing 
     supported + what is possible; NOT an unsolicited description.
 J12 web search whose first attempt fails → automatic retry, final sourced answer.
 J13 status labels are fixed strings in the UI locale across a whole conversation.
-J14 image generation with three explicit constraints → all three present
-    (automatic check: generate, then have the vision model verify each constraint;
-    record the prompt, the rewritten prompt and the seed).
+J14 image generation with three explicit constraints → the prompt is NOT truncated, is
+    rewritten, uses a random seed and 1024x1024; a vision check reports how many of the
+    three constraints are present, and the report records prompt, rewritten prompt, seed
+    and the per-constraint result. A score below 3/3 does not fail the gate but MUST be
+    reported as evidence for the model-choice decision.
 
 **Definition of done**: `make verify-m18` passes; J1–J14 all pass through the public chat
 API; the licence note is present.
