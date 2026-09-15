@@ -16,6 +16,10 @@ class WorkerTests(unittest.TestCase):
         ready = Event()
         servers: list[ThreadingHTTPServer] = []
         modules = MagicMock()
+        modules.cuda.get_device_properties.return_value.total_memory = 48 * 1024**3
+        modules.FluxPipeline.from_pretrained.return_value.to.return_value = (
+            modules.FluxPipeline.from_pretrained.return_value
+        )
         modules.FluxPipeline.from_pretrained.return_value.to.return_value.return_value.images = [
             Image.new("RGB", (1024, 1024), "red")
         ]

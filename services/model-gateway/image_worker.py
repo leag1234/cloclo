@@ -10,20 +10,26 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock, Timer
 from time import monotonic
+from typing import Any
+
+
+def place_pipeline(pipeline: Any, memory_bytes: int) -> None:
+    # BF16 weights plus encoders exceed a single L4's usable VRAM.
+    if memory_bytes < 40 * 1024**3:
+        pipeline.enable_sequential_cpu_offload()
+    else:
+        pipeline.to("cuda")
 
 
 def main() -> None:
     torch = importlib.import_module("torch")
     config = json.loads(Path(__file__).with_name("image-model.json").read_text())
-    pipeline = (
-        importlib.import_module("diffusers")
-        .FluxPipeline.from_pretrained(
-            config["repository"],
-            revision=config["revision"],
-            torch_dtype=torch.bfloat16,
-        )
-        .to("cuda")
+    pipeline = importlib.import_module("diffusers").FluxPipeline.from_pretrained(
+        config["repository"],
+        revision=config["revision"],
+        torch_dtype=torch.bfloat16,
     )
+    place_pipeline(pipeline, torch.cuda.get_device_properties(0).total_memory)
     lock = Lock()
 
     class Handler(BaseHTTPRequestHandler):
