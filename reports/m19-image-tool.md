@@ -8,5 +8,6 @@ request budget/deadline. Rewrite carries source and output language explicitly.
 The public API regression failed before implementation (504 for a model-selected
 natural drawing request). Unit tests now cover image delivery, invalid/disabled
 arguments, combined decision/image cost, exhausted budgets and rewrite reservation.
-Real GPU journeys and new provider recordings are still required: the compatible
-GPU is currently unavailable under the EUR 2/hour cap. No completion is claimed.
+M7 was recorded against the real provider (EUR 0.0127899). Real GPU journey
+recordings remain blocked: the affordable GPU was created but poweron returned
+`resource out of stock`; cleanup removed it. No completion is claimed.
