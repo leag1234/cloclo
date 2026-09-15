@@ -145,11 +145,16 @@ def up() -> None:
     if single(owned("instance", "server")) or STATE.exists():
         raise RuntimeError("Run gpu-down before starting a fresh verification cycle")
     catalog = call("instance", "server-type", "list")
-    # L4 first: 24 GB is enough for FLUX.1-schnell (~12 GB) and it is the cheapest
-    # (~0.79 EUR/h). L40S/H100 follow for workloads needing more VRAM. Having
-    # several families avoids being blocked by a single model being out of stock.
-    preferences = ["L4-1-24G", "L4-2-24G", "L40S-1-48G", "H100-1-80G",
-                   "L40S-2-48G", "H100-SXM-2-80G"]
+    # The image worker uses CPU offload on L4; BF16 weights are not resident.
+    # Multiple affordable families avoid dependence on one type's capacity.
+    preferences = [
+        "L4-1-24G",
+        "L4-2-24G",
+        "L40S-1-48G",
+        "H100-1-80G",
+        "L40S-2-48G",
+        "H100-SXM-2-80G",
+    ]
     affordable = [
         r
         for t in preferences
