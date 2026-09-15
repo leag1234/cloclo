@@ -68,9 +68,14 @@ class GPUContract(unittest.TestCase):
                     "server-type": [
                         {
                             "name": "L40S-1-48G",
-                            "availability": "scarce",
+                            "availability": "shortage",
                             "hourly_price": {"units": 1, "nanos": 0},
-                        }
+                        },
+                        {
+                            "name": "H100-1-80G",
+                            "availability": "available",
+                            "hourly_price": {"units": 3, "nanos": 0},
+                        },
                     ],
                 }[args[1]]
             if args[2] == "create":
@@ -82,6 +87,7 @@ class GPUContract(unittest.TestCase):
                 }
                 if args[1] == "server":
                     self.assertIn("additional-volumes.0=volume", args)
+                    self.assertIn("type=L40S-1-48G", args)
                     self.assertTrue(any(a.startswith("cloud-init=@") for a in args))
                     servers.append(obj)
                     return {

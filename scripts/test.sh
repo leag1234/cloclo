@@ -27,4 +27,5 @@ if [[ "${GITHUB_ACTIONS:-}" == true && "${ATLAS_VERIFY_M0:-}" != 1 ]]; then
   make verify-m16
   make verify-m17
   make verify-m18
+  make verify-m19
 fi
