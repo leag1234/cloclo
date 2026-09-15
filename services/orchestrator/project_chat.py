@@ -17,10 +17,9 @@ from services.orchestrator.chat_pipeline import (
 )
 from services.orchestrator.chat_schema import ChatMessage, ChatRequest
 from services.orchestrator.vision import process_vision
-from services.orchestrator.imagegen import process_image
-from packages.imagegen import image_request
 from packages.language import conversation_language, language_instruction
 from services.orchestrator.followup import is_followup, image_iteration
+from services.orchestrator.image_tool import declaration, finish
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.loop import Call, Limits, Message, Query, run
 from services.orchestrator.memory import consolidated
@@ -50,10 +49,12 @@ class Context(BaseModel):
 
 class ProjectTools(ChatTools):
     def __init__(self, item: Interaction, project: str) -> None:
-        super().__init__(item)
+        super().__init__(item, allow_image=True)
         self.project = project
 
     async def execute(self, call: Call, timeout: float) -> Message:
+        if call.name == "generate_image":
+            return await super().execute(call, timeout)
         # Memory must never be sent to an external web search engine.
         if call.name != "rag_search":
             return {"error": "tool_unavailable"}
@@ -125,17 +126,13 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
     )
     followup = is_followup(scoped_messages)
     iteration = image_iteration(scoped_messages)
-    if followup or request.messages[-1].images or image_request(question) or iteration:
+    if followup or request.messages[-1].images:
         if followup:
             from services.orchestrator.chat_pipeline import process
 
             await process(scoped, item)
-        elif request.messages[-1].images:
-            await process_vision(scoped, item)
         else:
-            await process_image(
-                iteration or question, item, request.seed, language=scoped.lang
-            )
+            await process_vision(scoped, item)
         if item.state == "done":
             await GatewayModel.post(
                 base + "/turns",
@@ -172,6 +169,8 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
         and isinstance(function := t.get("function"), dict)
         and function.get("name") == "rag_search"
     ]
+    model.tools.append(declaration())
+    tools = ProjectTools(item, str(project))
     item.cout_eur = 0.05
     history: list[Message] = []
     for turn in context.history:
@@ -195,20 +194,30 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
     )
     try:
         result = await run(
-            Query(question=question, lang=scoped.lang),
+            Query(question=iteration or question, lang=scoped.lang),
             model,
-            ProjectTools(item, str(project)),
+            tools,
             system,
             Limits(wall_clock=max(0, 120 - (time.monotonic() - started))),
             history=history,
+            terminal_tools=frozenset({"generate_image"}),
         )
         item.state, item.cout_eur = result.state, float(result.cost)
         if result.reason:
             item.erreurs.append(result.reason)
         if result.state != "done":
             return
-        answer, facts = consolidated(result.text, question)
-        if answer_stream and answer_stream.shown != answer:
+        if tools.image_prompt is not None:
+            await finish(scoped, item, result, tools.image_prompt, started)
+            answer = item.reponse
+            facts: list[str] = []
+        else:
+            answer, facts = consolidated(result.text, question)
+        if (
+            tools.image_prompt is None
+            and answer_stream
+            and answer_stream.shown != answer
+        ):
             raise ValueError("project_stream_changed")
         answer = render_project_citations(item, str(project), answer)
         answer = memory_prefix + answer
@@ -227,6 +236,6 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
     finally:
         item.tokens = {"in": model.input_tokens, "out": model.output_tokens}
         item.latence_ms["generation"] = model.generation_ms
-        if model.observations:
+        if model.observations and item.task_type != "imagegen":
             item.modele_utilise = model.observations[-1].provider
             item.route_decision = model.observations[0].route

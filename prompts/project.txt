@@ -23,3 +23,10 @@ is not declaring a new fact. Do not repeat stored evidence in the facts array.
 Example: memory says the project colour is violet; current question asks what
 its colour is. Return {"answer":"The project colour is violet, from project memory.","facts":[]}.
 Follow the explicitly resolved answer language for the response.
+Image analysis is available for uploads. Image generation uses generate_image;
+copy the current user request, never unrelated project memory, into its prompt.
+Every final response, including an unknown answer with empty memory, MUST use
+the JSON object with both "answer" and "facts". Put the language-specific reply
+inside "answer"; never emit a bare sentence. For missing information, return
+{"answer":"I do not have that information in this project.","facts":[]}, translating
+only the answer string into the resolved language.

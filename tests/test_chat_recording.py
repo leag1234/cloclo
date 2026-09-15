@@ -4,6 +4,7 @@ import gzip
 import json
 import unittest
 from services.orchestrator.tools import declarations
+from services.orchestrator.image_tool import declaration
 from pathlib import Path
 
 
@@ -14,7 +15,7 @@ class ChatRecordingTests(unittest.TestCase):
         )
         calls = archive["calls"]
         for call in calls:
-            self.assertEqual(call["request"]["tools"], declarations())
+            self.assertEqual(call["request"]["tools"], declarations() + [declaration()])
         self.assertGreaterEqual(len(calls), 2)
         self.assertEqual(
             [m["role"] for m in calls[0]["request"]["messages"]],

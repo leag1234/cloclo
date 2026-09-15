@@ -10,13 +10,39 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from services.orchestrator.chat_api import app
 from test_imagegen import png
+from decimal import Decimal
+from services.orchestrator.model import GatewayModel, Configuration
+from services.orchestrator.loop import Turn, Call, Reservation
 
 
 class ImageUITests(unittest.TestCase):
     def test_chat_and_sse_return_image_without_logging_bytes(self) -> None:
         url = png()
         upstream = AsyncMock(return_value={"image": url, "cost_eur": 0.001})
+        model = GatewayModel(
+            "http://unused",
+            Configuration(
+                input_eur_per_mtok=Decimal(0),
+                output_eur_per_mtok=Decimal(0),
+                max_tokens=100,
+            ),
+        )
+        decision = AsyncMock(
+            return_value=Turn(
+                "",
+                (
+                    Call(
+                        "image",
+                        "generate_image",
+                        json.dumps({"prompt": "dessine-moi un mouton"}),
+                    ),
+                ),
+                Reservation(10, Decimal(0)),
+            )
+        )
         with (
+            patch.object(GatewayModel, "connect", AsyncMock(return_value=model)),
+            patch.object(model, "complete", decision),
             tempfile.TemporaryDirectory() as root,
             patch.dict(os.environ, {"ATLAS_INTERACTION_DIR": root}),
             patch("services.orchestrator.model.GatewayModel.post", new=upstream),
@@ -27,7 +53,7 @@ class ImageUITests(unittest.TestCase):
                     "/v1/chat/completions",
                     json={
                         "messages": [
-                            {"role": "user", "content": "génère une image de cube"}
+                            {"role": "user", "content": "dessine-moi un mouton"}
                         ],
                         "stream": stream,
                     },
