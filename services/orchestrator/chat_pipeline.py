@@ -20,9 +20,8 @@ from services.orchestrator.tools import Fetch, Rag, Runtime
 from services.orchestrator.stream_client import sink_context
 from services.orchestrator.vision import process_vision
 from services.orchestrator.followup import is_followup, image_iteration
-from packages.imagegen import image_request
 from packages.language import conversation_language, language_instruction
-from services.orchestrator.imagegen import process_image
+from services.orchestrator.image_tool import GenerateImage, declaration, finish
 
 
 class Source(BaseModel):
@@ -99,15 +98,29 @@ async def render_citations(item: Interaction) -> None:
 
 
 class ChatTools(Runtime):
-    def __init__(self, item: Interaction, question: str = "") -> None:
+    def __init__(
+        self, item: Interaction, question: str = "", allow_image: bool = False
+    ) -> None:
         super().__init__(
             Cache(Path(os.environ.get("ATLAS_WEB_CACHE", "BRAIN/web-cache.sqlite"))),
             Decimal(0),
             question,
         )
         self.item = item
+        self.allow_image = allow_image
+        self.image_prompt: str | None = None
 
     async def execute(self, call: Call, timeout: float) -> Message:
+        if call.name == "generate_image":
+            if not self.allow_image:
+                return {"error": "tool_unavailable"}
+            try:
+                self.image_prompt = GenerateImage.model_validate_json(
+                    call.arguments
+                ).prompt
+                return {"selected": "generate_image"}
+            except ValueError:
+                return {"error": "invalid_image_arguments"}
         if call.name != "rag_search":
             output = await super().execute(call, timeout)
             # Keep enough source text for synthesis within the unchanged request cap.
@@ -174,14 +187,6 @@ async def process(request: ChatRequest, item: Interaction) -> None:
     if followup:
         item.task_type = "followup"
     iteration = image_iteration(request.messages)
-    if not followup and (iteration or image_request(request.messages[-1].text)):
-        await process_image(
-            iteration or request.messages[-1].text,
-            item,
-            request.seed,
-            language=request.lang,
-        )
-        return
     if not followup and request.messages[-1].images:
         await process_vision(request, item)
         return
@@ -192,15 +197,17 @@ async def process(request: ChatRequest, item: Interaction) -> None:
     )
     if followup:
         model.tools = []
+    else:
+        model.tools.append(declaration())
     model.observing = True
     model.sink = sink_context.get()
     model.reasoning_effort = request.reasoning_effort
     model.local_enabled = os.environ.get("GPU_LOCAL", "0") == "1"
     item.cout_eur = 0.05  # Conservative upper bound until the loop returns its ledger.
-    tools = ChatTools(item, request.messages[-1].text)
+    tools = ChatTools(item, request.messages[-1].text, allow_image=not followup)
     try:
         result = await run(
-            Query(question=request.messages[-1].text, lang=request.lang),
+            Query(question=iteration or request.messages[-1].text, lang=request.lang),
             model,
             tools,
             Path("prompts/agent.txt").read_text()
@@ -213,12 +220,18 @@ async def process(request: ChatRequest, item: Interaction) -> None:
                 {"role": m.role, "content": m.text} for m in request.messages[:-1]
             ],
             retry_web=True,
+            terminal_tools=frozenset({"generate_image"})
+            if not followup
+            else frozenset(),
         )
         item.reponse, item.state, item.cout_eur = (
             result.text,
             result.state,
             float(result.cost),
         )
+        if result.state == "done" and tools.image_prompt is not None:
+            await finish(request, item, result, tools.image_prompt, started)
+            return
         if result.reason:
             item.erreurs.append(result.reason)
         if result.state == "done" and not followup:
@@ -226,6 +239,6 @@ async def process(request: ChatRequest, item: Interaction) -> None:
     finally:
         item.tokens = {"in": model.input_tokens, "out": model.output_tokens}
         item.latence_ms["generation"] = model.generation_ms
-        if model.observations:
+        if model.observations and item.task_type != "imagegen":
             item.modele_utilise = model.observations[-1].provider
             item.route_decision = model.observations[0].route

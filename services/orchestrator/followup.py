@@ -31,18 +31,20 @@ def image_iteration(messages: list[ChatMessage]) -> str | None:
     if len(messages) < 3 or messages[-2].role != "assistant":
         return None
     previous = messages[-2].text
-    if not re.search(r"!\[[^\]]*\]\([^)]*(?:/images/|\[IMAGE\])", previous):
+    image = r"!\[[^\]]*\]\([^)]*(?:/images/|\[IMAGE\])"
+    if not re.search(image, previous):
         return None
     question = messages[-1].text
-    if not re.search(
-        r"(?i)\b(ajout\w*|oubli\w*|même|add|forgot|same|change|remplac\w*)\b", question
-    ):
+    change = r"(?i)\b(ajout\w*|oubli\w*|même|add|forgot|same|change|remplac\w*)\b"
+    if not re.search(change, question):
         return None
-    from packages.imagegen import image_request
-
     start = len(messages) - 3
-    for index in range(start, -1, -1):
-        if messages[index].role == "user" and image_request(messages[index].text):
-            start = index
-            break
+    while (
+        start >= 2
+        and messages[start].role == "user"
+        and re.search(change, messages[start].text)
+        and messages[start - 1].role == "assistant"
+        and re.search(image, messages[start - 1].text)
+    ):
+        start -= 2
     return "\n".join(m.text for m in messages[start:] if m.role == "user")

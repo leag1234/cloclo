@@ -6,6 +6,8 @@ import os
 from decimal import Decimal
 from time import monotonic
 from pathlib import Path
+from typing import Literal
+from pydantic import Field
 
 import aiohttp
 from packages.imagegen import ImagePrompt
@@ -13,8 +15,20 @@ from packages.images import image_info
 from image_prompt import reservation, rewrite
 
 
+class ImageRequest(ImagePrompt):
+    max_cost_eur: Decimal = Field(
+        default=Decimal("0.05"),
+        gt=0,
+        le=Decimal("0.05"),
+        strict=False,
+        allow_inf_nan=False,
+    )
+    timeout: float = Field(default=115, gt=0, le=120)
+    lang: Literal["fr", "de", "es", "it", "en"] = "fr"
+
+
 async def generate(request: object) -> dict[str, object]:
-    prompt = ImagePrompt.model_validate(request)
+    prompt = ImageRequest.model_validate(request)
     configured_ip = (
         os.environ.get("ATLAS_IMAGE_GPU_IP")
         or Path("BRAIN/gpu_ip.txt").read_text().strip()
@@ -27,12 +41,18 @@ async def generate(request: object) -> dict[str, object]:
     if not rate.is_finite() or not 0 < rate <= 2:
         raise RuntimeError("cost_budget")
     started = monotonic()
-    reserved = reservation(prompt.prompt)
-    available = Decimal("0.05") - reserved
+    reserved = reservation(prompt.prompt, prompt.lang)
+    available = prompt.max_cost_eur - reserved
     if available <= 0:
         raise RuntimeError("cost_budget")
-    rewritten = await rewrite(prompt.prompt, min(30, float(available * 3600 / rate)))
-    timeout = min(115 - (monotonic() - started), float(available * 3600 / rate))
+    rewritten = await rewrite(
+        prompt.prompt,
+        min(30, prompt.timeout, float(available * 3600 / rate)),
+        prompt.lang,
+    )
+    timeout = min(
+        prompt.timeout - (monotonic() - started), float(available * 3600 / rate)
+    )
     if timeout <= 0:
         raise RuntimeError("cost_budget")
     gpu_started = monotonic()
