@@ -91,6 +91,24 @@ class ImageHistoryTests(unittest.TestCase):
         messages[-2] = ChatMessage(role="assistant", content="A text answer")
         self.assertIsNone(image_iteration(messages))
 
+    def test_multiple_iterations_preserve_natural_original_request(self) -> None:
+        from services.orchestrator.followup import image_iteration
+
+        messages = [
+            ChatMessage(role="user", content="dessine-moi un mouton à cinq pattes"),
+            ChatMessage(
+                role="assistant", content="![Image](http://localhost/images/abc)"
+            ),
+            ChatMessage(role="user", content="Ajoute des lunettes bleues"),
+            ChatMessage(
+                role="assistant", content="![Image](http://localhost/images/def)"
+            ),
+            ChatMessage(role="user", content="Ajoute un chapeau"),
+        ]
+        prompt = image_iteration(messages) or ""
+        for constraint in ("mouton", "cinq pattes", "lunettes bleues", "chapeau"):
+            self.assertIn(constraint, prompt)
+
 
 class WebRetryTests(unittest.IsolatedAsyncioTestCase):
     async def test_transient_search_retried_with_same_ledger(self) -> None:
