@@ -335,15 +335,19 @@ transmitted in clear text. Resume PR/CI/merge for M18; do not ask for this again
 
 ## M19 — Explicit intent, explicit language, locked settings
 
+Examples below are English glosses. The exact French acceptance inputs are
+preserved in [the M19 journey cases](tests/journeys/m19-cases.json); tests must
+use those originals, including their unaccented variants.
+
 **Root cause.** A second real user session (2026-09-13, after M18) found three failures
 that share ONE cause: **decisions taken upstream by heuristics are never carried through
 to the model**. The model is then left to guess, and guesses wrong.
 
 | Symptom observed | What actually happens |
 |---|---|
-| "dessine-moi un mouton à 5 pattes…" → a text answer, no image | a regex decides whether to generate; `image_request()` only matches a verb IMMEDIATELY followed by image/dessin/photo, so 3 natural phrasings out of 4 are missed |
-| "Je ne peux pas dessiner d'images. Je suis un assistant textuel…" (with a redirect to DALL·E/Midjourney) | `prompts/chat.txt` declares NO capability (grep count = 0); the model sincerely believes it cannot |
-| "décris cette image" (French) → answer in English | `question_language()` correctly returns `fr`, but the result is only used to pick status LABELS; the detected language is never injected into the vision prompt |
+| "draw me a five-legged sheep…" → a text answer, no image | a regex decides whether to generate; `image_request()` only matches a verb IMMEDIATELY followed by image/dessin/photo, so 3 natural phrasings out of 4 are missed |
+| "I cannot draw images. I am a text assistant…" (with a redirect to DALL·E/Midjourney) | `prompts/chat.txt` declares NO capability (grep count = 0); the model sincerely believes it cannot |
+| "describe this image" (French) → answer in English | `question_language()` correctly returns `fr`, but the result is only used to pick status LABELS; the detected language is never injected into the vision prompt |
 
 ### D1 — Let the MODEL decide when to generate an image
 Replace the upstream regex with a declared tool, exactly like `web_search` and
@@ -351,11 +355,11 @@ Replace the upstream regex with a declared tool, exactly like `web_search` and
 - Declare `generate_image(prompt: str)` as a function/tool available to the model.
 - Remove `image_request()` from the routing path (keep it only, if useful, as a cheap
   pre-hint — never as the sole gate).
-- The model must handle: "dessine-moi un mouton", "fais-moi un portrait de X",
-  "je voudrais voir un dragon", "génère une image de X", "peux-tu représenter…",
+- The model must handle: "draw me a sheep", "make me a portrait of X",
+  "I would like to see a dragon", "generate an image of X", "can you depict…",
   and the English equivalents.
-- It must NOT trigger generation for "analyse cette image", "décris l'image ci-jointe",
-  "modifie cette image".
+- It must NOT trigger generation for "analyze this image", "describe the attached image",
+  "edit this image".
 
 ### D2 — Declare capabilities in the system prompt (and lock them)
 `prompts/chat.txt` is 5 lines and mentions neither vision nor image generation. Restore
@@ -370,7 +374,7 @@ When a capability genuinely fails, say what failed — never "I cannot do this".
 - inject the resolved language explicitly into the prompt of EVERY path (chat, vision,
   web, image rewrite, follow-up): e.g. "Answer in French." — do not rely on the model
   inferring it from a three-word message;
-- make detection robust to unaccented and uppercase French ("decris cette image"
+- make detection robust to unaccented and uppercase French ("describe this image (unaccented French)"
   currently returns None); fall back to the conversation language, then to the UI locale,
   never to a hardcoded default;
 - short messages (< 5 words) must inherit the conversation language.
@@ -387,13 +391,13 @@ These values were silently lost before and nothing detects it. Add a permanent t
 Any future change to these must break the test loudly, not silently.
 
 ### Journeys (extend `tests/journeys/`, public chat API only)
-J15 "dessine-moi un mouton à 5 pattes qui danse avec une vache bleue" → an image is
+J15 "draw me a five-legged sheep dancing with a blue cow" → an image is
     returned (tool-driven, no regex).
-J16 "fais-moi un portrait d'un chat" and "je voudrais voir un dragon" → images returned.
-J17 "analyse cette image" / "décris l'image" → NO generation; a description instead.
-J18 "peux-tu générer des images ?" → a clear yes; never a redirect to DALL·E/Midjourney.
-J19 "décris cette image" (3-word French message, image attached) → description **in
-    French**. Same test with an unaccented variant "decris cette image".
+J16 "make me a portrait of a cat" and "I would like to see a dragon" → images returned.
+J17 "analyze this image" / "describe the image" → NO generation; a description instead.
+J18 "can you generate images?" → a clear yes; never a redirect to DALL·E/Midjourney.
+J19 "describe this image" (3-word French message, image attached) → description **in
+    French**. Same test with an unaccented variant "describe this image (unaccented French)".
 J20 a French conversation that includes a web search and an image generation → every
     answer AND every status label stays in French throughout.
 
