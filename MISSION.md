@@ -405,3 +405,17 @@ J20 a French conversation that includes a web search and an image generation →
 
 **Definition of done**: `make verify-m19` passes; J1–J20 pass through the public chat
 API; `tests/test_settings_lock.py` is part of the standard test run.
+
+### M19 — External dependencies must not block delivery (2026-09-15)
+M19 has been blocked three times by external services (GPU out of stock, then "SerpApi
+timeouts") although its substance — imposed language, declared capabilities, tool-based
+image routing, locked settings — depends on neither. SerpApi has been verified working by
+the owner: HTTP 200 in 0.66 s, 229 searches left. The timeouts are therefore client-side.
+Note: `services/orchestrator/web.py` uses `ClientTimeout(total=15)`, which covers search
+AND page download; a heavy page exhausts it even though the search itself is instant.
+Separate the budgets (connect / search / page read) and raise the page-read budget.
+
+Rule: a journey depending on an external service (web search, image GPU) MAY be validated
+from an existing cassette when the live attempt fails, PROVIDED the report declares, per
+journey, whether it was `live` or `replay`. Replay is honest; silence is not. Never
+fabricate a result. Milestone delivery must not wait for a third party.
