@@ -4,7 +4,6 @@ import os
 import json
 import re
 from pathlib import Path
-from packages.language import question_language
 import time
 from decimal import Decimal
 from typing import Literal
@@ -40,7 +39,7 @@ async def process_vision(request: ChatRequest, item: Interaction) -> None:
         request.messages[-1].text,
     ):
         labels = json.loads(Path("prompts/image-edit.json").read_text())
-        language = question_language(request.messages[-1].text, request.lang)
+        language = request.lang
         item.reponse, item.state, item.task_type = labels[language], "done", "vision"
         sink = sink_context.get()
         if sink:
@@ -59,6 +58,7 @@ async def process_vision(request: ChatRequest, item: Interaction) -> None:
                 {
                     "messages": [m.model_dump() for m in request.messages],
                     "timeout": 115.0,
+                    "lang": request.lang,
                 },
                 115.0,
             )

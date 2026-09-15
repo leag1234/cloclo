@@ -19,6 +19,7 @@ from services.orchestrator.chat_schema import ChatMessage, ChatRequest
 from services.orchestrator.vision import process_vision
 from services.orchestrator.imagegen import process_image
 from packages.imagegen import image_request
+from packages.language import conversation_language, language_instruction
 from services.orchestrator.followup import is_followup, image_iteration
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.loop import Call, Limits, Message, Query, run
@@ -117,6 +118,7 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
     scoped = request.model_copy(
         update={
             "messages": scoped_messages,
+            "lang": conversation_language(scoped_messages, request.ui_locale),
             "project_id": None,
             "conversation_id": None,
         }
@@ -131,7 +133,9 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
         elif request.messages[-1].images:
             await process_vision(scoped, item)
         else:
-            await process_image(iteration or question, item, request.seed)
+            await process_image(
+                iteration or question, item, request.seed, language=scoped.lang
+            )
         if item.state == "done":
             await GatewayModel.post(
                 base + "/turns",
@@ -179,6 +183,7 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
         )
     system = (
         Path("prompts/project.txt").read_text()
+        + language_instruction(scoped.lang)
         + "\n"
         + json.dumps(
             {
@@ -190,7 +195,7 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
     )
     try:
         result = await run(
-            Query(question=question, lang=request.lang),
+            Query(question=question, lang=scoped.lang),
             model,
             ProjectTools(item, str(project)),
             system,

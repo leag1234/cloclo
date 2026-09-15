@@ -6,14 +6,13 @@ import os
 import time
 from packages.images import ImageURL
 from services.orchestrator.image_store import store
-from packages.language import question_language
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.model import GatewayModel
 from services.orchestrator.stream_client import sink_context
 
 
 async def process_image(
-    prompt: str, item: Interaction, seed: int | None = None
+    prompt: str, item: Interaction, seed: int | None = None, *, language: str
 ) -> None:
     started = time.monotonic()
     item.task_type, item.modele_utilise, item.route_decision = (
@@ -34,7 +33,7 @@ async def process_image(
         if not 0 <= cost <= 0.05:
             raise ValueError("invalid_provider_cost")
         labels = json.loads(Path("prompts/image-labels.json").read_text())
-        label = labels.get(question_language(prompt), labels["en"])
+        label = labels[language]
         reference = store(image.url)
         item.images = [
             {

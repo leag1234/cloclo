@@ -1,0 +1,7 @@
+{
+  "fr": "\nAnswer in French. Use another output language only when the user explicitly requests it, such as a translation.\n",
+  "de": "\nAnswer in German. Use another output language only when the user explicitly requests it, such as a translation.\n",
+  "es": "\nAnswer in Spanish. Use another output language only when the user explicitly requests it, such as a translation.\n",
+  "it": "\nAnswer in Italian. Use another output language only when the user explicitly requests it, such as a translation.\n",
+  "en": "\nAnswer in English. Use another output language only when the user explicitly requests it, such as a translation.\n"
+}

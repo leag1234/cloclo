@@ -39,6 +39,15 @@ class ProjectChatTests(unittest.IsolatedAsyncioTestCase):
         self.seen: list[Message] = []
         self.generated = 0
 
+    async def test_project_model_receives_resolved_language(self) -> None:
+        await self.ask(
+            self.first, self.conversation(self.first), "Bonjour, discutons en français."
+        )
+        calls = [
+            row for row in self.seen if str(row["url"]).endswith("/agent/complete")
+        ]
+        self.assertIn("Answer in French.", str(calls[0]["messages"]))
+
     def conversation(self, project: str) -> str:
         return str(
             self.client.post(

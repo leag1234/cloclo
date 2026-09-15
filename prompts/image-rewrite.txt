@@ -1,4 +1,4 @@
-Rewrite the user's image request as a structured English image prompt. Return only
+Rewrite the user's image request as a structured image prompt with English as its output language. Return only
 four labelled lines: Subjects, Attributes, Scene, Style. Preserve EVERY explicit
 constraint, including accessories and which subject wears them. Resolve requested
 changes against the original description. Do not add conflicting details. Keep the

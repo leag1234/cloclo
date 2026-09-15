@@ -6,6 +6,8 @@ import os
 from decimal import Decimal
 from pathlib import Path
 from time import monotonic
+from typing import Literal
+from packages.language import conversation_language, language_instruction
 
 import aiohttp
 import yaml
@@ -16,6 +18,7 @@ from packages.images import VisionInput
 
 
 class VisionRequest(VisionInput):
+    lang: Literal["fr", "de", "es", "it", "en"] = "fr"
     timeout: float = Field(gt=0, le=120, default=120)
 
 
@@ -58,6 +61,9 @@ class VisionProvider:
         incoming, reserved = self.reserve(request)
         prompt = Path("prompts/vision.txt").read_text()
         prompt += Path("prompts/chat.txt").read_text()
+        prompt += language_instruction(
+            conversation_language(request.messages, request.lang)
+        )
         # Count the versioned system instruction before transport as well.
         incoming += len(prompt.encode()) + 64
         reserved = self.cost(incoming, self.config["max_tokens"])
