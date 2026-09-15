@@ -47,7 +47,7 @@ async def check() -> None:
     )
     started = time.monotonic()
     if record:
-        archive["configuration"] = AgentProvider().configuration()
+        archive["configuration"] = AgentProvider().configuration(False)
         archive["calls"] = []
     config = Configuration.model_validate(archive["configuration"])
     model = GatewayModel("http://recording.invalid", config)

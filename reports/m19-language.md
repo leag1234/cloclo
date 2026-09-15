@@ -15,3 +15,6 @@ reuse previously recorded real GPU outputs. One real search timeout recovered.
 J12 initially exhausted tokens after failed/irrelevant page reads; the query fix
 and a bounded retry completed it without raising limits. This is an intermediate
 increment: tool-driven generation and J15–J20 are still pending, so M19 is incomplete.
+
+The compact capability prompt keeps the full M10 source within the unchanged budget;
+the recorder now reserves using the actual serverless configuration.
