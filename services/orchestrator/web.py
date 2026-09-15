@@ -12,6 +12,16 @@ from aiohttp.resolver import ThreadedResolver
 
 USER_AGENT = "ATLAS-0/0.1 (+https://github.com/leag1234/cloclo)"
 MAX_BYTES = 2_000_000
+CONNECT_TIMEOUT = 5
+SEARCH_TIMEOUT = 15
+PAGE_TIMEOUT = 30
+
+
+def http_timeout(remaining: float, operation_limit: float) -> aiohttp.ClientTimeout:
+    total = min(remaining, operation_limit)
+    return aiohttp.ClientTimeout(
+        total=total, connect=min(CONNECT_TIMEOUT, total), sock_read=total
+    )
 
 
 def public_ip(address: str) -> None:
@@ -74,7 +84,7 @@ class Web:
             trust_env=False,
             auto_decompress=False,
             headers={"User-Agent": USER_AGENT, "Accept-Encoding": "identity"},
-            timeout=aiohttp.ClientTimeout(total=timeout),
+            timeout=http_timeout(timeout, PAGE_TIMEOUT),
         ) as session:
             async with session.get(url, allow_redirects=False) as response:
                 if response.headers.get("Content-Encoding", "identity") != "identity":
@@ -114,8 +124,8 @@ class Web:
             return
         raise ValueError("robots_redirect_limit")
 
-    async def fetch(self, url: str, timeout: float = 15) -> tuple[str, bytes]:
-        async with asyncio.timeout(min(15, timeout)):
+    async def fetch(self, url: str, timeout: float = PAGE_TIMEOUT) -> tuple[str, bytes]:
+        async with asyncio.timeout(min(PAGE_TIMEOUT, timeout)):
             for _ in range(5):
                 validate_url(url)
                 await self._robots(url, timeout)
