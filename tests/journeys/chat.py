@@ -216,6 +216,9 @@ def main() -> None:
 
         run_m19(report, encoded)
     finally:
+        report["journey_modes"] = {
+            f"J{number}": report["mode"] for number in range(1, 21) if number != 8
+        }
         path.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))
 

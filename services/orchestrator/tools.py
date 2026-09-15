@@ -18,7 +18,13 @@ from services.orchestrator.cache import Cache
 from services.orchestrator.calculator import calculate
 from services.orchestrator.content import select_passages
 from services.orchestrator.loop import Call, Message, Reservation
-from services.orchestrator.web import MAX_BYTES, Web, validate_url
+from services.orchestrator.web import (
+    MAX_BYTES,
+    SEARCH_TIMEOUT,
+    Web,
+    http_timeout,
+    validate_url,
+)
 
 
 class Arguments(BaseModel):
@@ -111,7 +117,7 @@ class Runtime:
         if request.news:
             params["tbm"] = "nws"
         async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=timeout), trust_env=False
+            timeout=http_timeout(timeout, SEARCH_TIMEOUT), trust_env=False
         ) as session:
             async with session.get(
                 "https://serpapi.com/search.json", params=params, allow_redirects=False
