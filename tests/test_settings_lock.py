@@ -97,3 +97,18 @@ class SettingsLockTests(unittest.TestCase):
             ),
             "en",
         )
+
+    def test_english_image_request_does_not_fall_back_to_french(self) -> None:
+        self.assertEqual(
+            conversation_language(
+                [ChatMessage(role="user", content="I would like to see a dragon")], "fr"
+            ),
+            "en",
+        )
+
+    def test_rewrite_declares_source_and_output_languages(self) -> None:
+        from image_prompt import messages
+
+        prompt = str(messages("un cube rouge", "fr")[0]["content"])
+        self.assertIn('"source_language": "fr"', prompt)
+        self.assertIn('"output_language": "en"', prompt)

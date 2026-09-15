@@ -53,7 +53,7 @@ def main() -> None:
         "mode": "live" if os.environ.get("JOURNEYS_LIVE") == "1" else "replay"
     }
     if os.environ.get("JOURNEYS_RESUME"):
-        report["resumed_same_session_exchanges"] = True
+        report["resumed_recorded_prefix"] = True
     report["image_mode"] = report["mode"]
     report["web_mode"] = (
         "live" if os.environ.get("JOURNEYS_REFRESH") == "1" else report["mode"]
@@ -212,6 +212,9 @@ def main() -> None:
         assert "auxiliary" in Path("runbooks/chat.md").read_text().lower()
         report["J7_auxiliary_ok"] = True
         run_m18(report, rag_answer, encoded)
+        from journeys.m19 import run_m19
+
+        run_m19(report, encoded)
     finally:
         path.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))

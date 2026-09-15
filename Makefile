@@ -161,3 +161,7 @@ test-serve-idempotent: ## explicit disruptive J8, outside the CI gate
 .PHONY: verify-m18
 verify-m18: ## conversation integrity and image fidelity
 	@bash scripts/verify-m18.sh
+
+.PHONY: verify-m19
+verify-m19: ## explicit intent, language and permanent settings locks
+	@bash scripts/verify-m19.sh
