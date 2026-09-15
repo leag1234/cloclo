@@ -419,3 +419,129 @@ Rule: a journey depending on an external service (web search, image GPU) MAY be 
 from an existing cassette when the live attempt fails, PROVIDED the report declares, per
 journey, whether it was `live` or `replay`. Replay is honest; silence is not. Never
 fabricate a result. Milestone delivery must not wait for a third party.
+
+## M20 — Real-usage journeys, honest failures, unified startup
+
+Source: user sessions of 2026-09-13 and 2026-09-15. M19 delivered its substance (the
+model now decides when to generate, capabilities are declared, language is imposed on
+every path). The defects below were all found within minutes of ordinary use, by the most
+natural phrasings, while the gates were green.
+
+---
+
+### PART 1 — Permanent rules (apply from now on, to every milestone)
+
+**R1 — Journeys are written from usage, never from the implementation.**
+State the user's intent in one sentence, derive at least six natural phrasings, and only
+then look at the code. A journey whose wording mirrors a regex, a keyword list or a
+prompt template is invalid: it can only confirm the code.
+
+**R2 — Phrasing and input diversity is mandatory.** For every capability:
+at least 6 phrasings, of which 3 do not contain the obvious keyword; one very short
+message (<= 4 words); one without accents and one in uppercase; one English and one other
+language; at least one negative case that must NOT trigger the capability; and, where
+attachments are involved, **a case with two or more attachments** (the 2026-09-15 failure
+came from sending two images — nobody had tested more than one).
+
+**R3 — Assertions describe what the user receives**, never internal state, routing flags
+or function calls. If an assertion can pass while the user sees nothing useful, it is the
+wrong assertion.
+
+**R4 — Every defect reported by the owner becomes a permanent verbatim journey.** The
+exact phrasing that failed is added to `tests/journeys/` with the session date, and is
+never reworded into something easier to pass.
+
+**R5 — A module that is only called by its own tests is NOT delivered.** Three defects in
+three days had this shape: capability built, unit-tested, never reached from the user
+path (system prompt capabilities, projects in the UI, image prompt rewriting). Any
+service module with no caller outside `tests/` must fail the gate.
+
+**R6 — Failures must state what was measured against which limit.** `context_exceeded`
+with an empty question and zero tokens sent three diagnoses down the wrong path. Every
+rejection must report the measured values and the threshold, e.g. "2 images, 4160+4160
+tokens, text 12, total 9424, limit 129024", both to the user (in plain language) and to
+the server log.
+
+---
+
+### PART 2 — Defects to fix (2026-09-15 session)
+
+**D1 — Two attached images are rejected with `context_exceeded`.**
+Reproduction: send two images, then "intègre ces deux images". Observed: the interaction
+log records `erreurs: ['context_exceeded']`, `tokens: {'in': 0, 'out': 0}` and an **empty
+question** — the user's text never reached the model. Note: the vision context is
+131072 tokens and two 1024x1024 images cost about 4160 tokens each, so the arithmetic
+cannot overflow. **Diagnose before changing anything** (three code-reading hypotheses
+were already wrong: base64 re-injection, undersized context, malformed dimensions).
+Instrument the path, reproduce, then fix. Support several attachments.
+
+**D2 — Image editing is not answered honestly.** "intègre ces deux images" and
+"tu saurais modifier cette image ?" must produce an explicit statement that editing or
+compositing an existing image is not supported by the current model, plus what IS
+possible (describe it, or generate a new image from a description). Never an unsolicited
+description, never a silent failure. This was D3 in M18 and J11 passed — the journey was
+too easy.
+
+**D3 — The rewritten image prompt and the seed are not logged.** M18 required them for
+J14 but the real chat path records only the original question, so a disappointing image
+cannot be diagnosed or reproduced. Log, for every generation: original request, rewritten
+prompt, seed, model, resolution, steps.
+
+**D4 — Prompt-following on multi-subject constraints.** "un mouton à 5 pattes qui danse
+avec une vache bleue - les deux portent des lunettes roses et des patins jaune fluo"
+produced: sheep, blue cow, dancing, yellow skates on both, pink glasses **on the sheep
+only**, four legs. Verify whether the rewrite preserved "both wear pink sunglasses"
+(the rewrite prompt requires "which subject wears them"). If the rewrite is correct, this
+is a model limit — report it with evidence rather than claiming a fix. Counting body
+parts ("5 legs") is a known diffusion limitation: state it honestly, do not pretend.
+
+**D5 — Services must start as one.** `make serve` starts chat only; image generation
+needs a separate `make serve-imagegen` plus GPU provisioning. A user asking for a drawing
+must not be required to know this. When `generate_image` is called and the worker is not
+running, provision it on demand, tell the user it is starting (with the expected wait),
+then answer. Auto-shutdown after inactivity stays as it is.
+
+**D6 — Required configuration is not checked.** `GPU_CLIENT_IP` was missing from
+`secrets.env`; `make serve-imagegen` printed a success line, then hung, then died on a
+`KeyError`. Every service must validate its required variables at startup and refuse to
+start with an explicit list of what is missing. Add the required-variable list to the
+settings lock test.
+
+**D7 — `gpu-up` announces success before creating anything.** It prints "cloud-init
+submitted" before the instance exists, then can fail with nothing created — the same
+false-success pattern already fixed in `gpu-down`. Announce after verifying, and report
+the real error (stock shortage, quota, missing variable).
+
+---
+
+### PART 3 — Session efficiency
+
+**E1 — Do not re-verify completed milestones.** Observed on 2026-09-15: asked for M19,
+the agent began by re-running `verify-m17` and re-reading merged work. If
+`BRAIN/JOURNAL.md` records "MILESTONE Mn DONE" and its PR is merged on `main`, do not
+re-verify Mn; read the outcome from BRAIN and go straight to the requested milestone.
+Re-verify only if the owner asks, or if something visibly broke. State in one line which
+verifications were skipped.
+
+**E2 — Keep the permanent context lean.** `MISSION.md` is approaching 20 000 characters,
+much of it settled one-off decisions ("token revoked", "budget attested", "SerpApi
+confirmed"). Move them to `docs/decisions-log.md` (append-only, not read every session).
+Keep in `MISSION.md` only what applies to every session. Move, never delete.
+
+---
+
+### Journeys to add (verbatim, from the real sessions)
+J21 two images attached + "intègre ces deux images"     -> honest "not supported" answer,
+    no `context_exceeded`                                          [2026-09-15]
+J22 two images attached + "compare ces deux images"     -> a comparison, both images used
+J23 one image + "tu saurais modifier cette image ?"     -> honest answer            [2026-09-13]
+J24 "genere une image d'un mouton à 5 pattes, qui danse avec une vache bleue - les deux
+    portent des lunettes roses et des patins à roulette jaune fluo" -> report, per
+    constraint, which are satisfied; log original prompt, rewritten prompt, seed  [2026-09-15]
+J25 image generation requested while the worker is down -> the worker is provisioned
+    automatically, the user is told about the wait, the image is delivered
+J26 a required environment variable is missing          -> the service refuses to start
+    with an explicit message naming it (no hang, no KeyError)
+
+**Definition of done**: `make verify-m20` passes; J1–J26 pass through the public chat API;
+`MISSION.md` is under 8 000 characters; `docs/decisions-log.md` exists.
