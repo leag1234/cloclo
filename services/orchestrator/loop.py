@@ -101,6 +101,7 @@ async def run(
     clock: Callable[[], float] = time.monotonic,
     history: list[Message] | None = None,
     retry_web: bool = False,
+    terminal_tools: frozenset[str] = frozenset(),
 ) -> Result:
     result = Result()
     deadline = clock() + limits.wall_clock
@@ -242,6 +243,9 @@ async def run(
                         }
                     )
                 )
+                if call.name in terminal_tools and "error" not in output:
+                    result.state = "done"
+                    return result
                 messages.append(
                     {
                         "role": "tool",

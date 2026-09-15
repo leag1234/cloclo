@@ -126,15 +126,12 @@ def main() -> None:
 
     async def generate(request: Any) -> Any:
         nonlocal generating
+        value = {k: v for k, v in request.items() if k != "timeout"}
         if replaying():
-            return replay("image", request)
+            return replay("image", value)
         if refresh:
             saved_image = next(
-                (
-                    r
-                    for r in previous
-                    if r["kind"] == "image" and r["request"] == request
-                ),
+                (r for r in previous if r["kind"] == "image" and r["request"] == value),
                 None,
             )
             assert saved_image, "unrecorded_image_request"
@@ -145,7 +142,7 @@ def main() -> None:
                 result = await original_image(request)
             finally:
                 generating = False
-        record("image", request, result)
+        record("image", value, result)
         return result
 
     with tempfile.TemporaryDirectory() as directory, ExitStack() as contexts:

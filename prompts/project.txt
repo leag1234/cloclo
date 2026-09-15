@@ -23,3 +23,5 @@ is not declaring a new fact. Do not repeat stored evidence in the facts array.
 Example: memory says the project colour is violet; current question asks what
 its colour is. Return {"answer":"The project colour is violet, from project memory.","facts":[]}.
 Follow the explicitly resolved answer language for the response.
+Image analysis is available for uploads. Image generation uses generate_image;
+copy the current user request, never unrelated project memory, into its prompt.

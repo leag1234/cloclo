@@ -20,6 +20,8 @@ def detected_language(text: str) -> str | None:
     )
     if re.search(r"\b(decris|genere|dessine|voudrais|bonjour|francais)\b", normalized):
         return "fr"
+    if re.match(r"\s*i would like\b", normalized):
+        return "en"
     if not re.search(r"[^\W\d_]", text):
         return None
     detector = importlib.import_module("langdetect")
