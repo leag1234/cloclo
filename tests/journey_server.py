@@ -38,7 +38,6 @@ def main() -> None:
         if resume
         else (json.loads(gzip.decompress(ARCHIVE.read_bytes())) if not live else [])
     )
-    saved_image = next((r for r in previous if r["kind"] == "image"), None)
     rows: list[dict[str, Any]] = previous if resume or not (live or refresh) else []
     prefix_count = len(previous) if resume else 0
     position = 0
@@ -130,7 +129,15 @@ def main() -> None:
         if replaying():
             return replay("image", request)
         if refresh:
-            assert saved_image and saved_image["request"] == request
+            saved_image = next(
+                (
+                    r
+                    for r in previous
+                    if r["kind"] == "image" and r["request"] == request
+                ),
+                None,
+            )
+            assert saved_image, "unrecorded_image_request"
             result = copy.deepcopy(saved_image["response"])
         else:
             generating = True

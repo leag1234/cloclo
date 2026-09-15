@@ -104,7 +104,7 @@ class ImageTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(
             GatewayModel, "post", return_value={"image": png(), "cost_eur": 0.002}
         ) as transport:
-            await process_image("génère une image de cube", item)
+            await process_image("génère une image de cube", item, language="fr")
         self.assertEqual(item.task_type, "imagegen")
         self.assertEqual(item.state, "done")
         self.assertNotIn("base64", item.reponse)

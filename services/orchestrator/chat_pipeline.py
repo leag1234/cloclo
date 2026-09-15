@@ -16,11 +16,12 @@ from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.loop import Call, Limits, Message, Query, run
 from services.orchestrator.model import GatewayModel
-from services.orchestrator.tools import Rag, Runtime
+from services.orchestrator.tools import Fetch, Rag, Runtime
 from services.orchestrator.stream_client import sink_context
 from services.orchestrator.vision import process_vision
 from services.orchestrator.followup import is_followup, image_iteration
 from packages.imagegen import image_request
+from packages.language import conversation_language, language_instruction
 from services.orchestrator.imagegen import process_image
 
 
@@ -114,7 +115,13 @@ class ChatTools(Runtime):
             if call.name == "web_fetch" and isinstance(data, dict):
                 text = str(data.get("text", ""))
                 data["text"] = "\n".join(
-                    p.text for p in select_content(text, self.question, 400)
+                    p.text
+                    for p in select_content(
+                        text,
+                        Fetch.model_validate_json(call.arguments).query
+                        or self.question,
+                        400,
+                    )
                 )
                 data["truncated"] = len(str(data["text"])) < len(text)
             if "error" in output:
@@ -160,12 +167,20 @@ async def process(request: ChatRequest, item: Interaction) -> None:
 
         await process_project(request, item)
         return
+    request = request.model_copy(
+        update={"lang": conversation_language(request.messages, request.ui_locale)}
+    )
     followup = is_followup(request.messages)
     if followup:
         item.task_type = "followup"
     iteration = image_iteration(request.messages)
     if not followup and (iteration or image_request(request.messages[-1].text)):
-        await process_image(iteration or request.messages[-1].text, item, request.seed)
+        await process_image(
+            iteration or request.messages[-1].text,
+            item,
+            request.seed,
+            language=request.lang,
+        )
         return
     if not followup and request.messages[-1].images:
         await process_vision(request, item)
@@ -191,7 +206,8 @@ async def process(request: ChatRequest, item: Interaction) -> None:
             Path("prompts/agent.txt").read_text()
             + Path("prompts/chat.txt").read_text()
             + Path("prompts/web-chat.txt").read_text()
-            + (Path("prompts/followup.txt").read_text() if followup else ""),
+            + (Path("prompts/followup.txt").read_text() if followup else "")
+            + language_instruction(request.lang),
             Limits(wall_clock=max(0, 120 - (time.monotonic() - started))),
             history=[
                 {"role": m.role, "content": m.text} for m in request.messages[:-1]

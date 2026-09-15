@@ -56,7 +56,7 @@ class WebContextTests(unittest.IsolatedAsyncioTestCase):
             ),
         ):
             result = await ChatTools(Interaction(), "CERN release").execute(
-                Call("c", "web_fetch", "{}"), 5
+                Call("c", "web_fetch", '{"url":"https://example.org/history"}'), 5
             )
         data = result["data"]
         assert isinstance(data, dict)
