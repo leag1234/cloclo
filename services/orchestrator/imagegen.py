@@ -8,8 +8,9 @@ from decimal import Decimal
 from packages.images import ImageURL
 from services.orchestrator.image_store import store
 from services.orchestrator.interactions import Interaction
-from services.orchestrator.model import GatewayModel
+from services.orchestrator.model import GatewayError, GatewayModel
 from services.orchestrator.stream_client import sink_context
+from services.orchestrator.deadline import infrastructure_startup
 
 
 async def process_image(
@@ -31,6 +32,30 @@ async def process_image(
     if not 0 < budget <= Decimal("0.05") or not 0 < timeout <= 120:
         raise RuntimeError("cost_budget")
     try:
+        if os.environ.get("ATLAS_IMAGE_ON_DEMAND") == "1":
+            # Provision through the gateway; M13 accounts for loading separately.
+            gateway = os.environ.get(
+                "ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"
+            ).rstrip("/")
+            health = await GatewayModel.post(
+                gateway + "/images/ready", {}, min(3, timeout)
+            )
+            if health.get("ready") is not True:
+                sink = sink_context.get()
+                if sink:
+                    labels = json.loads(Path("prompts/image-start.json").read_text())
+                    await sink({"delta": {"content": labels[language] + "\n\n"}})
+                loading = time.monotonic()
+                try:
+                    async with infrastructure_startup(900):
+                        await GatewayModel.post(
+                            gateway + "/images/start", {"timeout": 895}, 900
+                        )
+                finally:
+                    item.startup_seconds = time.monotonic() - loading
+            timeout -= time.monotonic() - started - item.startup_seconds
+            if timeout <= 0:
+                raise TimeoutError("image_worker_start_timeout")
         response = await GatewayModel.post(
             os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010")
             + "/images/generate",
@@ -58,10 +83,15 @@ async def process_image(
             }
         ]
         item.images[0]["reference"] = reference
+        item.images[0]["original_request"] = item.question
         item.reponse = f"![{label}]({reference})"
         item.cout_eur, item.state = cost, "done"
         sink = sink_context.get()
         if sink is not None:
             await sink({"delta": {"content": item.reponse}})
+    except GatewayError as exc:
+        if exc.code == "configuration_missing":
+            item.cout_eur = 0.0  # Startup refused before any generation transport.
+        raise
     finally:
         item.latence_ms["generation"] = (time.monotonic() - started) * 1000

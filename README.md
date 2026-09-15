@@ -23,8 +23,10 @@ scope, quality targets, and budget limits.
 - **Evaluation harness:** multilingual golden sets, replayable checks, reports,
   and local interaction telemetry.
 
-GPU provisioning is a separate, explicitly budgeted workflow. `make serve` does
-not provision a GPU. See [the architecture](docs/02-architecture-cible.md) and
+`make serve` starts the CPU stack. The first image-generation request starts an
+ephemeral GPU worker automatically and shows a loading notice. Initial loading
+can take up to 15 minutes; inference retains its own time and cost allowance.
+The worker launcher shuts down the GPU automatically. See [the architecture](docs/02-architecture-cible.md) and
 [developer API runbook](runbooks/devapi.md) for component contracts and endpoints.
 
 ## Quickstart

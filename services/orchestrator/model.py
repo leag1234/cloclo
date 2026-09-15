@@ -1,6 +1,7 @@
 """Model-independent client; provider selection and prices belong to the gateway."""
 
 import json
+import re
 from decimal import Decimal
 from time import monotonic
 from typing import Literal
@@ -49,8 +50,8 @@ class WireTurn(BaseModel):
 
 
 class GatewayError(RuntimeError):
-    def __init__(self, code: str, status: int) -> None:
-        self.code, self.status = code, status
+    def __init__(self, code: str, status: int, detail: str = "") -> None:
+        self.code, self.status, self.detail = code, status, detail
         super().__init__(code)
 
 
@@ -80,10 +81,13 @@ class GatewayModel:
                     url, json=payload, allow_redirects=False
                 ) as response:
                     if response.status != 200:
-                        if url.endswith(("/vision/complete", "/images/generate")):
+                        if url.endswith(
+                            ("/vision/complete", "/images/generate", "/images/start")
+                        ):
                             error = json.loads(await response.content.read(512))
                             codes = {
                                 "cost_budget": 504,
+                                "configuration_missing": 503,
                                 "timeout": 504,
                                 "context_exceeded": 413,
                                 "invalid_input": 400,
@@ -93,7 +97,30 @@ class GatewayModel:
                                 error.get("code") if isinstance(error, dict) else None
                             )
                             if code in codes:
-                                raise GatewayError(code, codes[code])
+                                detail = ""
+                                if code == "context_exceeded" and all(
+                                    type(error.get(k)) is int
+                                    for k in ("tokens", "limit")
+                                ):
+                                    detail = f"context_exceeded: {error['tokens']} tokens, limit {error['limit']} tokens"
+                                if code == "timeout" and all(
+                                    type(error.get(k)) in (int, float)
+                                    and 0 <= error[k] <= 1000000
+                                    for k in ("elapsed_seconds", "limit_seconds")
+                                ):
+                                    detail = f"Timeout: {error['elapsed_seconds']:.3f} seconds elapsed, limit {error['limit_seconds']:.3f} seconds"
+                                if code == "configuration_missing":
+                                    missing = error.get("missing")
+                                    if isinstance(missing, list) and all(
+                                        isinstance(name, str)
+                                        and re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", name)
+                                        for name in missing
+                                    ):
+                                        detail = (
+                                            "Missing required environment variables: "
+                                            + ", ".join(missing)
+                                        )
+                                raise GatewayError(code, codes[code], detail)
                         raise RuntimeError("gateway_error")
                     maximum = 2800000 if url.endswith("/images/generate") else 800000
                     data = bytearray()

@@ -12,6 +12,9 @@ from uuid import uuid4
 
 @dataclass
 class Interaction:
+    uploads: list[dict[str, int]] = field(default_factory=list)
+    rejection: dict[str, str] = field(default_factory=dict)
+    startup_seconds: float = 0.0
     execution: str = "live"
     timestamp: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()

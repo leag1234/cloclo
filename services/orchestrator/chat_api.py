@@ -1,6 +1,7 @@
 """Loopback OpenAI-compatible adapter with one journal row on every outcome."""
 
 import asyncio
+import json
 import os
 import time
 from pathlib import Path
@@ -8,10 +9,12 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import ValidationError
+from packages.image_upload import UploadError, normalize_uploads
 import html
 
 from services.orchestrator.chat_pipeline import process, source
 from services.orchestrator.chat_schema import ChatRequest
+from services.orchestrator.deadline import request_deadline
 from services.orchestrator.chat_stream import response as stream_response
 from services.orchestrator.model import GatewayError
 from services.orchestrator.interactions import Interaction, write_interaction
@@ -21,7 +24,10 @@ from services.orchestrator.mcp_confirmation import router as mcp_router
 
 from services.orchestrator.image_store import router as image_router
 
+from services.orchestrator.app import app as harness_app
+
 app = FastAPI(title="ATLAS chat")
+app.mount("/harness", harness_app)
 
 app.include_router(image_router)
 app.include_router(project_router)
@@ -60,18 +66,18 @@ async def sources(key: str) -> Response:
 async def execute(
     request: Request, payload: ChatRequest, item: Interaction, remaining: float
 ) -> None:
-    task = asyncio.create_task(process(payload, item))
-    try:
-        async with asyncio.timeout(remaining):
+    async with request_deadline(remaining):
+        task = asyncio.create_task(process(payload, item))
+        try:
             while not task.done():
                 await asyncio.wait({task}, timeout=0.1)
                 if await request.is_disconnected():
                     raise asyncio.CancelledError
             await task
-    finally:
-        if not task.done():
-            task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
+        finally:
+            if not task.done():
+                task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
 
 
 @app.post("/v1/chat/completions")
@@ -81,22 +87,58 @@ async def chat(request: Request) -> Response:
     item, started = Interaction(), time.monotonic()
     status, code, payload = 200, "", None
     streaming = False
+    detail = ""
     try:
         body = bytearray()
         async with asyncio.timeout(5):
             async for piece in request.stream():
                 body.extend(piece)
                 if len(body) > 6 * 1024 * 1024:
-                    status, code = 413, "context_exceeded"
+                    status, code = 413, "request_size_exceeded"
+                    detail = f"Request body: {len(body)} bytes, limit {6 * 1024 * 1024} bytes"
                     break
         if not code:
             try:
-                payload = ChatRequest.model_validate_json(body)
-            except (ValidationError, ValueError):
-                status, code = (
-                    (413, "context_exceeded")
-                    if len(body) > 160000
-                    else (400, "invalid_request")
+                raw = json.loads(body)
+                if (
+                    isinstance(raw, dict)
+                    and isinstance(raw.get("messages"), list)
+                    and raw["messages"]
+                ):
+                    last = raw["messages"][-1]
+                    if isinstance(last, dict):
+                        content = last.get("content", "")
+                        if isinstance(content, str):
+                            item.question = content[:32000]
+                        elif isinstance(content, list):
+                            item.question = "\n".join(
+                                p["text"]
+                                for p in content
+                                if isinstance(p, dict)
+                                and p.get("type") == "text"
+                                and isinstance(p.get("text"), str)
+                            )[:32000]
+                raw, item.uploads = normalize_uploads(raw)
+                payload = ChatRequest.model_validate(raw)
+            except UploadError as exc:
+                status, code, detail = 413, exc.code, str(exc)
+            except ValidationError as exc:
+                status, code = 400, "invalid_request"
+                # Do not reflect Pydantic inputs/context: these can contain image
+                # data or credentials. Types and numeric bounds are safe.
+                failures = exc.errors(
+                    include_input=False, include_context=False, include_url=False
+                )
+                detail = "; ".join(str(e["type"]) for e in failures)
+            except json.JSONDecodeError:
+                status = 413 if len(body) > 160000 else 400
+                code = "invalid_request"
+                detail = f"Malformed JSON: {len(body)} bytes; malformed-body diagnostic limit 160000 bytes"
+            except (ValueError, OSError):
+                status, code, detail = (
+                    400,
+                    "invalid_request",
+                    "Invalid JSON or image data",
                 )
         if payload is not None:
             item.question = payload.messages[-1].text
@@ -112,16 +154,19 @@ async def chat(request: Request) -> Response:
     except asyncio.CancelledError:
         status, code = 499, "cancelled"
     except GatewayError as exc:
-        status, code = exc.status, exc.code
+        status, code, detail = exc.status, exc.code, exc.detail
     except TimeoutError:
         status, code = 504, "timeout"
+        limit = 5.0 if payload is None else 120.0 + item.startup_seconds
+        detail = f"Timeout: {time.monotonic() - started:.3f} seconds elapsed, limit {limit:.3f} seconds"
     except Exception:
         # Never reflect provider/transport exception text into logs or the client.
         status, code = 502, "provider_error"
     finally:
         if code:
             item.erreurs.append(code)
-            item.state, item.reponse = "error", ""
+            item.state, item.reponse = "error", detail
+            item.rejection = {"code": code, "message": detail}
         if not streaming:
             item.latence_ms["total"] = (time.monotonic() - started) * 1000
             write_interaction(
@@ -130,7 +175,8 @@ async def chat(request: Request) -> Response:
             )
     if code:
         return JSONResponse(
-            {"error": {"message": code, "type": code, "code": code}}, status_code=status
+            {"error": {"message": detail or code, "type": code, "code": code}},
+            status_code=status,
         )
     usage = {
         "prompt_tokens": item.tokens["in"],

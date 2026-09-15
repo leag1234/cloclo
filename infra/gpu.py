@@ -12,6 +12,9 @@ import sys
 import tempfile
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from packages.configuration import GPU_REQUIRED_ENV, require_env
+
 TAG = "atlas-m1"
 STATE = Path("BRAIN/gpu-root.json")
 
@@ -26,7 +29,19 @@ def call(*args: str) -> Any:
     )
     if result.returncode:
         # Provider output can contain request data; do not leak it into logs.
-        raise RuntimeError(f"Scaleway {' '.join(args[:3])}: exit {result.returncode}")
+        reason = "provider_error"
+        diagnostic = (result.stderr or "").lower()
+        for category, words in (
+            ("stock_unavailable", ("stock", "capacity", "sold out")),
+            ("quota_exceeded", ("quota",)),
+            ("permission_denied", ("forbidden", "unauthorized")),
+        ):
+            if any(word in diagnostic for word in words):
+                reason = category
+                break
+        raise RuntimeError(
+            f"Scaleway {' '.join(args[:3])}: {reason}, exit {result.returncode}"
+        )
     return json.loads(result.stdout) if result.stdout.strip() else None
 
 
@@ -138,6 +153,7 @@ def down() -> None:
 
 
 def up() -> None:
+    require_env(GPU_REQUIRED_ENV)
     model = os.environ["LOCAL_MODEL"]
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", model):
         raise ValueError("Invalid LOCAL_MODEL repository identifier")
@@ -228,7 +244,10 @@ def up() -> None:
     )
     Path("BRAIN/gpu_ip.txt").write_text(address + "\n")
     Path("BRAIN/gateway.env").write_text(f"LOCAL_API_BASE=http://{address}:8000/v1\n")
-    print("[gpu-up] cloud-init submitted; readiness checked by verify-m1", flush=True)
+    print(
+        f"[gpu-up] instance {server['id']} created at {address}; worker readiness pending",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":
@@ -238,6 +257,7 @@ if __name__ == "__main__":
     with Path("BRAIN/gpu.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if sys.argv[1] == "up":
+            require_env(GPU_REQUIRED_ENV)
             if single(owned("instance", "server")) or STATE.exists():
                 raise RuntimeError("Existing cycle: run gpu-down first")
             try:

@@ -11,8 +11,10 @@ import time
 from fastapi.responses import StreamingResponse
 
 from services.orchestrator.chat_schema import ChatRequest
+from services.orchestrator.deadline import request_deadline
 from services.orchestrator.interactions import Interaction, write_interaction
 from services.orchestrator.stream_client import sink_context
+from services.orchestrator.model import GatewayError
 
 
 def response(
@@ -115,7 +117,7 @@ def response(
         async def produce() -> None:
             token = sink_context.set(sink)
             try:
-                async with asyncio.timeout(max(0, 120 - (time.monotonic() - started))):
+                async with request_deadline(max(0, 120 - (time.monotonic() - started))):
                     await process(payload, item)
                     if item.state != "done":
                         raise RuntimeError("request_stopped")
@@ -125,6 +127,33 @@ def response(
                 item.state = "cancelled"
                 item.erreurs.append("cancelled")
                 raise
+            except TimeoutError:
+                item.state = "error"
+                item.erreurs.append("stream_error")
+                detail = f"Timeout: {time.monotonic() - started:.3f} seconds elapsed, limit {120 + item.startup_seconds:.3f} seconds"
+                item.rejection = {"code": "timeout", "message": detail}
+                await queue.put(
+                    {
+                        "error": {
+                            "code": "stream_error",
+                            "type": "stream_error",
+                            "message": detail,
+                        }
+                    }
+                )
+            except GatewayError as exc:
+                item.state = "error"
+                item.erreurs.append(exc.code)
+                item.rejection = {"code": exc.code, "message": exc.detail}
+                await queue.put(
+                    {
+                        "error": {
+                            "code": exc.code,
+                            "type": exc.code,
+                            "message": exc.detail or exc.code,
+                        }
+                    }
+                )
             except Exception:
                 item.state = "error"
                 item.erreurs.append("stream_error")
