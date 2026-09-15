@@ -74,3 +74,7 @@ M15: POST /v1/responses provides named text/function events, item identifiers, a
 M15: POST /v1/messages translates text/tool_use/tool_result and SSE message/content_block events. A truncated output remains max_tokens; costs come from the same registry per key. Experimental compatibility for clients configured without thinking or hosted tools.
 
 M15: make test-devapi verifies the six gate criteria with recorded real streams. The large context case transmits 24,616 bytes of useful functions and verifies three remote values; double is rejected before inference for budget. The registry retains known costs and unknown reservations per key.
+
+The chat adapter also mounts the bounded M3 harness at `/harness`: POST
+`/harness/query` and GET `/harness/continuation/{handle}`. These existing
+read-only endpoints retain their validation and budgets.

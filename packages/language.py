@@ -50,8 +50,21 @@ def conversation_language(messages: Sequence[VisionMessage], locale: str) -> str
             if message.role == "assistant":
                 history = detected_language(message.text) or history
     current = messages[-1].text
-    if len(re.findall(r"\b[\w'-]+\b", current)) < 5 and history is not None:
-        return history
+    if len(re.findall(r"\b[\w'-]+\b", current)) < 5:
+        if history is not None:
+            return history
+        # Statistical detection is unreliable on very short messages. Retain
+        # explicit French cues locked by M19, otherwise honor the UI locale.
+        normalized = "".join(
+            c
+            for c in unicodedata.normalize("NFKD", current.lower())
+            if not unicodedata.combining(c)
+        )
+        if re.search(
+            r"\b(decris|genere|dessine|voudrais|bonjour|francais)\b", normalized
+        ):
+            return "fr"
+        return locale
     return question_language(current, history or locale)
 
 

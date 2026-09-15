@@ -15,6 +15,7 @@ from pydantic import Field
 
 from agent_provider import Completion
 from packages.images import VisionInput
+from packages.context_limit import ContextExceeded
 
 
 class VisionRequest(VisionInput):
@@ -49,7 +50,9 @@ class VisionProvider:
             for im in images
         )
         if tokens + self.config["max_tokens"] > self.config["context_tokens"]:
-            raise ValueError("context_exceeded")
+            raise ContextExceeded(
+                tokens + self.config["max_tokens"], self.config["context_tokens"]
+            )
         reservation = self.cost(tokens, self.config["max_tokens"])
         if reservation > Decimal("0.05"):
             raise RuntimeError("cost_budget")
@@ -61,6 +64,21 @@ class VisionProvider:
         incoming, reserved = self.reserve(request)
         prompt = Path("prompts/vision.txt").read_text()
         prompt += Path("prompts/chat.txt").read_text()
+        if sum(len(message.images) for message in request.messages) > 1:
+            prompt += Path("prompts/vision-multiple.txt").read_text()
+        pixels = [
+            {"image": index, "rgb": image["uniform_rgb"]}
+            for index, image in enumerate(
+                (im for message in request.messages for im in message.images), 1
+            )
+            if "uniform_rgb" in image
+        ]
+        if pixels:
+            prompt += (
+                Path("prompts/vision-pixels.txt")
+                .read_text()
+                .format(measurements=json.dumps(pixels))
+            )
         prompt += language_instruction(
             conversation_language(request.messages, request.lang)
         )
@@ -68,7 +86,9 @@ class VisionProvider:
         incoming += len(prompt.encode()) + 64
         reserved = self.cost(incoming, self.config["max_tokens"])
         if incoming + self.config["max_tokens"] > self.config["context_tokens"]:
-            raise ValueError("context_exceeded")
+            raise ContextExceeded(
+                incoming + self.config["max_tokens"], self.config["context_tokens"]
+            )
         if reserved > Decimal("0.05"):
             raise RuntimeError("cost_budget")
         messages = [{"role": "system", "content": prompt}]

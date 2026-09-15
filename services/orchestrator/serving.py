@@ -11,6 +11,8 @@ from pathlib import Path
 from urllib.request import urlopen
 from urllib.error import URLError
 
+from packages.configuration import CHAT_REQUIRED_ENV, require_env
+
 import uvicorn
 from gateway_cpu import CPUModels
 from http_gateway import serve
@@ -146,13 +148,8 @@ def stack(name: str = "atlas-chat", persistent: bool = True) -> Iterator[None]:
 
 
 def run() -> None:
-    for key in (
-        "ESCALATION_MODEL",
-        "SCW_GENERATIVE_BASE_URL",
-        "SCW_GENERATIVE_API_KEY",
-    ):
-        if not os.environ.get(key):
-            raise RuntimeError("missing_configuration:" + key)
+    require_env(CHAT_REQUIRED_ENV)
+    os.environ["ATLAS_IMAGE_ON_DEMAND"] = "1"
     stopping = False
 
     def stop_requested(signum: int, frame: object) -> None:

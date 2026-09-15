@@ -20,6 +20,7 @@ def image_info(url: str) -> dict[str, int | str]:
     formats = {"data:image/png;base64": "PNG", "data:image/jpeg;base64": "JPEG"}
     if prefix not in formats or len(encoded) > 2796204:
         raise ValueError("invalid_image")
+    uniform: str | None = None
     try:
         raw = base64.b64decode(encoded, validate=True)
         if not raw or len(raw) > 2 * 1024 * 1024:
@@ -33,14 +34,23 @@ def image_info(url: str) -> dict[str, int | str]:
             im.verify()
         with Image.open(io.BytesIO(raw), formats=[formats[prefix]]) as im:
             im.load()  # Header validation alone misses a truncated JPEG raster.
+            # A solid image has an exact, deterministic color measurement. This
+            # avoids asking a vision model to infer color from featureless patches.
+            if "A" not in im.getbands():
+                colors = im.convert("RGB").getcolors(maxcolors=1)
+                if colors and isinstance(colors[0][1], tuple):
+                    uniform = ",".join(str(component) for component in colors[0][1])
     except (OSError, Image.DecompressionBombError) as exc:
         raise ValueError("invalid_image") from exc
-    return {
+    metadata: dict[str, int | str] = {
         "format": formats[prefix],
         "width": width,
         "height": height,
         "bytes": len(raw),
     }
+    if uniform is not None:
+        metadata["uniform_rgb"] = uniform
+    return metadata
 
 
 class ImageURL(Strict):

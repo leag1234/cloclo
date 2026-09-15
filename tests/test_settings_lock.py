@@ -11,6 +11,38 @@ from services.orchestrator.chat_schema import ChatMessage
 
 
 class SettingsLockTests(unittest.TestCase):
+    def test_required_startup_configuration(self) -> None:
+        from packages.configuration import (
+            CHAT_REQUIRED_ENV,
+            GPU_REQUIRED_ENV,
+            IMAGE_REQUIRED_ENV,
+            require_env,
+        )
+        from unittest.mock import patch
+        import os
+
+        self.assertEqual(
+            set(CHAT_REQUIRED_ENV),
+            {"ESCALATION_MODEL", "SCW_GENERATIVE_BASE_URL", "SCW_GENERATIVE_API_KEY"},
+        )
+        self.assertEqual(
+            set(GPU_REQUIRED_ENV),
+            {
+                "SCW_DEFAULT_PROJECT_ID",
+                "SCW_DEFAULT_ZONE",
+                "LOCAL_MODEL",
+                "GPU_CLIENT_IP",
+                "GPU_MAX_EUR_H",
+            },
+        )
+        self.assertEqual(
+            set(IMAGE_REQUIRED_ENV),
+            set(CHAT_REQUIRED_ENV) | (set(GPU_REQUIRED_ENV) - {"GPU_CLIENT_IP"}),
+        )
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "GPU_CLIENT_IP"):
+                require_env(GPU_REQUIRED_ENV)
+
     def test_capabilities_and_model_path_instructions(self) -> None:
         chat = Path("prompts/chat.txt").read_text().lower()
         for capability in (

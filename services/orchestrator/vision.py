@@ -34,10 +34,18 @@ class VisionReply(BaseModel):
 
 
 async def process_vision(request: ChatRequest, item: Interaction) -> None:
-    if re.search(
-        r"(?i)\b(edit\w*|modifi\w*|retouch\w*|bearbeit\w*|modificar)\b",
-        request.messages[-1].text,
-    ):
+    text = request.messages[-1].text
+    editing = re.search(
+        r"(?i)\b(edit\w*|modifi\w*|retouch\w*|bearbeit\w*|modificar|int[éeè]gr\w*|integr\w*|fusion\w*|combin\w*)\b"
+        r"|\b(?:mets?|mettre|put|bring)\b.{0,60}\b(?:ensemble|together)\b"
+        r"|\b(?:fais|faire|crée|cree|create|make)\b.{0,60}\b(?:montage|collage)\b",
+        text,
+    )
+    analyzing = re.search(
+        r"(?i)^\s*(?:please\s+)?(?:analyse|analyze|describe|décris|decris|compare|beschreib\w*|analysier\w*|vergleiche|analiza|compara|descrivi|analizza|confronta)\b",
+        text,
+    )
+    if editing and not analyzing:
         labels = json.loads(Path("prompts/image-edit.json").read_text())
         language = request.lang
         item.reponse, item.state, item.task_type = labels[language], "done", "vision"

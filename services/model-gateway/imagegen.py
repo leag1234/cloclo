@@ -85,6 +85,9 @@ async def generate(request: object) -> dict[str, object]:
     if type(seed) is not int or not 0 <= seed < 2**32:
         raise ValueError("invalid_provider_seed")
     return {
+        "model": json.loads(Path(__file__).with_name("image-model.json").read_text())[
+            "repository"
+        ],
         "seed": seed,
         "prompt": prompt.prompt,
         "rewritten_prompt": rewritten,

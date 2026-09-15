@@ -5,13 +5,18 @@ import json
 import logging
 import select
 import socket
+from time import monotonic
 from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 
 from gateway_cpu import CPUModels, EMBEDDING_REVISION
 from generation import Generator
 from agent_provider import AgentProvider
 from vision import VisionProvider
+from packages.context_limit import ContextExceeded
+from packages.configuration import MissingConfiguration
+
 import imagegen
+import image_lifecycle
 
 
 def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
@@ -75,6 +80,8 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                 return
 
         def do_POST(self) -> None:
+            started = monotonic()
+            request: object = {}
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 maximum = 6 * 1024 * 1024 if self.path == "/vision/complete" else 800000
@@ -139,6 +146,15 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                 elif self.path == "/agent/stream":
                     self.stream_response(request)
                     return
+                elif self.path == "/images/ready":
+                    response = {"ready": image_lifecycle.ready()}
+                elif self.path == "/images/start":
+                    asyncio.run(
+                        image_lifecycle.ensure_worker(
+                            min(895, float(request.get("timeout", 895)))
+                        )
+                    )
+                    response = {"ready": True}
                 elif self.path == "/images/generate":
                     response = asyncio.run(imagegen.complete(request))
                 elif self.path == "/vision/complete":
@@ -150,6 +166,21 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                 else:
                     raise ValueError("invalid_input")
                 status = 200
+            except MissingConfiguration as exc:
+                status, response = (
+                    503,
+                    {"code": "configuration_missing", "missing": list(exc.missing)},
+                )
+            except ContextExceeded as exc:
+                # context_exceeded reports measured tokens against the model limit.
+                status, response = (
+                    413,
+                    {
+                        "code": "context_exceeded",
+                        "tokens": exc.tokens,
+                        "limit": exc.limit,
+                    },
+                )
             except ValueError as exc:
                 reason = str(exc)
                 code = (
@@ -173,7 +204,22 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
             except TypeError:
                 status, response = 400, {"code": "invalid_input"}
             except TimeoutError:
-                status, response = 504, {"code": "timeout"}
+                value = (
+                    request.get("timeout", 120) if isinstance(request, dict) else 120
+                )
+                limit = (
+                    float(value)
+                    if isinstance(value, (int, float)) and 0 < value <= 900
+                    else 120.0
+                )
+                status, response = (
+                    504,
+                    {
+                        "code": "timeout",
+                        "elapsed_seconds": round(monotonic() - started, 3),
+                        "limit_seconds": limit,
+                    },
+                )
             except RuntimeError as exc:
                 if (
                     self.path in {"/vision/complete", "/images/generate"}
