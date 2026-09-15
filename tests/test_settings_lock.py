@@ -105,3 +105,10 @@ class SettingsLockTests(unittest.TestCase):
             ),
             "en",
         )
+
+    def test_rewrite_declares_source_and_output_languages(self) -> None:
+        from image_prompt import messages
+
+        prompt = str(messages("un cube rouge", "fr")[0]["content"])
+        self.assertIn('"source_language": "fr"', prompt)
+        self.assertIn('"output_language": "en"', prompt)

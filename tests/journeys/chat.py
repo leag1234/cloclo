@@ -212,6 +212,9 @@ def main() -> None:
         assert "auxiliary" in Path("runbooks/chat.md").read_text().lower()
         report["J7_auxiliary_ok"] = True
         run_m18(report, rag_answer, encoded)
+        from journeys.m19 import run_m19
+
+        run_m19(report, encoded)
     finally:
         path.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report))

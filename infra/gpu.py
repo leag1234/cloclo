@@ -146,14 +146,18 @@ def up() -> None:
         raise RuntimeError("Run gpu-down before starting a fresh verification cycle")
     catalog = call("instance", "server-type", "list")
     preferences = ["L40S-1-48G", "H100-1-80G", "L40S-2-48G", "H100-SXM-2-80G"]
+    affordable = [
+        r
+        for t in preferences
+        for r in catalog
+        if r["name"] == t
+        and r["hourly_price"]["units"] + r["hourly_price"]["nanos"] / 1e9
+        <= float(os.environ["GPU_MAX_EUR_H"])
+    ]
+    # Creation confirms capacity; never substitute a pricier GPU.
     chosen = next(
-        (
-            r
-            for t in preferences
-            for r in catalog
-            if r["name"] == t and r["availability"] in ("available", "scarce")
-        ),
-        None,
+        (r for r in affordable if r["availability"] in ("available", "scarce")),
+        next(iter(affordable), None),
     )
     if chosen is None:
         raise RuntimeError("No compatible GPU available")
