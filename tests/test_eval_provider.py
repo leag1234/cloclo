@@ -104,6 +104,20 @@ class StreamTests(unittest.TestCase):
 
 
 class ProviderTests(unittest.TestCase):
+    def test_empty_optional_model_settings_use_configured_defaults(self) -> None:
+        import os
+        from unittest.mock import patch
+        from eval_provider import EvalProvider
+
+        with patch.dict(os.environ, {}, clear=True):
+            defaults = EvalProvider().roles
+        with patch.dict(
+            os.environ,
+            {"ESCALATION_MODEL": "", "JUDGE_MODEL": "", "REFERENCE_JUDGE_MODEL": ""},
+            clear=True,
+        ):
+            self.assertEqual(EvalProvider().roles, defaults)
+
     def test_reference_uses_distinct_non_reasoning_configured_role(self) -> None:
         import os
         from pathlib import Path

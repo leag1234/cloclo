@@ -113,11 +113,10 @@ class EvalProvider:
             "serverless"
         ]
         self.roles = {
-            "system": os.environ.get("ESCALATION_MODEL", routing["text"]["model"]),
-            "production": os.environ.get("JUDGE_MODEL", routing["code"]["model"]),
-            "reference": os.environ.get(
-                "REFERENCE_JUDGE_MODEL", routing["fast"]["model"]
-            ),
+            "system": os.environ.get("ESCALATION_MODEL") or routing["text"]["model"],
+            "production": os.environ.get("JUDGE_MODEL") or routing["code"]["model"],
+            "reference": os.environ.get("REFERENCE_JUDGE_MODEL")
+            or routing["fast"]["model"],
         }
         self.prices = yaml.safe_load(
             Path(__file__).with_name("pricing.yaml").read_text()
