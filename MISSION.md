@@ -125,3 +125,23 @@ and the general0.05 EUR rule for that model only. atlas/none remains0.05 EUR, th
 for every other path. Measured hard deep request: about9700 output tokens,0.035 EUR at
 3.60 EUR/M; reserving under0.05 EUR would reject heavy requests before starting. This
 explicit owner exception is authoritative: do not stop on this contradiction again.
+
+### M21 — Deep mode is asynchronous (owner decision, 2026-09-17)
+Measured: in deep mode the model can spend ~96 s in reasoning alone, exceeding the 120 s
+request deadline; the fallback then returned an INCORRECT derivation. Two rules follow.
+
+**1. Deadline.** `atlas-deep` gets a **300 s** deadline (standard `atlas` stays at 120 s).
+The user is never left staring at a frozen screen: the activity indicator (D5) must be
+live from the first second, name the current phase ("Réflexion…"), and show elapsed time.
+A slow correct answer is acceptable; a fast wrong one is not.
+
+**2. Fallback must not degrade correctness.** If deep inference fails or times out, do NOT
+salvage a partial derivation. Re-run the question in standard mode (`reasoning_effort=none`,
+full prompt, full context) and return that complete answer, stating in the status that the
+deep attempt did not complete. Never assemble an answer from an interrupted reasoning trace.
+
+**3. Quality is not guaranteed by depth.** Measured on the Z80 question: standard mode
+produced a correct 6 888-character answer, while deep mode produced timings belonging to
+another platform (18/23 cycles). J27 must therefore assert correctness, not depth: if deep
+mode is less accurate than standard on the same question, report it as evidence rather
+than forcing the assertion to pass.
