@@ -1,23 +1,19 @@
 # MISSION — ATLAS-0
 
-Build the PoC defined in [docs/13](docs/13-poc-spec.md). Read AGENTS.md,
-docs/11 and docs/14 before implementation. Historical milestone definitions,
-attestations and one-off decisions have moved, unchanged, to
-[the decisions log](docs/decisions-log.md); they are not mandatory session context.
-M0–M20 are delivered; the current milestone is M21. No later milestone is defined.
+Build [docs/13](docs/13-poc-spec.md); read AGENTS.md, docs/11 and docs/14 first.
+Settled history remains unchanged in [decisions log](docs/decisions-log.md),
+not mandatory context. M0–M20 delivered; M21 current; no later milestone.
 
-A milestone is complete only after its `make verify-mN` gate and the GitHub `ci`
-job are green. Never modify workflows, CODEOWNERS or scripts/verify-*; never
+Completion requires `make verify-mN` and green GitHub `ci`. Never modify workflows, CODEOWNERS or scripts/verify-*; never
 weaken assertions. Branches and PRs only; no direct pushes to main. Follow the
 current human mandate for merge authorization and subsequent milestones.
 
 ## Permanent constraints
 
-Requirements/contracts precede code. Verify useful answers through public chat HTTP;
-unit tests alone do not prove delivery. No secrets in repository/logs/prompts; remain
-in the dedicated project. GPU <=2 EUR/h, <=30 EUR/milestone; owner accepts bounded
-risk, alerts active. Record costs before provisioning; destroy experimental resources
-and shut down GPUs through infra/gpu-down.sh at session end.
+Requirements/contracts precede code. Prove useful answers through public chat HTTP.
+No secrets in repo/logs/prompts; dedicated project only. GPU <=2 EUR/h,
+<=30 EUR/milestone; owner accepts bounded risk, alerts active. Record costs before
+provisioning; destroy experiments and run infra/gpu-down.sh at session end.
 
 Requests: <=120 seconds, <=10 tools, <=0.05 EUR (atlas-deep <=0.10 EUR, exception below).
 Image model loading is measured separately under contracts/m13 and M20's bounded
@@ -26,9 +22,9 @@ Never invent results. Do NOT re-verify completed milestones merely to start work
 use BRAIN's merged outcomes. Recheck on explicit request or visible regression;
 report skipped verifications. CI regression gates remain mandatory.
 
-Update BRAIN/STATUS.md, TASK.md, JOURNAL.md before risky operations and at session end;
-record unresolved blockers in BLOCKERS.md. Keep MISSION under8000 bytes; move settled
-history unchanged to append-only docs/decisions-log.md. Active rules stay here.
+Update BRAIN/{STATUS,TASK,JOURNAL}.md before risk and session end; blockers in
+BLOCKERS.md. MISSION <=8000 bytes; append settled history unchanged to
+docs/decisions-log.md. Keep active rules here.
 
 ### Journey rules (permanent)
 
@@ -54,11 +50,9 @@ limits. Preserve the user's question when it can be safely parsed.
 
 ## Standing facts — active rules, never archive
 
-- Both GitHub token exposures (2026-09-13 and2026-09-15) are CLOSED. After the15th,
-  the owner regenerated the token with Contents/Pull-requests/Workflows write,
-  verified API write201/delete200 and git push, and reinjected it into secrets.env
-  and the remote. The active token is the post-15th token. No further confirmation
-  needed; never stop for an exposure recorded before2026-09-17.
+- Token exposures2026-09-13/15 are CLOSED. Owner replaced the token after the15th
+  with Contents/Pull-requests/Workflows write, tested API201/delete200 and push,
+  reinjected secrets.env/remote. No reconfirmation or stop for pre-17th incidents.
 - Owner attests GPU_MAX_EUR_H=2.00,30 EUR/milestone,800 EUR monthly with alerts.
   Hypothetical shutdown defects are notes, not blockers.
 - External failure counters reset per session; historical errors do not prevent
@@ -66,10 +60,9 @@ limits. Preserve the user's question when it can be safely parsed.
 
 ## M21 — Reasoning, expertise, complete context and clear UI
 
-Source: owner comparison corpus, 2026-09-17 (guitar photo, CPC/Z80 throughput,
-National Geographic solargraphy). Measured causes and original prose preserved in
-[decisions log](docs/decisions-log.md). Requirements: REQ-ENG-004/005/009/011,
-REQ-FIN-002, POC-F1/F2/F4/F5. Contract: [M21](contracts/m21.md).
+Source: owner corpus,2026-09-17: guitar, CPC/Z80, solargraphy; original prose and
+causes in [decisions log](docs/decisions-log.md). REQ-ENG-004/005/009/011,
+REQ-FIN-002, POC-F1/F2/F4/F5; [contract](contracts/m21.md).
 
 D1: Expose exactly two models in adapter and Open WebUI: atlas (reasoning_effort=none,
 max_tokens=3000, 0.05 EUR) and atlas-deep (high,16000,0.10 EUR). Same routing/tools/
@@ -94,9 +87,9 @@ https://www.nationalgeographic.com/premium/article/longest-known-exposure-pinhol
 Question: “comment fabriquer ce type de camera”. Answer must contain at least3 of
 Ilford/Bayfordbury/cider/Multigrade. Original page measured400859 bytes, no paywall.
 
-D4: The32 MB body increase (601a548) only unblocked photos. Store uploaded images once
-using image_store.py, use references in model history, materialize only images needed
-for the current turn. Ten turns, one new photo each, must produce no size error.
+D4: The32 MB body increase (601a548) only unblocked photos. Store uploads once with
+image_store.py; history uses references, materializing current-turn evidence only.
+Ten turns with one new photo each must produce no size error.
 
 D5: Stream visible animated activity and elapsed time within2 s, from request start:
 Use the verbatim French labels in tests/journeys/m21-cases.json. Update
@@ -120,28 +113,41 @@ make verify-m21 locally and green GitHub ci; J1–J33 through public chat API; a
 measured causes removed. MISSION <=8000 bytes. Report live/replay honestly.
 
 ### Budget exception — owner decision 2026-09-17
-AUTHORIZED: atlas-deep (high) has a0.10 EUR per-request cap, superseding docs/13 POC-P6
-and the general0.05 EUR rule for that model only. atlas/none remains0.05 EUR, the default
-for every other path. Measured hard deep request: about9700 output tokens,0.035 EUR at
-3.60 EUR/M; reserving under0.05 EUR would reject heavy requests before starting. This
-explicit owner exception is authoritative: do not stop on this contradiction again.
+AUTHORIZED: deep/high0.10 EUR per request supersedes docs/13 POC-P6; all other paths
+retain0.05 EUR. Measured deep output9700 tokens costs~0.035 EUR at3.60 EUR/M;
+0.05 EUR reservations reject heavy requests. This owner exception is authoritative;
+do not block on this contradiction.
 
-### M21 — Deep mode is asynchronous (owner decision, 2026-09-17)
-Measured: in deep mode the model can spend ~96 s in reasoning alone, exceeding the 120 s
-request deadline; the fallback then returned an INCORRECT derivation. Two rules follow.
+### M21 — Asynchronous deep mode (owner decision, 2026-09-17)
 
-**1. Deadline.** `atlas-deep` gets a **300 s** deadline (standard `atlas` stays at 120 s).
-The user is never left staring at a frozen screen: the activity indicator (D5) must be
-live from the first second, name the current phase ("Réflexion…"), and show elapsed time.
-A slow correct answer is acceptable; a fast wrong one is not.
+Measured: deep reasoning alone took ~96s; the120s deadline caused recovery with
+an incorrect derivation. Standard returned a correct6888-character Z80 answer;
+deep used another platform's18/23-cycle timings.
 
-**2. Fallback must not degrade correctness.** If deep inference fails or times out, do NOT
-salvage a partial derivation. Re-run the question in standard mode (`reasoning_effort=none`,
-full prompt, full context) and return that complete answer, stating in the status that the
-deep attempt did not complete. Never assemble an answer from an interrupted reasoning trace.
+1. **Deadline:** atlas-deep300s; atlas120s. D5 activity starts within the first
+second, names the phase (“Réflexion…”) and displays elapsed time throughout.
+A slow correct answer is acceptable.
+2. **Recovery:** on deep failure/timeout, rerun the question without reasoning
+with the full prompt and context, within the budget. Return the complete answer
+and state that deep did not complete. Never salvage an interrupted derivation.
+3. **Correctness:** J27 must verify correct timings and derivation. Compare both
+profiles on the same question; report lower deep accuracy honestly, never force
+an assertion to pass.
 
-**3. Quality is not guaranteed by depth.** Measured on the Z80 question: standard mode
-produced a correct 6 888-character answer, while deep mode produced timings belonging to
-another platform (18/23 cycles). J27 must therefore assert correctness, not depth: if deep
-mode is less accurate than standard on the same question, report it as evidence rather
-than forcing the assertion to pass.
+### Budget raised for full-context tool chains (owner decision, 2026-09-17) — supersedes ALL earlier per-request caps
+AUTHORIZED, and this is now the single authoritative statement of per-request caps:
+- `atlas` (standard): **0.10 EUR** per request (was 0.05).
+- `atlas-deep`: **0.20 EUR** per request (was 0.10).
+Any lower figure in docs/13, in earlier MISSION entries or in code comments is SUPERSEDED.
+Do not stop on a contradiction with those older figures; apply these.
+
+Rationale, measured on 2026-09-17: removing the 2 000-byte web cut and the 400-byte RAG cut
+(M21/D3) multiplied the context carried through a tool chain. A question that triggers five
+tools now costs ~0.069 EUR in deep mode and exceeded the old caps BEFORE the answer was
+produced — including in standard mode. The caps had been sized for truncated content; they
+must be sized for full content, which is the whole point of this milestone.
+
+Cost control stays in place: tool-call count limits, wall-clock deadlines (120 s standard,
+300 s deep) and the monthly budget with alerts are unchanged. If a request still exceeds
+0.20 EUR, that is a genuine signal — report it with the measured breakdown rather than
+silently truncating context again.
