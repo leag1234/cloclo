@@ -602,8 +602,7 @@ only the ones the current turn needs. Journey: ten turns, one photo each, no siz
 - **Live activity indicator.** In deep mode the model can think for a minute before any
   text appears; today the screen shows nothing and the user cannot tell the system from a
   frozen one. Stream a visible state from the first moment: an animated indicator with the
-  current activity ("Réflexion…", "Recherche web…", "Lecture de la page…", "Génération de
-  l'image…") and an elapsed-time counter. It must appear within 2 s of the request and
+  current activity (verbatim multilingual labels: tests/journeys/m21-cases.json) and an elapsed-time counter. It must appear within 2 s of the request and
   update at every state change, including while the reasoning trace is being produced.
 - **Name the tool.** "Étape intermédiaire terminée : appel d'outil" is uninformative. Show
   **which** tool ran (recherche web, lecture de page, calcul, génération d'image…), and for
@@ -617,7 +616,7 @@ J27 `atlas-deep` on the Z80 question → non-empty answer containing OUTI/OTIR t
     derivation; trace present and collapsed; cost logged.
 J28 `atlas-deep` with a deliberately small budget → no empty answer (fallback applied and
     stated).
-J29 guitar photo + "C'est quoi cet accord (a priori un Ré quelque chose)" → a chord name, a
+J29 guitar photo + original question (verbatim: tests/journeys/m21-cases.json) → a chord name, a
     tablature or fret list, the notes, a conclusion; no "positions may vary" ending.
 J30 National Geographic article → ≥ 3 of the 4 detail keywords present in the answer.
 J31 RAG question whose answer sits beyond byte 400 of its chunk → answered with citation.

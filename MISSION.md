@@ -99,7 +99,7 @@ using image_store.py, use references in model history, materialize only images n
 for the current turn. Ten turns, one new photo each, must produce no size error.
 
 D5: Stream visible animated activity and elapsed time within2 s, from request start:
-“Réflexion…”, “Recherche web…”, “Lecture de la page…”, “Génération de l’image…”. Update
+Use the verbatim French labels in tests/journeys/m21-cases.json. Update
 on every state change and throughout reasoning. Collapsible tool steps name each tool
 and web URLs; replace generic “Étape intermédiaire terminée : appel d’outil”. Give user
 messages a distinct green background consistent with e/OS in the existing UI.
@@ -108,7 +108,7 @@ Public HTTP journeys:
 - J27 atlas-deep, Z80 question: nonempty answer with OUTI/OTIR timings and derivation;
   trace present and collapsed, cost logged.
 - J28 atlas-deep, deliberately small output budget: nonempty answer, fallback stated.
-- J29 guitar photo + “C'est quoi cet accord (a priori un Ré quelque chose)”: chord name,
+- J29 original guitar photo/question (verbatim in tests/journeys/m21-cases.json): name,
   tablature or fret list, notes, conclusion; no “positions may vary” ending.
 - J30 National Geographic: at least3 of the4 details in answer.
 - J31 RAG fact beyond byte400: answered with citation.
