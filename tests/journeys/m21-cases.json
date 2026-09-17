@@ -1,0 +1,12 @@
+{
+  "source": "Owner conversations, 2026-09-17; verbatim multilingual acceptance inputs and UI labels.",
+  "J29": "C'est quoi cet accord (a priori un Ré quelque chose)",
+  "J30": "lis ça https://www.nationalgeographic.com/premium/article/longest-known-exposure-pinhole-uk et dis moi comment fabriquer ce type de \"camera\"",
+  "activity_labels": [
+    "Réflexion…",
+    "Recherche web…",
+    "Lecture de la page…",
+    "Génération de l’image…"
+  ],
+  "tool_label_to_replace": "Étape intermédiaire terminée : appel d’outil"
+}
