@@ -29,7 +29,7 @@ def main() -> None:
             item = Interaction()
             request = ChatRequest.model_validate(
                 {
-                    "model": "atlas",
+                    "model": "atlas-qwen",
                     "messages": [
                         {
                             "role": "user",

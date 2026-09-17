@@ -14,6 +14,7 @@ from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.model import GatewayModel
 from services.orchestrator.stream_client import sink_context
+from services.orchestrator.narration import clean_answer
 
 
 class VisionUsage(BaseModel):
@@ -90,7 +91,7 @@ async def process_vision(request: ChatRequest, item: Interaction) -> None:
         )
         item.token_split_estimated = result.token_split_estimated
         item.reasoning_retried = result.reasoning_retried
-        text = result.text
+        text = clean_answer(result.text)
         for message in request.messages:
             if isinstance(message.content, list):
                 for part in message.content:

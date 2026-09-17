@@ -112,6 +112,7 @@ async def run(
     history: list[Message] | None = None,
     retry_web: bool = False,
     terminal_tools: frozenset[str] = frozenset(),
+    initial_calls: tuple[Call, ...] = (),
 ) -> Result:
     result = Result()
     deadline = clock() + limits.wall_clock
@@ -163,20 +164,25 @@ async def run(
 
     try:
         while True:
-            result.state = "model"
-            reserved = model.estimate(messages)
-            reserve(reserved)
-            turn = await invoke(model.complete(messages, remaining()))
-            if not isinstance(turn, Turn):
-                raise ValueError("invalid_model_response")
-            if turn.usage is not None:
-                if (
-                    turn.usage.tokens > reserved.tokens
-                    or turn.usage.cost > reserved.cost
-                ):
-                    raise ValueError("provider_usage_exceeds_reservation")
-                result.tokens -= reserved.tokens - turn.usage.tokens
-                result.cost -= reserved.cost - turn.usage.cost
+            if initial_calls:
+                turn = Turn("", initial_calls, Reservation(0, Decimal(0)))
+                initial_calls = ()
+            else:
+                result.state = "model"
+                reserved = model.estimate(messages)
+                reserve(reserved)
+                received = await invoke(model.complete(messages, remaining()))
+                if not isinstance(received, Turn):
+                    raise ValueError("invalid_model_response")
+                turn = received
+                if turn.usage is not None:
+                    if (
+                        turn.usage.tokens > reserved.tokens
+                        or turn.usage.cost > reserved.cost
+                    ):
+                        raise ValueError("provider_usage_exceeds_reservation")
+                    result.tokens -= reserved.tokens - turn.usage.tokens
+                    result.cost -= reserved.cost - turn.usage.cost
             if not turn.calls:
                 if not turn.text.strip():
                     raise ValueError("empty_model_response")

@@ -66,7 +66,7 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
                 provider,
                 tools,
                 "",
-                Limits(profile="atlas"),
+                Limits(profile="atlas-qwen"),
             )
             self.assertEqual(tools.calls, 3)
             self.assertEqual(provider.calls, 2)

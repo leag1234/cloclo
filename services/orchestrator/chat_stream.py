@@ -32,6 +32,9 @@ def response(
     activity_labels = activity_labels.get(language, activity_labels["en"])
 
     async def generate() -> AsyncIterator[str]:
+        from services.orchestrator.narration import NarrationFilter
+
+        narration = NarrationFilter()
         queue: asyncio.Queue[dict[str, object] | None] = asyncio.Queue(maxsize=8)
         pending = ""
         turn = 0
@@ -137,6 +140,8 @@ def response(
                     "source_truncated",
                 }:
                     activity = phase
+                elif phase == "narration":
+                    activity = "thinking"
                 elif phase == "generating":
                     activity = (
                         "thinking"
@@ -201,6 +206,15 @@ def response(
             if "reasoning_content" in delta:
                 activity = "thinking"
                 await queue.put(event)
+            if isinstance(delta.get("content"), str):
+                count = len(narration.removed)
+                text = narration.feed(delta["content"])
+                if len(narration.removed) > count:
+                    activity = "thinking"
+                    await queue.put(
+                        {"atlas": {"phase": "narration"}, "event": status_event()}
+                    )
+                delta = {**delta, "content": text}
             if "content" in delta and (
                 event.get("memory") is True
                 or item.task_type
@@ -229,7 +243,7 @@ def response(
                     await process(payload, item)
                     if item.state != "done":
                         raise RuntimeError("request_stopped")
-                    await content(pending)
+                    await content(pending + narration.finish())
                 await queue.put({"finish": True})
             except asyncio.CancelledError:
                 item.state = "cancelled"

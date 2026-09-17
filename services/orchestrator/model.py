@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from services.orchestrator.loop import Call, Message, Reservation, Turn
 from services.orchestrator.tools import declarations
 from services.orchestrator.stream_client import Sink, receive
+from services.orchestrator.narration import NarrationFilter, clean_answer
 
 
 class Configuration(BaseModel):
@@ -315,10 +316,34 @@ class GatewayModel:
                         "max_output_tokens": self.max_tokens,
                     }
                 )
+                parser = NarrationFilter()
+                sink = self.sink
+
+                async def filtered(event: dict[str, object]) -> None:
+                    delta = event.get("delta")
+                    if isinstance(delta, dict) and isinstance(
+                        delta.get("content"), str
+                    ):
+                        count = len(parser.removed)
+                        text = parser.feed(delta["content"])
+                        if len(parser.removed) > count:
+                            await sink(
+                                {"phase": "narration", "sentences": len(parser.removed)}
+                            )
+                        if text:
+                            await sink({"delta": {**delta, "content": text}})
+                    else:
+                        await sink(event)
+
                 wire = await receive(
-                    self.url + "/agent/stream", payload, timeout, self.sink
+                    self.url + "/agent/stream", payload, timeout, filtered
                 )
+                tail = parser.finish()
+                if tail:
+                    await sink({"delta": {"content": tail}})
             result = WireTurn.model_validate(wire)
+            if result.text:
+                result.text = clean_answer(result.text, allow_empty=bool(result.calls))
             if (
                 not self.profile
                 and result.usage.completion_tokens > self.configuration.max_tokens

@@ -79,7 +79,7 @@ def main() -> None:
             started = True
             wait_http("http://127.0.0.1:3000")
             payload = {
-                "model": "atlas",
+                "model": "atlas-qwen",
                 "messages": [
                     {
                         "role": "user",

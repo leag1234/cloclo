@@ -19,7 +19,7 @@ def ask(
         API + "/v1/chat/completions",
         data=json.dumps(
             {
-                "model": "atlas",
+                "model": "atlas-qwen",
                 "messages": messages,
                 "stream": stream,
                 "ui_locale": ui_locale,

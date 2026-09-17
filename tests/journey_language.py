@@ -5,7 +5,10 @@ import re
 
 
 def matches(text: str, language: str) -> bool:
-    text = re.sub(r"```.*?```", "", text, flags=re.S).strip()
+    text = re.sub(r"```.*?```", "", text, flags=re.S)
+    text = re.sub(r"<details\b[^>]*>.*?</details>", "", text, flags=re.S | re.I)
+    text = re.sub(r"\[[^\]]*\]\(https?://[^)]+\)", "", text)
+    text = re.sub(r"https?://\S+", "", text).strip()
     if not re.search(r"[^\W\d_]", text):
         return False
     detector = importlib.import_module("langdetect")

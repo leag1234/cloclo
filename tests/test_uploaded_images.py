@@ -63,7 +63,8 @@ class UploadTests(unittest.TestCase):
                 }
                 history.append(message)
                 response = client.post(
-                    "/v1/chat/completions", json={"model": "atlas", "messages": history}
+                    "/v1/chat/completions",
+                    json={"model": "atlas-qwen", "messages": history},
                 )
                 self.assertEqual(response.status_code, 200, response.text)
                 data = response.json()

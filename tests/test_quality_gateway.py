@@ -65,8 +65,8 @@ class ProfileTests(unittest.TestCase):
         from vision import VisionRequest
 
         messages = [{"role": "user", "content": "Explain this limit"}]
-        profiles: tuple[tuple[Literal["atlas", "atlas-glm"], int], ...] = (
-            ("atlas", 120),
+        profiles: tuple[tuple[Literal["atlas-qwen", "atlas-glm"], int], ...] = (
+            ("atlas-qwen", 120),
             ("atlas-glm", 120),
         )
         for profile, maximum in profiles:
@@ -97,8 +97,8 @@ class ProfileTests(unittest.TestCase):
     def test_owner_full_context_caps(self) -> None:
         from services.orchestrator.model import WireTurn
 
-        profiles: tuple[tuple[Literal["atlas", "atlas-glm"], str], ...] = (
-            ("atlas", "0.10"),
+        profiles: tuple[tuple[Literal["atlas-qwen", "atlas-glm"], str], ...] = (
+            ("atlas-qwen", "0.10"),
             ("atlas-glm", "0.10"),
         )
         for profile, cap in profiles:
@@ -127,12 +127,14 @@ class ProfileTests(unittest.TestCase):
         provider = VisionProvider()
         with patch.object(provider, "cost", return_value=Decimal("0.08")):
             provider.reserve(
-                VisionRequest.model_validate({**payload(picture()), "profile": "atlas"})
+                VisionRequest.model_validate(
+                    {**payload(picture()), "profile": "atlas-qwen"}
+                )
             )
             with self.assertRaises(RuntimeError):
                 provider.reserve(VisionRequest.model_validate(payload(picture())))
         with patch.object(provider, "cost", return_value=Decimal("0.15")):
-            for profile in ("atlas", "atlas-glm", "atlas-fast"):
+            for profile in ("atlas-qwen", "atlas-glm", "atlas-deepseek"):
                 with self.assertRaises(RuntimeError):
                     provider.reserve(
                         VisionRequest.model_validate(
@@ -191,14 +193,15 @@ class ProfileTests(unittest.TestCase):
     def test_profiles_and_hard_caps(self) -> None:
         self.assertEqual(request().max_tokens, 3000)
         self.assertEqual(request().reasoning_effort, "none")
-        self.assertEqual(request(profile="atlas").max_tokens, 3000)
+        self.assertEqual(request(profile="atlas-qwen").max_tokens, 3000)
         self.assertEqual(
-            request(profile="atlas", reasoning_effort="high").reasoning_effort, "none"
+            request(profile="atlas-qwen", reasoning_effort="high").reasoning_effort,
+            "none",
         )
         for options in (
             {"max_tokens": 16001},
-            {"profile": "atlas", "max_tokens": 3001},
-            {"profile": "atlas", "budget_eur": "0.100001"},
+            {"profile": "atlas-qwen", "max_tokens": 3001},
+            {"profile": "atlas-qwen", "budget_eur": "0.100001"},
             {"budget_eur": "NaN"},
         ):
             with self.assertRaises((ValueError, ValidationError)):
@@ -206,7 +209,7 @@ class ProfileTests(unittest.TestCase):
         Limits(profile="atlas-glm", cost=Decimal("0.10"), tokens=262144)
         for limit_options in (
             {"cost": Decimal("0.10")},
-            {"profile": "atlas", "cost": Decimal("0.100001")},
+            {"profile": "atlas-qwen", "cost": Decimal("0.100001")},
             {"profile": "atlas-glm", "tool_calls": 11},
             {"wall_clock": 121},
         ):
@@ -279,7 +282,7 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
             events = [
                 event
                 async for event in stream_quality(
-                    AgentProvider(), request(profile="atlas")
+                    AgentProvider(), request(profile="atlas-qwen")
                 )
             ]
         self.assertEqual(calls, 2)
@@ -379,7 +382,7 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Full recovery answer", str(events))
 
     async def test_partial_length_is_replaced_only_before_answer_emission(self) -> None:
-        for profile in ("atlas", "atlas-glm"):
+        for profile in ("atlas-qwen", "atlas-glm"):
             attempts: list[AgentRequest] = []
 
             async def upstream(
@@ -449,7 +452,7 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
         from serverless import classify_task
 
         tool = {"type": "function", "function": {"name": "web_search"}}
-        for profile in ("atlas", "atlas-glm"):
+        for profile in ("atlas-qwen", "atlas-glm"):
             with patch.dict(os.environ, environment()):
                 policy = ServerlessPolicy()
                 req = request(profile=profile, tools=[tool], max_tokens=3000)
@@ -493,7 +496,7 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
         async def upstream(
             req: AgentRequest, model: str, timeout: float
         ) -> AsyncGenerator[dict[str, object], None]:
-            self.assertEqual(model, policy.models["text"])
+            self.assertEqual(model, policy.models["vision"])
             self.assertEqual(req.reasoning_effort, "none")
             self.assertEqual(req.messages, original.messages)
             yield result("The visible image supports this identification.", 20)
@@ -524,7 +527,7 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
         ):
             policy = ServerlessPolicy()
             original = request(
-                profile="atlas",
+                profile="atlas-qwen",
                 messages=[{"role": "user", "content": "Compare these assembly loops."}],
             )
             budget = policy.cost(
@@ -533,7 +536,7 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
                 3000,
             )
             original = request(
-                profile="atlas", messages=original.messages, budget_eur=str(budget)
+                profile="atlas-qwen", messages=original.messages, budget_eur=str(budget)
             )
             events = [e async for e in stream_quality(AgentProvider(), original)]
         self.assertIn("complete expert answer", str(events))
@@ -935,7 +938,9 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
         ):
             events = [
                 e
-                async for e in stream_quality(AgentProvider(), request(profile="atlas"))
+                async for e in stream_quality(
+                    AgentProvider(), request(profile="atlas-qwen")
+                )
             ]
         self.assertEqual(len(attempts), 2)
         self.assertEqual(attempts[0], attempts[1])
@@ -1038,7 +1043,7 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
                 _ = [
                     e
                     async for e in stream_quality(
-                        AgentProvider(), request(profile="atlas")
+                        AgentProvider(), request(profile="atlas-qwen")
                     )
                 ]
         self.assertEqual(calls, 1)
@@ -1079,9 +1084,9 @@ class SelectorTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ, environment()):
             policy = ServerlessPolicy()
             for profile, role in (
-                ("atlas", "text"),
+                ("atlas-qwen", "text"),
                 ("atlas-glm", "code"),
-                ("atlas-fast", "fast"),
+                ("atlas-deepseek", "fast"),
             ):
                 called = []
 
@@ -1182,6 +1187,6 @@ class VisionDetailTests(unittest.IsolatedAsyncioTestCase):
             patch("stream_transport.attempt", upstream),
         ):
             answer = await VisionProvider().complete(
-                {**payload(picture()), "profile": "atlas"}
+                {**payload(picture()), "profile": "atlas-qwen"}
             )
         self.assertIn("visible object", str(answer["text"]))

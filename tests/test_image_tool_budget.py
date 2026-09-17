@@ -85,6 +85,7 @@ class ImageToolBudgetTests(unittest.IsolatedAsyncioTestCase):
             ) as generate,
         ):
             await finish(request, item, Result(cost=Decimal("0.02")), "a sheep", 10.0)
+        self.assertEqual(generate.call_args.args[0], request.messages[-1].text)
         self.assertEqual(generate.call_args.kwargs["budget"], Decimal("0.05"))
         self.assertEqual(generate.call_args.kwargs["timeout"], 100.0)
         self.assertEqual(item.cout_eur, 0.02)
