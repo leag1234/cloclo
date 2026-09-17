@@ -93,9 +93,9 @@ async def chat(request: Request) -> Response:
         async with asyncio.timeout(5):
             async for piece in request.stream():
                 body.extend(piece)
-                if len(body) > 6 * 1024 * 1024:
+                if len(body) > 32 * 1024 * 1024:
                     status, code = 413, "request_size_exceeded"
-                    detail = f"Request body: {len(body)} bytes, limit {6 * 1024 * 1024} bytes"
+                    detail = f"Request body: {len(body)} bytes, limit {32 * 1024 * 1024} bytes"
                     break
         if not code:
             try:

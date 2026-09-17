@@ -84,7 +84,7 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
             request: object = {}
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                maximum = 6 * 1024 * 1024 if self.path == "/vision/complete" else 800000
+                maximum = 32 * 1024 * 1024 if self.path == "/vision/complete" else 800000
                 if not 0 < length <= maximum:
                     raise ValueError("context_exceeded")
                 self.connection.settimeout(30)
