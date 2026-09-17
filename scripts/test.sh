@@ -13,21 +13,5 @@ if [[ "${GITHUB_ACTIONS:-}" == true && "${ATLAS_VERIFY_M0:-}" != 1 ]]; then
   PYTHONPATH=".:tests:$PYTHONPATH" python3 tests/m2_gate.py
   ATLAS_M3_EVAL_MODE=replay make verify-m3
   make verify-m4
-  ATLAS_M5_MODE=replay make verify-m5
-  ATLAS_M6_MODE=replay make verify-m6
-  ATLAS_M7_MODE=replay make verify-m7
-  SCW_GENERATIVE_API_KEY=test-only ATLAS_M8_MODE=replay make verify-m8
-  make verify-m9
-  make verify-m10
-  make verify-m11
-  SCW_GENERATIVE_API_KEY=test-only ATLAS_M12_MODE=replay make verify-m12
-  make verify-m13
-  make verify-m14
-  make verify-m15
-  make verify-m16
-  make verify-m17
-  make verify-m18
-  make verify-m19
-  make verify-m20
-  make verify-m21
+  python3 tests/ci_regressions.py
 fi
