@@ -245,3 +245,13 @@ and cost.
 **Definition of done**: `make verify-m21` passes; J1–J32 pass through the public chat API;
 the four measured causes above are gone (no 2 000-byte cut, no 400-byte cut, expertise
 prompts in place, two effort levels exposed).
+
+### Budget exception for `atlas-deep` (owner decision, 2026-09-17) — supersedes the 0.05 EUR cap for that model only
+AUTHORIZED. Per-request cost caps are now, explicitly:
+- `atlas` (standard, `reasoning_effort=none`): **0.05 EUR** — unchanged, this is the default.
+- `atlas-deep` (`reasoning_effort=high`): **0.10 EUR** — exception granted.
+Rationale, measured on 2026-09-17: a hard question in deep mode consumes about 9 700
+output tokens (~0.035 EUR at 3.60 EUR/M). A 0.05 EUR reservation would reject the heaviest
+requests before they start, which is the exact failure this milestone exists to remove.
+The 0.05 EUR cap documented in docs/13 remains the rule for every other path.
+This is an explicit owner exception: treat it as authoritative, do not stop on it again.
