@@ -9,6 +9,18 @@ from agent_provider import AgentProvider, Completion
 
 
 class ProviderTests(unittest.TestCase):
+    def test_error_body_cannot_be_accepted_alongside_valid_answer(self) -> None:
+        with self.assertRaises(ValueError):
+            Completion.model_validate(
+                {
+                    "error": {"message": "private provider diagnostic"},
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 10},
+                    "choices": [
+                        {"finish_reason": "stop", "message": {"content": "answer"}}
+                    ],
+                }
+            )
+
     def test_missing_price_denies_provider(self) -> None:
         with patch.dict("os.environ", {"ESCALATION_MODEL": "absent"}):
             with self.assertRaisesRegex(ValueError, "missing_price"):
@@ -75,10 +87,18 @@ class ProviderTransportTests(unittest.IsolatedAsyncioTestCase):
             answer = await provider.complete(payload)
             self.assertEqual(answer["text"], "complete answer")
             self.assertEqual(session.post.call_args.kwargs["json"]["max_tokens"], 2048)
+            self.assertEqual(
+                session.post.call_args.kwargs["json"]["reasoning_effort"], "none"
+            )
             data["choices"] = [
                 {"finish_reason": "length", "message": {"content": "cut"}}
             ]
             with self.assertRaisesRegex(RuntimeError, "provider_error"):
+                await provider.complete(payload)
+            data["choices"] = [
+                {"finish_reason": "stop", "message": {"content": " \n\t "}}
+            ]
+            with self.assertRaisesRegex(RuntimeError, "provider_response_invalid"):
                 await provider.complete(payload)
             response.status = 429
             with self.assertRaisesRegex(RuntimeError, "provider_error"):

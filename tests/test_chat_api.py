@@ -1,5 +1,7 @@
 """HTTP chat protocol, SSE, errors and exactly one journal row per request."""
 
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
 import json
 import os
 from pathlib import Path
@@ -15,6 +17,82 @@ from services.orchestrator.interactions import Interaction
 
 
 class ChatAPITests(unittest.TestCase):
+    def test_http_deadlines_follow_model_for_json_and_stream(self) -> None:
+        limits: list[float] = []
+
+        @asynccontextmanager
+        async def deadline(seconds: float) -> AsyncIterator[None]:
+            limits.append(seconds)
+            yield
+
+        async def respond(request: ChatRequest, item: Interaction) -> None:
+            item.reponse = "Complete useful answer"
+            item.state = "done"
+
+        with (
+            tempfile.TemporaryDirectory() as root,
+            patch.dict(os.environ, {"ATLAS_INTERACTION_DIR": root}),
+            TestClient(app) as client,
+            patch("services.orchestrator.chat_api.process", side_effect=respond),
+            patch("services.orchestrator.chat_api.request_deadline", deadline),
+            patch("services.orchestrator.chat_stream.request_deadline", deadline),
+        ):
+            for profile, maximum in (
+                ("atlas", 120),
+                ("atlas-glm", 120),
+                ("atlas-fast", 120),
+            ):
+                for streaming in (False, True):
+                    before = len(limits)
+                    response = client.post(
+                        "/v1/chat/completions",
+                        json={
+                            "model": profile,
+                            "stream": streaming,
+                            "messages": [
+                                {"role": "user", "content": "Explain this limit"}
+                            ],
+                        },
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(len(limits), before + 1)
+                    self.assertGreater(limits[-1], maximum - 1)
+                    self.assertLessEqual(limits[-1], maximum)
+
+    def test_incomplete_deep_retry_status_survives_terminal_response(self) -> None:
+        async def respond(request: ChatRequest, item: Interaction) -> None:
+            item.reponse = "Complete answer"
+            item.reasoning_retried = True
+            item.state = "done"
+
+        with (
+            tempfile.TemporaryDirectory() as root,
+            patch.dict(os.environ, {"ATLAS_INTERACTION_DIR": root}),
+            TestClient(app) as client,
+            patch("services.orchestrator.chat_api.process", side_effect=respond),
+        ):
+            for streaming in (False, True):
+                response = client.post(
+                    "/v1/chat/completions",
+                    json={
+                        "model": "atlas-glm",
+                        "stream": streaming,
+                        "messages": [{"role": "user", "content": "Explain this limit"}],
+                    },
+                )
+                if streaming:
+                    rows = [
+                        json.loads(line[6:])
+                        for line in response.text.splitlines()
+                        if line.startswith("data: ") and line != "data: [DONE]"
+                    ]
+                    metadata = rows[-1]["atlas"]
+                else:
+                    metadata = response.json()["atlas"]
+                self.assertTrue(metadata["reasoning_retried"])
+                self.assertIn("inachevée", metadata["status"])
+                self.assertIn("reprise complète", metadata["status"])
+
     def test_json_sse_history_and_errors(self) -> None:
         async def respond(request: ChatRequest, item: Interaction) -> None:
             self.assertEqual(request.messages[-1].content, "Bonjour")
@@ -58,10 +136,13 @@ class ChatAPITests(unittest.TestCase):
                 self.assertEqual(
                     json.loads(chunks[0])["object"], "chat.completion.chunk"
                 )
-                self.assertEqual(
-                    json.loads(chunks[0])["choices"][0]["delta"]["content"],
-                    "Réponse avec preuve",
-                )
+                self.assertEqual(json.loads(chunks[0])["event"]["type"], "status")
+                content_chunks = [
+                    json.loads(chunk)["choices"][0]["delta"]["content"]
+                    for chunk in chunks[:-1]
+                    if "content" in json.loads(chunk)["choices"][0]["delta"]
+                ]
+                self.assertEqual(content_chunks, ["Réponse avec preuve"])
             with patch(
                 "services.orchestrator.chat_api.process",
                 side_effect=RuntimeError("private-detail"),

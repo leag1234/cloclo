@@ -54,3 +54,21 @@ budget before inference, and uses `vision.yaml` for the sovereign model and its
 rate. The transport performs neither image URL lookup nor text fallback.
 
 M15: dev_gateway prepares an immutable code request and reserves UTF8 bytes +512 and maximum output under 50000 microEUR. Single TLS transport, no redirection or resumption; SSE bounded to 2 MB and mandatory terminal usage. Tests replay real Scaleway deltas (provider metadata removed), without external SDK dependency.
+
+
+M21: public profiles atlas/atlas-glm/atlas-fast pin serverless text/code/fast roles
+in routing.yaml. FAST_MODEL may override the configured fast model only when its
+price/capabilities are present in the catalog. All three explicitly send
+reasoning_effort=none; recovery and evaluation do likewise. Profile limits are
+3000 output tokens,120 seconds and0.10 EUR. The gateway reserves full-context input
+and at most two attempts before I/O, retains unknown usage, validates output and
+returns provider_model and measured/estimated token splits. A budget-shortened
+answer is held until validation; malformed output must not reach the user.
+See contracts/m21.md for whole-evidence, activity and public HTTP acceptance.
+
+M21 evaluation keeps explicit `reasoning_effort: none` for system and both judges.
+The reference defaults to the configured fast model (`REFERENCE_JUDGE_MODEL` may
+override it); system, production judge and reference must remain distinct. The
+previous reference cannot disable reasoning on Scaleway. Recorded evaluations
+match provider identity as well as role/messages, and calibration is reacquired
+when the reference changes. Existing per-call/series budgets remain enforced.

@@ -117,7 +117,7 @@ class VisionAPITests(unittest.TestCase):
                 for p in Path(root).glob("*.jsonl")
                 for line in p.read_text().splitlines()
             ]
-            self.assertEqual([row["cout_eur"] for row in rows[:3]], [0.05] * 3)
+            self.assertEqual([row["cout_eur"] for row in rows[:3]], [0.10] * 3)
             self.assertEqual(rows[1]["erreurs"], ["cost_budget"])
             self.assertNotIn(url.split(",")[1], json.dumps(rows))
             self.assertEqual(rows[-1]["task_type"], "vision")

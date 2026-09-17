@@ -1,5 +1,6 @@
 """Launcher shutdown retains data and stops only the UI it started."""
 
+from contextlib import nullcontext
 import os
 import unittest
 from unittest.mock import Mock, patch
@@ -20,8 +21,13 @@ class ServingTests(unittest.TestCase):
                     "SCW_GENERATIVE_API_KEY": "test-only",
                 },
             ),
+            patch(
+                "services.orchestrator.serve_owner.ownership",
+                return_value=nullcontext(),
+            ),
             patch("services.orchestrator.serving.stack"),
             patch("services.orchestrator.serving.webui"),
+            patch("services.orchestrator.serving.configure"),
             patch(
                 "services.orchestrator.serving.signal.signal",
                 side_effect=lambda sig, handler: handler(sig, None),

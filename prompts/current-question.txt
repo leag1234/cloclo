@@ -1,0 +1,1 @@
+CURRENT REQUEST: answer the question field below; earlier turns are background only. Resolve references from the earlier conversation without answering its old questions again. Focus all research on this current request.

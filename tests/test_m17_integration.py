@@ -26,7 +26,7 @@ class IntegrationTests(unittest.TestCase):
 
 
 class WebContextTests(unittest.IsolatedAsyncioTestCase):
-    async def test_web_context_retains_source_and_caps_synthesis_input(self) -> None:
+    async def test_web_context_retains_complete_source_for_m21(self) -> None:
         import tempfile
         from pathlib import Path
         from unittest.mock import patch
@@ -60,11 +60,11 @@ class WebContextTests(unittest.IsolatedAsyncioTestCase):
             )
         data = result["data"]
         assert isinstance(data, dict)
-        self.assertLessEqual(len(str(data["text"]).encode()), 400)
+        self.assertEqual(data["text"], "The CERN release was in 1993. " * 500)
         self.assertIn("1993", str(data["text"]))
         self.assertEqual(data["url"], "https://example.org")
         self.assertEqual(data["consulted_at"], "2026-09-11")
-        self.assertTrue(data["truncated"])
+        self.assertNotIn("truncated", data)
 
 
 class ProjectSelectionTests(unittest.IsolatedAsyncioTestCase):

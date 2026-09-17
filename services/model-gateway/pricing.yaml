@@ -18,6 +18,9 @@ models:
   qwen3-embedding-8b:
     input_eur_per_mtok: 0.10
     output_eur_per_mtok: 0.0
+  deepseek-v4-flash-0731:
+    input_eur_per_mtok: 0.40
+    output_eur_per_mtok: 0.80
   local:                  # Qwen3-30B served on a rented L40S GPU
     input_eur_per_mtok: 0.0
     output_eur_per_mtok: 0.0

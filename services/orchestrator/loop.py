@@ -1,5 +1,7 @@
 """POC-P6: reserve worst-case usage before starting cancellable I/O."""
 
+from packages.profiles import PROFILES
+
 import asyncio
 import json
 import logging
@@ -8,6 +10,7 @@ from collections import Counter
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
+from pathlib import Path
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -26,16 +29,23 @@ class Query(BaseModel):
 @dataclass(frozen=True)
 class Limits:
     tokens: int = 16384
+    profile: str | None = None
     tool_calls: int = 10
     wall_clock: float = 120
     cost: Decimal = Decimal("0.05")
 
     def __post_init__(self) -> None:
+        if self.profile is not None and self.profile not in PROFILES:
+            raise ValueError("invalid_limits")
         if not (
-            0 <= self.tokens <= 16384
+            0 <= self.tokens <= (262144 if self.profile else 16384)
             and 0 <= self.tool_calls <= 10
-            and 0 <= self.wall_clock <= 120
-            and 0 <= self.cost <= Decimal("0.05")
+            and (0 <= self.wall_clock <= 120)
+            and (
+                0
+                <= self.cost
+                <= Decimal("0.10" if self.profile is not None else "0.05")
+            )
         ):
             raise ValueError("invalid_limits")
 
@@ -108,10 +118,24 @@ async def run(
     messages: list[Message] = [
         {"role": "system", "content": system},
         *(history or []),
-        {"role": "user", "content": json.dumps(query.model_dump(), ensure_ascii=False)},
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    **(
+                        {"scope": Path("prompts/current-question.txt").read_text()}
+                        if limits.profile
+                        else {}
+                    ),
+                    **query.model_dump(),
+                },
+                ensure_ascii=False,
+            ),
+        },
     ]
     counts: Counter[str] = Counter()
     recent: list[tuple[str, str]] = []
+    quota_recovered = False
 
     def remaining() -> float:
         seconds = deadline - clock()
@@ -158,6 +182,8 @@ async def run(
                     raise ValueError("empty_model_response")
                 result.text, result.state = turn.text, "done"
                 return result
+            if quota_recovered:
+                raise Stop("tool_quota_exhausted")
             messages.append(
                 {
                     "role": "assistant",
@@ -194,6 +220,51 @@ async def run(
                     )
                 result.state = "tool"
                 remaining()
+                quota = (
+                    "tool_calls"
+                    if result.tool_calls >= limits.tool_calls
+                    else "search_limit"
+                    if call.name == "web_search" and counts[call.name] >= 3
+                    else "fetch_limit"
+                    if call.name == "web_fetch" and counts[call.name] >= 8
+                    else ""
+                )
+                if quota and limits.profile and not quota_recovered:
+                    quota_recovered = True
+                    for denied in pending_calls[pending_calls.index(call) :]:
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": denied.id,
+                                "content": json.dumps(
+                                    {
+                                        "error": "tool_quota_exhausted",
+                                        "reason": quota,
+                                        "tools_executed": result.tool_calls,
+                                        "tool_limit": limits.tool_calls,
+                                        "searches_executed": counts["web_search"],
+                                        "search_limit": 3,
+                                        "fetches_executed": counts["web_fetch"],
+                                        "fetch_limit": 8,
+                                    }
+                                ),
+                            }
+                        )
+                    logging.getLogger(__name__).info(
+                        json.dumps(
+                            {
+                                "event": "tool_quota_exhausted",
+                                "reason": quota,
+                                "executed": result.tool_calls,
+                                "searches": counts["web_search"],
+                                "search_limit": 3,
+                                "fetches": counts["web_fetch"],
+                                "fetch_limit": 8,
+                                "tool_limit": limits.tool_calls,
+                            }
+                        )
+                    )
+                    break
                 if result.tool_calls >= limits.tool_calls:
                     raise Stop("tool_calls")
                 if call.name == "web_search" and counts[call.name] >= 3:

@@ -1,19 +1,21 @@
 """Validated tool-calling transport and human-confirmed pricing, POC-P6."""
 
+from packages.profiles import PROFILES
+
 import asyncio
 import json
 import logging
 import re
 from time import monotonic
 import os
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 from collections.abc import AsyncGenerator
 
 import aiohttp
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 def classify(messages: list[dict[str, object]]) -> str:
@@ -46,21 +48,23 @@ class ToolCall(BaseModel):
 
 
 class Reply(BaseModel):
-    content: str | None = Field(default=None, max_length=32000)
+    content: str | None = Field(default=None, max_length=128000)
     tool_calls: list[ToolCall] = Field(default_factory=list, max_length=10)
 
 
 class Choice(BaseModel):
-    finish_reason: Literal["stop", "tool_calls"]
+    finish_reason: Literal["stop", "tool_calls", "length"]
     message: Reply
 
 
 class Usage(BaseModel):
     prompt_tokens: int = Field(ge=0, strict=True)
-    completion_tokens: int = Field(ge=0, le=2048, strict=True)
+    completion_tokens: int = Field(ge=0, le=16000, strict=True)
 
 
 class Completion(BaseModel):
+    # Some providers return HTTP 200 for errors; never ignore one beside choices.
+    error: None = None
     usage: Usage
     choices: list[Choice] = Field(min_length=1, max_length=1)
 
@@ -69,9 +73,52 @@ class AgentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     messages: list[dict[str, object]] = Field(min_length=1, max_length=100)
     tools: list[dict[str, object]] = Field(min_length=0, max_length=5)
-    timeout: float = Field(gt=0, le=120)
+    tool_choice: Literal["auto", "none"] = Field(
+        default="auto", exclude_if=lambda value: value == "auto"
+    )
+    timeout: float = Field(gt=0, le=300)
     local_enabled: bool = True
     observe: bool = False
+    profile: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    max_tokens: int = Field(
+        default=2048, ge=1, le=16000, exclude_if=lambda value: value == 2048
+    )
+    reasoning_effort: Literal["none", "low", "high"] = Field(
+        default="none", exclude_if=lambda value: value == "none"
+    )
+    budget_eur: str | None = Field(
+        default=None, max_length=40, exclude_if=lambda value: value is None
+    )
+
+    @model_validator(mode="after")
+    def quality(self) -> Self:
+        if self.profile is not None and self.profile not in PROFILES:
+            raise ValueError("invalid_profile")
+        if self.timeout > 120:
+            raise ValueError("timeout_budget")
+        if self.profile is None:
+            if (
+                self.max_tokens != 2048
+                or self.budget_eur is not None
+                or self.reasoning_effort == "high"
+            ):
+                raise ValueError("invalid_legacy_profile")
+            self.reasoning_effort = "none"
+            return self
+        ceiling = 3000
+        if "max_tokens" not in self.model_fields_set:
+            self.max_tokens = ceiling
+        if self.max_tokens > ceiling:
+            raise ValueError("output_budget")
+        self.reasoning_effort = "none"
+        cap = Decimal("0.10")
+        try:
+            budget = Decimal(self.budget_eur) if self.budget_eur is not None else cap
+        except InvalidOperation:
+            raise ValueError("cost_budget") from None
+        if not budget.is_finite() or not 0 <= budget <= cap:
+            raise ValueError("cost_budget")
+        return self
 
 
 class AgentProvider:
@@ -114,6 +161,10 @@ class AgentProvider:
 
     async def complete(self, payload: object) -> dict[str, object]:
         request = AgentRequest.model_validate(payload)
+        if request.profile is not None:
+            from quality import complete
+
+            return await complete(self, request)
         if not request.local_enabled:
             return await self.serverless_complete(request)
         endpoint = os.environ["SCW_GENERATIVE_BASE_URL"].rstrip("/")
@@ -284,8 +335,14 @@ class AgentProvider:
                         if len(data) > 800000:
                             raise RuntimeError("provider_response_limit")
             completion = Completion.model_validate(json.loads(data))
+            if (
+                completion.usage.completion_tokens > 2048
+                or completion.choices[0].finish_reason == "length"
+                or len(completion.choices[0].message.content or "") > 32000
+            ):
+                raise ValueError("provider_response_invalid")
             reply = completion.choices[0].message
-            if not reply.content and not reply.tool_calls:
+            if not (reply.content or "").strip() and not reply.tool_calls:
                 raise RuntimeError("provider_response_invalid")
             ids = [call.id for call in reply.tool_calls]
             if len(ids) != len(set(ids)):

@@ -1,5 +1,7 @@
 """M8 task policy: validated capabilities and conservative two-attempt reservation."""
 
+from packages.profiles import PROFILES
+
 from dataclasses import dataclass
 from decimal import Decimal
 import json
@@ -32,6 +34,18 @@ def classify_task(messages: list[dict[str, object]]) -> Task:
         texts.append(content)
     if not texts:
         raise ValueError("invalid_input")
+    combined = "\n".join(texts)
+    # Software performance analysis needs instruction-level code expertise;
+    # bare hardware specifications stay on the text route.
+    if re.search(r"(?i)\b(assembly|assembler|assembleur)\b", combined) or all(
+        re.search(pattern, combined, re.I)
+        for pattern in (
+            r"\b(cpu|processor|processeur)\b",
+            r"\b(software|logiciel|instructions?|program\w*)\b",
+            r"\b(throughput|d[eé]bit|cycles?|performance|speed)\b",
+        )
+    ):
+        return "code"
     if re.search(
         r"(?i)\b(python|javascript|typescript|sql|rust|java|bash|debug\w*|refactor\w*|programm\w*|coding)\b|c\+\+|c#|```|\b(write|écris|écrire|schreib\w*|implement\w*|scrivi|escrib\w*)\b.{0,80}\b(code|function|fonction|funktion|función|funzione)\b",
         "\n".join(texts),
@@ -56,7 +70,13 @@ class Plan:
 class ServerlessPolicy:
     def __init__(self) -> None:
         root = Path(__file__).parent
-        self.config = yaml.safe_load((root / "routing.yaml").read_text())["serverless"]
+        routing = yaml.safe_load((root / "routing.yaml").read_text())
+        self.config = routing["serverless"]
+        self.public_profiles: dict[str, str] = routing["public_profiles"]
+        if set(self.public_profiles) != set(PROFILES) or any(
+            role not in self.config for role in self.public_profiles.values()
+        ):
+            raise ValueError("invalid_public_profiles")
         self.prices = yaml.safe_load((root / "pricing.yaml").read_text())["models"]
         self.models: dict[str, str] = {}
         for role, entry in self.config.items():
@@ -90,7 +110,7 @@ class ServerlessPolicy:
                 )
             )
             for key in ("input_eur_per_mtok", "output_eur_per_mtok")
-        } | {"max_tokens": 2048}
+        } | {"max_tokens": 2048, "gateway_reserves_quality": True}
 
     def reserve(
         self, messages: list[dict[str, object]], tools: list[dict[str, object]]

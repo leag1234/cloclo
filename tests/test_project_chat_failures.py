@@ -45,6 +45,7 @@ class ProjectFailureTests(ProjectChatTests):
                 else json.dumps({"answer": "Dix jours [" + key + "].", "facts": []}),
                 "calls": calls,
                 "usage": {"prompt_tokens": 100, "completion_tokens": 50},
+                "cost_eur": "0.0001",
                 "observation": {"provider": "escalade", "route": "complexe"},
             }
 

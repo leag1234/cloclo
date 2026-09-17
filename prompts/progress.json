@@ -1,9 +1,9 @@
 {
-  "fr": "Étape intermédiaire terminée : appel d'outil.",
-  "en": "Intermediate step completed: tool call.",
-  "de": "Zwischenschritt abgeschlossen: Werkzeugaufruf.",
-  "es": "Paso intermedio completado: llamada a herramienta.",
-  "it": "Passaggio intermedio completato: chiamata allo strumento.",
-  "ar": "اكتملت الخطوة الوسيطة: استدعاء الأداة.",
-  "zh-cn": "中间步骤已完成：工具调用。"
+  "fr": "Étape intermédiaire terminée",
+  "en": "Intermediate step completed",
+  "de": "Zwischenschritt abgeschlossen",
+  "es": "Paso intermedio completado",
+  "it": "Passaggio intermedio completato",
+  "ar": "اكتملت الخطوة الوسيطة",
+  "zh-cn": "中间步骤已完成"
 }

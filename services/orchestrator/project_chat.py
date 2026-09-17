@@ -1,6 +1,7 @@
 """Project chat: scoped retrieval, automatic facts and one shared bounded ledger."""
 
 import json
+from decimal import Decimal
 import os
 import re
 import time
@@ -143,7 +144,7 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
                     "facts": [],
                     "revision": context.revision,
                 },
-                max(0.001, 120 - (time.monotonic() - started)),
+                max(0.001, request.timeout_seconds - (time.monotonic() - started)),
             )
         return
     model = await GatewayModel.connect(
@@ -154,7 +155,8 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
     sink = sink_context.get()
     answer_stream = AnswerStream(sink) if sink else None
     model.sink = answer_stream
-    model.reasoning_effort = request.reasoning_effort
+    model.configure_quality(request.model, request.max_tokens)
+    item.reasoning_effort = request.reasoning_effort
     memory_prefix = (
         ("Project memory:\n" + "\n".join("- " + f.text for f in context.facts) + "\n\n")
         if context.facts
@@ -171,7 +173,7 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
     ]
     model.tools.append(declaration())
     tools = ProjectTools(item, str(project))
-    item.cout_eur = 0.05
+    item.cout_eur = 0.1
     history: list[Message] = []
     for turn in context.history:
         history.extend(
@@ -198,7 +200,14 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
             model,
             tools,
             system,
-            Limits(wall_clock=max(0, 120 - (time.monotonic() - started))),
+            Limits(
+                profile=request.model,
+                tokens=262144,
+                cost=Decimal("0.10"),
+                wall_clock=max(
+                    0, request.timeout_seconds - (time.monotonic() - started)
+                ),
+            ),
             history=history,
             terminal_tools=frozenset({"generate_image"}),
         )
@@ -230,11 +239,16 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
                 "facts": facts,
                 "revision": context.revision,
             },
-            max(0.001, 120 - (time.monotonic() - started)),
+            max(0.001, request.timeout_seconds - (time.monotonic() - started)),
         )
         item.reponse = answer
     finally:
         item.tokens = {"in": model.input_tokens, "out": model.output_tokens}
+        item.provider_model = model.provider_model
+        item.reasoning = model.reasoning
+        item.trace_tokens, item.answer_tokens = model.trace_tokens, model.answer_tokens
+        item.token_split_estimated = model.token_split_estimated
+        item.reasoning_retried = model.reasoning_retried
         item.latence_ms["generation"] = model.generation_ms
         if model.observations and item.task_type != "imagegen":
             item.modele_utilise = model.observations[-1].provider

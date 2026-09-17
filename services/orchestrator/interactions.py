@@ -12,6 +12,14 @@ from uuid import uuid4
 
 @dataclass
 class Interaction:
+    uploaded_images: list[str] = field(default_factory=list)
+    provider_model: str = ""
+    reasoning_effort: str = "none"
+    reasoning: str = ""
+    trace_tokens: int = 0
+    answer_tokens: int = 0
+    token_split_estimated: bool = False
+    reasoning_retried: bool = False
     uploads: list[dict[str, int]] = field(default_factory=list)
     rejection: dict[str, str] = field(default_factory=dict)
     startup_seconds: float = 0.0

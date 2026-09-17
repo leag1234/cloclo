@@ -53,6 +53,7 @@ class StreamingNetworkTests(unittest.IsolatedAsyncioTestCase):
                         "text": "Bonjour",
                         "calls": [],
                         "usage": {"prompt_tokens": 40, "completion_tokens": 2},
+                        "cost_eur": "0.0000312",
                         "observation": {"provider": "escalade", "route": "complexe"},
                     }
                 }

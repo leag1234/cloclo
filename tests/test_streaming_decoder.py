@@ -29,6 +29,28 @@ def end(finish: str = "stop", output: int = 8) -> bytes:
 
 
 class StreamDecoderTests(unittest.TestCase):
+    def test_error_body_cannot_be_accepted_alongside_valid_choices(self) -> None:
+        payload = {
+            "error": {"message": "private provider diagnostic"},
+            "choices": [{"index": 0, "delta": {"content": "false success"}}],
+        }
+        decoder = StreamDecoder(allow_length=True)
+        with self.assertRaises(ValueError):
+            decoder.feed(("data: " + json.dumps(payload) + "\n\n").encode())
+
+    def test_profile_empty_stop_retains_validated_usage_for_recovery(self) -> None:
+        decoder = StreamDecoder(allow_length=True)
+        decoder.feed(end(output=1))
+        decoder.finish()
+        assert decoder.result is not None
+        self.assertEqual(decoder.result["text"], "")
+        self.assertEqual(
+            decoder.result["usage"], {"prompt_tokens": 20, "completion_tokens": 1}
+        )
+        self.assertEqual(decoder.result["finish_reason"], "stop")
+        with self.assertRaisesRegex(ValueError, "empty_stream"):
+            StreamDecoder().feed(end(output=1))
+
     def test_unicode_delta_is_available_before_terminal_usage(self) -> None:
         decoder = StreamDecoder()
         events: list[dict[str, object]] = []

@@ -1,0 +1,20 @@
+/* Existing Open WebUI user-message component; preserve its layout and controls. */
+.user-message {
+  background: #d9f3df !important;
+  color: #143b27 !important;
+  border: 1px solid #95d5a7;
+  border-radius: 1rem;
+  padding: 0.75rem 1rem;
+}
+.dark .user-message {
+  background: #16432c !important;
+  color: #eafff0 !important;
+  border-color: #377b50;
+}
+.user-message [class*="bg-gray-"],
+.user-message [class*="bg-white"] {
+  background-color: transparent !important;
+}
+.user-message [class*="text-gray-"] {
+  color: inherit !important;
+}

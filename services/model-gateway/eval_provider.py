@@ -109,10 +109,14 @@ def summarize_stream(
 
 class EvalProvider:
     def __init__(self) -> None:
+        routing = yaml.safe_load(Path(__file__).with_name("routing.yaml").read_text())[
+            "serverless"
+        ]
         self.roles = {
-            "system": os.environ["ESCALATION_MODEL"],
-            "production": os.environ["JUDGE_MODEL"],
-            "reference": "gpt-oss-120b",
+            "system": os.environ.get("ESCALATION_MODEL") or routing["text"]["model"],
+            "production": os.environ.get("JUDGE_MODEL") or routing["code"]["model"],
+            "reference": os.environ.get("REFERENCE_JUDGE_MODEL")
+            or routing["fast"]["model"],
         }
         self.prices = yaml.safe_load(
             Path(__file__).with_name("pricing.yaml").read_text()
@@ -153,7 +157,7 @@ class EvalProvider:
             "max_tokens": 2048,
             "stream": True,
             "stream_options": {"include_usage": True},
-            "reasoning_effort": "none" if role == "system" else "low",
+            "reasoning_effort": "none",
         }
         request = Request(
             endpoint + "/chat/completions",

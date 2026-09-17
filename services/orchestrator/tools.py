@@ -10,13 +10,14 @@ from pathlib import Path
 from typing import Literal
 
 import aiohttp
-import trafilatura
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from services.orchestrator import mcp_client
 from services.orchestrator.cache import Cache
 from services.orchestrator.calculator import calculate
-from services.orchestrator.content import select_passages
+from services.orchestrator.content import hierarchical_summary
+from packages.evidence import estimated_tokens
+from packages.web_extract import extract
 from services.orchestrator.loop import Call, Message, Reservation
 from services.orchestrator.web import (
     MAX_BYTES,
@@ -158,9 +159,7 @@ class Runtime:
         cached = self.cache.get(key)
         if cached is None:
             url, body = await self.web.fetch(request.url, timeout)
-            text = await asyncio.to_thread(
-                trafilatura.extract, body, url=url, include_comments=False
-            )
+            text = await asyncio.to_thread(extract, body, url)
             if not text:
                 raise ValueError("extraction_empty")
             cached = {
@@ -170,33 +169,38 @@ class Runtime:
             }
             self.cache.put(key, cached, 86400)
         text, url = str(cached["text"]), str(cached["url"])
-        question = request.query or self.question
-        if question:
-            passages = select_passages(text, question, 1998)
-            handle = self.cache.key(["source", url, text])
-            self.cache.put(handle, {"text": text, "url": url}, 86400)
-            return {
-                "url": url,
-                "consulted_at": cached["consulted_at"],
-                "text": "\n".join(p.text for p in passages),
-                "passages": [{"start": p.start, "end": p.end} for p in passages],
-                "examined": passages[0].examined if passages else 0,
-                "handle": handle,
-                "selected": True,
-                "truncated": False,
-            }
-        # Retain the continuation contract for legacy callers without a question.
-        prefix = text.encode()[:2000].decode("utf-8", errors="ignore")
-        handle = self.cache.key(["continuation", url, text]) if prefix != text else ""
-        if handle:
-            self.cache.put(handle, {"text": text[len(prefix) :], "url": url}, 86400)
-        return {
+        handle = self.cache.key(["source", url, text])
+        self.cache.put(handle, {"text": text, "url": url}, 86400)
+        output: Message = {
             "url": url,
             "consulted_at": cached["consulted_at"],
-            "text": prefix,
+            "text": text,
             "handle": handle,
-            "truncated": bool(handle),
+            "truncated": False,
+            "selected": False,
+            "passages": [{"start": 0, "end": len(text)}],
+            "examined": 1,
+            "token_budget": 4000,
+            "estimated_tokens": estimated_tokens(text),
         }
+        if estimated_tokens(text) > 4000:
+            summary, passages, sections = hierarchical_summary(
+                text, request.query or self.question
+            )
+            output.update(
+                text=summary,
+                selected=True,
+                passages=[{"start": p.start, "end": p.end} for p in passages],
+                examined=passages[0].examined if passages else 0,
+                estimated_tokens=estimated_tokens(summary),
+                synthesis={
+                    "method": "hierarchical_extractive",
+                    "levels": 2,
+                    "sections_examined": sections,
+                    "source_characters": len(text),
+                },
+            )
+        return output
 
     async def execute(self, call: Call, timeout: float) -> Message:
         if call.name == "mcp_call":

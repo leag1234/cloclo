@@ -58,12 +58,13 @@ limits. Preserve the user's question when it can be safely parsed.
 Source: owner corpus2026-09-17; history in decisions-log. REQ-ENG-004/005/009/011,
 REQ-FIN-002, POC-F1/F2/F4/F5; [contract](contracts/m21.md).
 
-D1: Expose exactly two models in adapter and Open WebUI: atlas (reasoning_effort=none,
-max_tokens=3000, 0.10 EUR) and atlas-deep (high,16000,0.20 EUR). Same routing/tools/
-prompts. Reasoning and answer share output allowance. Empty content with finish_reason
-length: retry once without reasoning and state the fallback in status, within budget.
-Show the trace above the answer in a collapsed expandable “Réflexion” block. Log effort,
-trace tokens, answer tokens and cost per request.
+D1: Expose exactly atlas, atlas-glm and atlas-fast in adapter and Open WebUI.
+All use reasoning_effort=none explicitly, max_tokens=3000, 0.10 EUR/120s and10 tools.
+The selector pins the configured provider model; prompts/tools remain shared.
+Unsupported vision uses a configured compatible alternate, reported as fallback.
+Validate all replies; empty/malformed output gets at most one affordable recovery.
+Never append a restarted derivation after visible partial output. Log effort,
+trace tokens, answer tokens, fallback and cost per request.
 
 D2: Rewrite prompts/chat.txt, vision.txt, web-chat.txt and rag.txt to answer the QUESTION
 as a domain expert; attachments are evidence. Use native formats (tablature, code,
@@ -86,20 +87,20 @@ image_store.py; history uses references, materializing current-turn evidence onl
 Ten turns with one new photo each must produce no size error.
 
 D5: Visible animated activity + elapsed time from request start (within1s); use exact
-French labels in tests/journeys/m21-cases.json. Update each state and during reasoning.
+French labels in tests/journeys/m21-cases.json. Update each state and during generation.
 Collapsible steps name tools and web URLs; replace generic intermediate-step text.
 User messages get distinct e/OS green background in existing UI.
 
 Public HTTP journeys:
-- J27 atlas-deep, Z80 question: nonempty answer with OUTI/OTIR timings and derivation;
-  trace present and collapsed, cost logged.
-- J28 atlas-deep, deliberately small output budget: nonempty answer, fallback stated.
+- J27 same original Z80 question on all three models: useful nonempty technical
+  answers, actual models and costs, honest comparative derivation quality.
+- J28 malformed/incomplete provider output: bounded recovery or clear error.
 - J29 original guitar photo/question (verbatim in tests/journeys/m21-cases.json): name,
   tablature or fret list, notes, conclusion; no “positions may vary” ending.
 - J30 National Geographic: at least3 of the4 details in answer.
 - J31 RAG fact beyond byte400: answered with citation.
 - J32 each tool step named; web steps list URLs.
-- J33 activity within2 s, visible and updated throughout deep reasoning.
+- J33 activity within2 s, visible and updated throughout generation.
 
 Non-regression: M17–M20/J1–J26; standard atlas retains speed and cost. Done only after
 make verify-m21 locally and green GitHub ci; J1–J33 through public chat API; all four
@@ -107,21 +108,12 @@ measured causes removed. MISSION <=8000 bytes. Report live/replay honestly.
 
 ### Authoritative owner decisions — 2026-09-17
 
-Budgets supersede ALL older figures in docs/13, MISSION, contracts and code:
-**atlas0.10 EUR/120s; atlas-deep0.20 EUR/300s;10 tools**. Full-context chains
-measured~0.069 EUR. Monthly budget and alerts remain. Report the measured breakdown
-if0.20 EUR is exceeded; never silently truncate evidence.
-
-Deep activity starts within1s, names the phase (“Réflexion…”) and displays elapsed
-time throughout. Correctness takes priority. On deep timeout/failure, rerun the
-full prompt/context without reasoning within the same ledger. Return its complete
-answer and state deep did not complete; never salvage an interrupted derivation.
-Compare both profiles on the same question; report lower deep accuracy honestly.
-
-Always send reasoning_effort explicitly on provider generation calls: none for
-atlas and high for atlas-deep, none for recovery. Never depend on provider defaults.
-Owner measured omitted effort consuming output on reasoning; explicit none returned
-content. Re-evaluate earlier quality rejections after fixing transport. Unsupported capabilities select a configured compatible alternate.
+The latest three-model decision below supersedes earlier deep requirements.
+All three non-reasoning profiles retain atlas0.10 EUR/120s,3000 output tokens,10 tools.
+Monthly budget and alerts remain. Never silently truncate evidence.
+Activity starts within1s and displays phase and elapsed time throughout inference.
+Every provider generation call sends reasoning_effort=none explicitly, including
+recovery and evaluation. No further deep attempts without a new owner decision.
 Empty content with nonempty reasoning is a provider-default regression: log it,
 retry once with explicit none within budget and surface the incident.
 
@@ -135,12 +127,7 @@ Regression tests must cover outgoing effort and malformed replies with clear err
 Original owner prose and measured diagnoses preserved unchanged in decisions-log.
 
 ### Reasoning mode: negative result confirmed on all three provider models (2026-09-17)
-Same hard Z80 question, `max_tokens` 12 000, `reasoning_effort` explicit:
-| model | none | high |
-|---|---|---|
-| qwen3.5-397b | 6 888 chars, 2 069 tok | wrong timings, then empty answers, then tool JSON |
-| glm-5.2 | 4 563 chars, 1 413 tok, 40 s | **non-JSON reply** after 107 s |
-| deepseek-v4-flash | 4 628 chars, 1 489 tok, **19 s** | 42 081 chars of trace, **0 chars of answer**, 12 000 tok saturated, 204 s |
+Owner measurements preserved verbatim in reports/M21.md and decisions-log.
 Reasoning mode is unusable on this provider regardless of model. Standard mode works on
 all three. Record this table in `reports/M21.md`. The model selector (atlas / atlas-glm /
 atlas-fast) is therefore the way to compare quality; `reasoning_effort` stays `"none"`
