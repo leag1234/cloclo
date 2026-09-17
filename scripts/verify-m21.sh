@@ -24,17 +24,26 @@ for f in prompts/chat.txt prompts/vision.txt; do
 done
 pass "prompts ask for expertise, derivation and an explicit conclusion"
 
-# two effort levels exposed
-grep -rqE "atlas-deep" services/orchestrator/ 2>/dev/null || fail "atlas-deep model not exposed"
+# Model selector (deep mode was abandoned: measured unusable on all three provider models
+# on 2026-09-17 — see reports/M21.md). What must be exposed now is a choice of MODELS.
+for m in "atlas-glm" "atlas-fast"; do
+  grep -rqE "$m" services/orchestrator/ services/model-gateway/ 2>/dev/null \
+    || fail "model $m is not exposed: the selector must offer the configured provider models"
+done
+grep -rqE "atlas-deep" services/orchestrator/ services/model-gateway/ 2>/dev/null \
+  && fail "atlas-deep is still exposed: deep mode was abandoned with measured evidence"
+# reasoning_effort must be sent EXPLICITLY on every call: the provider default changed
+# mid-day on 2026-09-17 and silently emptied every answer.
 grep -rqE "reasoning_effort" services/model-gateway/ services/orchestrator/ 2>/dev/null \
-  || fail "reasoning_effort is never sent to the provider"
-grep -rqE "16000|16_000" services/ 2>/dev/null || fail "deep mode max_tokens is not 16000"
-pass "two effort levels exposed with measured parameters"
+  || fail "reasoning_effort is never sent to the provider (never rely on its default)"
+pass "model selector exposed; reasoning_effort always sent explicitly"
 
 # empty-answer guard
-grep -rqiE "empty.*content|content.*empty|finish_reason.*length" services/orchestrator/ services/model-gateway/ 2>/dev/null \
-  || fail "no guard against an empty answer when the reasoning trace exhausts the budget"
-pass "empty-answer guard present"
+# Provider replies are untrusted data: empty content, text in an unexpected field,
+# finish_reason length, malformed JSON — all must degrade gracefully, never silently.
+grep -rqiE "empty.*content|content.*empty|finish_reason" services/orchestrator/ services/model-gateway/ 2>/dev/null \
+  || fail "no validation of provider replies (empty content, finish_reason, malformed body)"
+pass "provider replies are validated, not assumed"
 
 # images by reference for uploads
 grep -rqE "image_store" services/orchestrator/chat_pipeline.py services/orchestrator/vision.py services/orchestrator/chat_api.py 2>/dev/null \
@@ -75,8 +84,8 @@ R="BRAIN/eval/journeys.json"; [[ -f "$R" ]] || fail "report $R not produced"
 python3 - "$R" << 'PY'
 import sys, json
 new = {
- "J27_deep_derivation":"atlas-deep did not produce a derivation with OUTI/OTIR timings",
- "J28_no_empty_answer":"deep mode returned an empty answer under a small budget",
+ "J27_model_selector":"the same question does not run on the three exposed models",
+ "J28_reply_validation":"a malformed provider reply is not handled gracefully",
  "J29_expert_chord":"chord photo not answered as an expert (name, tablature, notes, conclusion)",
  "J30_full_article":"National Geographic article details did not reach the answer",
  "J31_rag_beyond_400":"RAG fact located beyond byte 400 of its chunk was not answered",
@@ -95,8 +104,10 @@ if fails:
     print("::error::verify-m21: journeys failed:")
     for f in fails: print("  -", f)
     sys.exit(1)
-for k in ("j27_trace_tokens","j27_answer_tokens","j27_cost_eur"):
+for k in ("j27_models","j27_costs_eur"):
     if k not in d: print(f"::error::verify-m21: J27 must record {k}"); sys.exit(1)
+if not isinstance(d.get("j27_models"), list) or len(d["j27_models"]) < 3:
+    print("::error::verify-m21: J27 must record the three models it compared"); sys.exit(1)
 if d.get("mode") not in ("live","replay"):
     print("::error::verify-m21: report must declare mode = live|replay"); sys.exit(1)
 print(f"  ✓ journeys passed, no regression (mode: {d.get('mode')})", file=sys.stderr)
