@@ -12,6 +12,10 @@ models:
   gpt-oss-120b:           # cross-calibration reference, MISSION M5
     input_eur_per_mtok: 0.15
     output_eur_per_mtok: 0.60
+  # Source: https://www.scaleway.com/en/pricing/model-as-a-service/ 2026-09-17
+  gemma-4-26b-a4b-it:
+    input_eur_per_mtok: 0.25
+    output_eur_per_mtok: 0.50
   pixtral-12b-2409:
     input_eur_per_mtok: 0.20
     output_eur_per_mtok: 0.20

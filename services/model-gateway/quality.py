@@ -16,6 +16,7 @@ from packages.tool_history import (
     is_history_answer,
     possible_history_answer,
 )
+from packages.profiles import PROFILES
 from packages.evidence import estimated_tokens
 from packages.images import image_info
 from serverless import ServerlessPolicy, classify_task
@@ -78,7 +79,11 @@ async def stream_quality(
 
     policy = ServerlessPolicy()
     task = classify_task(request.messages)
-    role = policy.public_profiles.get(request.profile or "", task)
+    role = (
+        "vision"
+        if task == "vision"
+        else policy.public_profiles.get(request.profile or "", task)
+    )
     primary = policy.models[role]
     fallback_role = policy.config[role]["fallback"]
     budget = Decimal(request.budget_eur or "0.10")
@@ -90,20 +95,6 @@ async def stream_quality(
     started = monotonic()
     current = request
     model = primary
-    if task == "vision" and not policy.config[role]["capabilities"][model].get(
-        "vision", False
-    ):
-        role, fallback_role = fallback_role, role
-        model = policy.models[role]
-        fallback = True
-        logging.getLogger(__name__).info(
-            json.dumps(
-                {"event": "quality_capability_alternate", "capability": "vision"}
-            )
-        )
-    if task == "vision":
-        # Both attempts must accept images, including the standard model's retry.
-        fallback_role = "vision" if role != "vision" else "text"
     # A large evidence input can exceed the primary's conservative reservation
     # even when the configured alternate can answer within the same ledger.
     alternate = policy.models[fallback_role]
@@ -156,7 +147,7 @@ async def stream_quality(
         )
         if (
             index == 0
-            and request.profile == "atlas-qwen"
+            and request.profile == PROFILES[0]
             and recovery + policy.cost(model, incoming, current.max_tokens)
             > budget - spent
         ):

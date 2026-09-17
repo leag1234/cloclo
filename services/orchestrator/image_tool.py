@@ -7,6 +7,7 @@ from time import monotonic
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from packages.imagegen import ImagePrompt
 from services.orchestrator.chat_schema import ChatRequest
+from services.orchestrator.followup import image_iteration
 from services.orchestrator.imagegen import process_image
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.loop import Message, Result
@@ -37,6 +38,10 @@ def declaration() -> Message:
 async def finish(
     request: ChatRequest, item: Interaction, result: Result, prompt: str, started: float
 ) -> None:
+    # Selection is model-owned; the original request is user-owned. A model
+    # paraphrase must not silently discard constraints before the image rewriter.
+    if image_iteration(request.messages) is None:
+        prompt = request.messages[-1].text
     try:
         await process_image(
             prompt,

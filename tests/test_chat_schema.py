@@ -12,7 +12,12 @@ class ChatSchemaTests(unittest.TestCase):
             {"role": "user", "content": "Traduis cela en allemand."},
         ]
         req = ChatRequest.model_validate(
-            {"model": "atlas", "messages": messages, "stream": True, "temperature": 0.2}
+            {
+                "model": "atlas-qwen",
+                "messages": messages,
+                "stream": True,
+                "temperature": 0.2,
+            }
         )
         self.assertEqual(len(req.messages), 3)
         self.assertTrue(req.stream)

@@ -38,9 +38,9 @@ class ChatAPITests(unittest.TestCase):
             patch("services.orchestrator.chat_stream.request_deadline", deadline),
         ):
             for profile, maximum in (
-                ("atlas", 120),
+                ("atlas-qwen", 120),
                 ("atlas-glm", 120),
-                ("atlas-fast", 120),
+                ("atlas-deepseek", 120),
             ):
                 for streaming in (False, True):
                     before = len(limits)
@@ -106,7 +106,7 @@ class ChatAPITests(unittest.TestCase):
             item.route_decision = "complexe"
 
         payload = {
-            "model": "atlas",
+            "model": "atlas-qwen",
             "messages": [{"role": "user", "content": "Bonjour"}],
         }
         with (
@@ -114,7 +114,9 @@ class ChatAPITests(unittest.TestCase):
             patch.dict(os.environ, {"ATLAS_INTERACTION_DIR": root}),
             TestClient(app) as client,
         ):
-            self.assertEqual(client.get("/v1/models").json()["data"][0]["id"], "atlas")
+            self.assertEqual(
+                client.get("/v1/models").json()["data"][0]["id"], "atlas-qwen"
+            )
             with patch("services.orchestrator.chat_api.process", side_effect=respond):
                 response = client.post("/v1/chat/completions", json=payload)
                 self.assertEqual(response.status_code, 200)

@@ -20,11 +20,11 @@ def valid_report(report: object) -> bool:
     numbers = set()
     for name, value in report.items():
         match = re.match(r"^J(\d+)_", name)
-        if match and 1 <= int(match[1]) <= 33:
+        if match and 1 <= int(match[1]) <= 38:
             if value is not True:
                 return False
             numbers.add(int(match[1]))
-    return numbers == set(range(1, 34))
+    return numbers == set(range(1, 39))
 
 
 def fingerprint(root: Path, run_id: str) -> str:
@@ -81,6 +81,8 @@ def main() -> None:
             "M20_RESUME",
             "M21_LIVE",
             "M21_RESUME",
+            "M22_LIVE",
+            "M22_RESUME",
         )
     )
     run_id = None
@@ -92,7 +94,7 @@ def main() -> None:
         environment = {
             key: value
             for key, value in os.environ.items()
-            if key.startswith(("ATLAS_", "M20_", "M21_", "JOURNEYS_"))
+            if key.startswith(("ATLAS_", "M20_", "M21_", "M22_", "JOURNEYS_"))
             and not any(
                 secret in key for secret in ("KEY", "TOKEN", "SECRET", "PASSWORD")
             )
@@ -108,7 +110,7 @@ def main() -> None:
         )
 
     def execute() -> None:
-        for script in ("journey_server", "m20_gate", "m21_gate"):
+        for script in ("journey_server", "m20_gate", "m21_gate", "m22_gate"):
             subprocess.run([sys.executable, "tests/" + script + ".py"], check=True)
 
     run(Path.cwd(), run_id, execute)

@@ -56,8 +56,8 @@ From your workstation, forward the chat UI and citation adapter ports:
 ssh -N -L 3000:127.0.0.1:3000 -L 8020:127.0.0.1:8020 user@your-vm
 ```
 
-Open [the chat UI](http://localhost:3000) and select `atlas`, `atlas-glm`, or
-`atlas-fast` to compare the configured models. Each uses explicit non-reasoning
+Open [the chat UI](http://localhost:3000) and select `atlas-qwen`, `atlas-glm`, or
+`atlas-deepseek` to compare the configured models. Each uses explicit non-reasoning
 generation with a €0.10,120-second and3000-output-token limit. See
 [the M21 report](reports/M21.md) for measured quality limitations. The adapter on port
 8020 serves document citations. Stop the stack with Ctrl-C; persistent database

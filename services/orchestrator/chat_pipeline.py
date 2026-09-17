@@ -18,6 +18,7 @@ from services.orchestrator.model import GatewayModel
 from services.orchestrator.tools import Rag, Runtime
 from services.orchestrator.stream_client import sink_context
 from services.orchestrator.vision import process_vision
+from services.orchestrator.search_policy import required_research
 from services.orchestrator.followup import is_followup, image_iteration
 from packages.language import conversation_language, language_instruction
 from services.orchestrator.image_tool import GenerateImage, declaration, finish
@@ -199,6 +200,14 @@ class ChatTools(Runtime):
 
 
 async def process(request: ChatRequest, item: Interaction) -> None:
+    from services.orchestrator.narration import clean_answer
+
+    await _process(request, item)
+    if item.state == "done":
+        item.reponse = clean_answer(item.reponse)
+
+
+async def _process(request: ChatRequest, item: Interaction) -> None:
     from services.orchestrator.project_commands import select
 
     if await select(request, item, retrieval_url()):
@@ -239,7 +248,7 @@ async def process(request: ChatRequest, item: Interaction) -> None:
             Query(question=iteration or request.messages[-1].text, lang=request.lang),
             model,
             tools,
-            Path("prompts/agent.txt").read_text()
+            Path("prompts/chat-agent.txt").read_text()
             + Path("prompts/chat.txt").read_text()
             + Path("prompts/web-chat.txt").read_text()
             + (Path("prompts/followup.txt").read_text() if followup else "")
@@ -256,6 +265,9 @@ async def process(request: ChatRequest, item: Interaction) -> None:
                 {"role": m.role, "content": m.text} for m in request.messages[:-1]
             ],
             retry_web=True,
+            initial_calls=required_research(request.messages[-1].text, request.lang)
+            if not followup
+            else (),
             terminal_tools=frozenset({"generate_image"})
             if not followup
             else frozenset(),

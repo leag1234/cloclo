@@ -28,8 +28,15 @@ serverless:
       glm-5.2: {context: 262144, tools: true, vision: false}
   vision:
     env: VISION_MODEL
+    model: gemma-4-26b-a4b-it
+    fallback: visionprevious
+    capabilities:
+      gemma-4-26b-a4b-it: {context: 262144, tools: true, vision: true, reasoning: false}
+      pixtral-12b-2409: {context: 131072, tools: true, vision: true, reasoning: false}
+  visionprevious:
+    env: VISION_PREVIOUS_MODEL
     model: pixtral-12b-2409
-    fallback: text
+    fallback: vision
     capabilities:
       pixtral-12b-2409: {context: 131072, tools: true, vision: true, reasoning: false}
   fast:

@@ -52,7 +52,7 @@ async def check() -> None:
         archive["calls"] = []
     config = Configuration.model_validate(archive["configuration"])
     model = GatewayModel("http://recording.invalid", config)
-    model.configure_quality("atlas", 3000)
+    model.configure_quality("atlas-qwen", 3000)
     provider = AgentProvider() if record else None
     index = 0
 
@@ -123,7 +123,9 @@ async def check() -> None:
                 model,
                 runtime,
                 Path("prompts/agent.txt").read_text(),
-                limits=Limits(profile="atlas", tokens=262144, cost=Decimal("0.10")),
+                limits=Limits(
+                    profile="atlas-qwen", tokens=262144, cost=Decimal("0.10")
+                ),
                 history=[
                     {
                         "role": "tool",
@@ -194,7 +196,7 @@ async def check() -> None:
                 for p in passages
             )
             model = GatewayModel("http://recording.invalid", config)
-            model.configure_quality("atlas", 3000)
+            model.configure_quality("atlas-qwen", 3000)
             with patch.object(GatewayModel, "post", staticmethod(transport)):
                 document_result = await run(
                     Query(question=QUESTION, lang="en"),
@@ -202,7 +204,9 @@ async def check() -> None:
                     runtime,
                     Path("prompts/agent.txt").read_text()
                     + Path("prompts/chat.txt").read_text(),
-                    limits=Limits(profile="atlas", tokens=262144, cost=Decimal("0.10")),
+                    limits=Limits(
+                        profile="atlas-qwen", tokens=262144, cost=Decimal("0.10")
+                    ),
                     history=[
                         {
                             "role": "tool",

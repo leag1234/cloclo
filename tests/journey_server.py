@@ -1,7 +1,6 @@
 """Isolated real HTTP stack; external provider exchanges are recorded only here."""
 
 import copy
-import asyncio
 import logging
 import gzip
 import json
@@ -20,7 +19,7 @@ from vision import VisionProvider
 import imagegen
 import stream_transport
 from serverless_support import environment
-from provider_recording import ExactHistory, capture_stream, replay_stream
+from provider_recording import ExactHistory, capture_stream, capture_tool, replay_stream
 from services.orchestrator.serving import stack
 from services.orchestrator.tools import Runtime
 
@@ -88,6 +87,9 @@ def main() -> None:
                     if result.get("fault_injected"):
                         injected_timeout = True
                     raise TimeoutError
+                if isinstance(result, dict) and "recorded_exception" in result:
+                    errors = {"ValueError": ValueError, "TimeoutError": TimeoutError}
+                    raise errors[result["recorded_exception"]](result["message"])
                 return result
             saved = unchanged.take(kind, value) if refresh else None
             if saved is not None:
@@ -96,6 +98,9 @@ def main() -> None:
                     if saved.get("fault_injected"):
                         injected_timeout = True
                     raise TimeoutError
+                if isinstance(saved, dict) and "recorded_exception" in saved:
+                    errors = {"ValueError": ValueError, "TimeoutError": TimeoutError}
+                    raise errors[saved["recorded_exception"]](saved["message"])
                 return saved
             if kind == "search" and "Python" in str(value) and not injected_timeout:
                 injected_timeout = True
@@ -108,13 +113,10 @@ def main() -> None:
                     },
                 )
                 raise TimeoutError
-            try:
-                result = await original(self, request, *args)
-            except (TimeoutError, asyncio.CancelledError):
-                record(kind, value, {"recorded_timeout": True})
-                raise
-            record(kind, value, result)
-            return result
+            return await capture_tool(
+                original(self, request, *args),
+                lambda result: record(kind, value, result),
+            )
 
         return patch.object(cls, name, transport)
 

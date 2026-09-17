@@ -21,11 +21,11 @@ class CIRegressionTests(unittest.TestCase):
             elif milestone == 21:
                 journeys_finished.set()
             elif milestone == 6:
-                self.assertEqual(set(completed), {5, *range(7, 22)})
+                self.assertEqual(set(completed), {5, *range(7, 23)})
             completed.append(milestone)
 
         run(execute)
-        self.assertEqual(sorted(completed), list(range(5, 22)))
+        self.assertEqual(sorted(completed), list(range(5, 23)))
         self.assertEqual(completed[-1], 6)
 
     def test_failure_in_either_lane_prevents_report_success(self) -> None:

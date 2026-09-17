@@ -8,7 +8,7 @@ from services.orchestrator.loop import Limits, Message, Query, Reservation, Turn
 
 class CurrentQuestionTests(unittest.IsolatedAsyncioTestCase):
     async def test_profiles_preserve_history_and_mark_only_latest_request(self) -> None:
-        for profile in ("atlas", "atlas-glm"):
+        for profile in ("atlas-qwen", "atlas-glm"):
             history: list[Message] = [
                 {"role": "user", "content": "What was the old rate?"}
             ]

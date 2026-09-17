@@ -25,9 +25,9 @@ class QualityTests(unittest.IsolatedAsyncioTestCase):
     def test_three_profiles(self) -> None:
         with TestClient(app) as client:
             names = {x["id"] for x in client.get("/v1/models").json()["data"]}
-        self.assertEqual(names, {"atlas", "atlas-glm", "atlas-fast"})
+        self.assertEqual(names, {"atlas-qwen", "atlas-glm", "atlas-deepseek"})
         for model, effort in [
-            (name, "none") for name in ("atlas", "atlas-glm", "atlas-fast")
+            (name, "none") for name in ("atlas-qwen", "atlas-glm", "atlas-deepseek")
         ]:
             request = ChatRequest.model_validate(
                 {"model": model, "messages": [{"role": "user", "content": "Explain."}]}

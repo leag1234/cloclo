@@ -174,3 +174,7 @@ verify-m20: ## real-usage journeys, honest failures and unified startup
 .PHONY: verify-m21
 verify-m21: ## reasoning, expert evidence and native activity
 	@bash scripts/verify-m21.sh
+
+.PHONY: verify-m22
+verify-m22: ## search discipline, graded vision and narration
+	@bash scripts/verify-m22.sh

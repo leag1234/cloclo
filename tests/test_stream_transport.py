@@ -165,7 +165,7 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
             req = AgentRequest(
                 messages=messages,
                 tools=[{"type": "function", "function": {"name": "web_fetch"}}],
-                profile="atlas",
+                profile="atlas-qwen",
                 tool_choice="none",
                 timeout=5.0,
             )

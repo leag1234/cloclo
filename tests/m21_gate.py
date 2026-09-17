@@ -214,7 +214,7 @@ def main() -> None:
         stack("atlas-m21-test", False),
     ):
         try:
-            models = ["atlas", "atlas-glm", "atlas-fast"]
+            models = ["atlas-qwen", "atlas-glm", "atlas-deepseek"]
             with urlopen("http://127.0.0.1:8020/v1/models") as response:
                 assert {row["id"] for row in json.load(response)["data"]} == set(models)
             comparisons = {}
@@ -263,7 +263,9 @@ def main() -> None:
             text, metadata, events = ask(
                 "J28",
                 question(
-                    "Explain why the sky appears blue.", model="atlas", max_tokens=1
+                    "Explain why the sky appears blue.",
+                    model="atlas-qwen",
+                    max_tokens=1,
                 ),
             )
             if "error" in metadata:

@@ -12,7 +12,7 @@ ChatMessage = VisionMessage
 
 class ChatRequest(VisionInput):
     model_config = ConfigDict(extra="ignore", strict=True)
-    model: str = "atlas"
+    model: str = PROFILES[0]
     project_id: str | None = None
     conversation_id: str | None = None
     stream: bool = False

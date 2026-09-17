@@ -22,3 +22,14 @@ class LanguageTests(unittest.TestCase):
             )
         )
         self.assertFalse(matches("```La capitale de la France est Paris.```", "fr"))
+
+    def test_source_titles_and_activity_do_not_determine_answer_language(self) -> None:
+        metadata = "<details>Recherche web en cours. Lecture de page.</details>"
+        citation = "\nSource : [The birth of the World Wide Web](https://home.cern/science/computing/the-birth-of-the-web/), consulté le 2026-09-17."
+        french = "Le CERN a rendu le World Wide Web public le 30 avril 1993 en plaçant son logiciel dans le domaine public."
+        english = "The laboratory released the software into the public domain, allowing anyone to use and improve it."
+        self.assertTrue(matches(metadata + french + citation, "fr"))
+        self.assertFalse(matches(metadata * 10 + english + citation, "fr"))
+        self.assertFalse(
+            matches(metadata + "[An English source](https://example.org)", "fr")
+        )
