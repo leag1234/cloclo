@@ -85,6 +85,7 @@ class ProjectChatTests(unittest.IsolatedAsyncioTestCase):
             "text": json.dumps({"answer": answer, "facts": facts}),
             "calls": [],
             "usage": {"prompt_tokens": 100, "completion_tokens": 50},
+            "cost_eur": "0.0001",
             "observation": {"provider": "escalade", "route": "complexe"},
         }
 

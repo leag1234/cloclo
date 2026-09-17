@@ -5,7 +5,7 @@ Python: requirements-dev.txt; Docker Linux. No cloud credentials transmitted to 
 From your workstation: `ssh -L 3000:127.0.0.1:3000 -L 8020:127.0.0.1:8020 user@vm`,
 then http://localhost:3000; select atlas. The 8020 tunnel serves citations.
 Ctrl-C stops the services; atlas-chat-ui/index volumes are preserved. Private logs:
-BRAIN/interactions/YYYY-MM-DD.jsonl. Budget/stop: 120 s and 0.05 EUR per request.
+BRAIN/interactions/YYYY-MM-DD.jsonl. Current public chat budget/stop:120 s and0.10 EUR per request.
 Local single-user UI; no HTTPS and no public exposure. No GPU created by serve.
 Open WebUI v0.11.3, pinned digest, image ~7.14 GB; interface/branding preserved.
 Dependency imposed by MISSION; LibreChat alternative discarded for a single integration.
@@ -53,3 +53,27 @@ use. Never label replay output as live evidence.
 checks readiness after the second start. Run only with no active user session.
 The launcher requests graceful shutdown of its previous process and replaces
 only its named containers with matching images; persistent volumes are retained.
+
+## M21 model selection and evidence
+
+The selector exposes atlas, atlas-glm and atlas-fast. All explicitly disable
+reasoning and use3000 output tokens,120 seconds,0.10 EUR and10 tools. Changing the
+model keeps the same prompts/tools. The gateway's text/code/fast roles are configured
+centrally; unsupported vision uses a compatible alternate. Public response metadata
+and request logs identify the provider that supplied the answer and its cost.
+
+Activity reports elapsed time and names tools/URLs. Expand the native tool controls
+to inspect steps; unexpected provider reasoning remains separate and collapsed.
+Uploaded photos are stored once by reference; history does not accumulate base64.
+Web/RAG evidence uses token budgets and discloses incomplete coverage.
+
+Before emitting answer text, empty/malformed replies may recover once within the
+same ledger. Failure after visible text is reported explicitly rather than appending
+a second derivation. Errors report measured time and reservation limits. Never treat
+an interrupted answer as complete or assume model availability proves accuracy.
+
+Stop other disposable test stacks before M21 verification; they share ports.
+`M21_LIVE=1 PYTHONPATH=.:tests:services/model-gateway python tests/m21_gate.py`
+records real provider exchanges for J27–J33. `make verify-m21` checks the complete
+journey report, including earlier regressions. Compare live/replay labels and the
+quality breakdown in reports/M21.md; only green GitHub ci certifies completion.

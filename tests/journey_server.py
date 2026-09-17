@@ -6,7 +6,7 @@ import logging
 import gzip
 import json
 import os
-from contextlib import ExitStack
+from contextlib import ExitStack, aclosing
 from pathlib import Path
 import subprocess
 import sys
@@ -20,6 +20,7 @@ from vision import VisionProvider
 import imagegen
 import stream_transport
 from serverless_support import environment
+from provider_recording import ExactHistory, capture_stream, replay_stream
 from services.orchestrator.serving import stack
 from services.orchestrator.tools import Runtime
 
@@ -88,6 +89,14 @@ def main() -> None:
                         injected_timeout = True
                     raise TimeoutError
                 return result
+            saved = unchanged.take(kind, value) if refresh else None
+            if saved is not None:
+                record(kind, value, saved)
+                if isinstance(saved, dict) and saved.get("recorded_timeout") is True:
+                    if saved.get("fault_injected"):
+                        injected_timeout = True
+                    raise TimeoutError
+                return saved
             if kind == "search" and "Python" in str(value) and not injected_timeout:
                 injected_timeout = True
                 record(
@@ -109,20 +118,29 @@ def main() -> None:
 
         return patch.object(cls, name, transport)
 
+    unchanged = ExactHistory(previous)
     original_stream = stream_transport.attempt
 
     async def stream(request: Any, model: str, timeout: float) -> Any:
         payload = request.model_dump(exclude={"timeout"})
-        if replaying():
-            for event in replay("stream", payload):
-                yield event
+        saved = unchanged.take("stream", payload) if refresh else None
+        if saved is not None:
+            record("stream", payload, saved)
+            async with aclosing(replay_stream(saved)) as events:
+                async for event in events:
+                    yield event
             return
-        events = []
-        async for event in original_stream(request, model, timeout):
-            events.append(event)
-            if "result" in event:
-                record("stream", payload, events)
-            yield event
+        source = (
+            replay_stream(replay("stream", payload))
+            if replaying()
+            else capture_stream(
+                original_stream(request, model, timeout),
+                lambda events: record("stream", payload, events),
+            )
+        )
+        async with aclosing(source):
+            async for event in source:
+                yield event
 
     original_image = imagegen.generate
 

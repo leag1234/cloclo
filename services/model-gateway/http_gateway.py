@@ -68,7 +68,31 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                 try:
                     async with asyncio.timeout(validated.timeout):
                         await relay()
-                except (ValueError, RuntimeError, TimeoutError, OSError):
+                except (ValueError, RuntimeError, TimeoutError, OSError) as exc:
+                    known = {
+                        "cost_budget",
+                        "context_exceeded",
+                        "provider_error",
+                        "provider_usage_exceeds_reservation",
+                        "empty_content_after_retry",
+                        "incomplete_provider_answer",
+                        "unexpected_tool_history_answer",
+                    }
+                    reason = (
+                        "timeout"
+                        if isinstance(exc, TimeoutError)
+                        else str(exc)
+                        if str(exc) in known
+                        else "invalid_or_unavailable"
+                    )
+                    logging.getLogger(__name__).warning(
+                        json.dumps(
+                            {
+                                "event": "gateway_stream_failure",
+                                "reason": reason,
+                            }
+                        )
+                    )
                     async with asyncio.timeout(0.1):
                         await send({"error": "provider_error"})
 

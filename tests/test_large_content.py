@@ -7,11 +7,39 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from services.orchestrator.cache import Cache
-from services.orchestrator.content import select_passages
+from services.orchestrator.content import select_passages, hierarchical_summary
 from services.orchestrator.tools import Fetch, Runtime
 
 
 class SelectionTests(unittest.TestCase):
+    def test_comparison_keeps_both_separated_operation_definitions(self) -> None:
+        text = "Unrelated background. " * 2000
+        for identifier, fact in (("OPABC", "17 cycles"), ("OPXYZ", "29 cycles")):
+            text += "\n" + identifier + "\n"
+            text += "Registers transfer stored data. " * 45
+            text += "\nTiming table: " + fact + ".\n"
+            text += "Unrelated background. " * 2000
+        _, passages, _ = hierarchical_summary(text, "Compare OPABC OPXYZ timing")
+        for identifier, fact in (("OPABC", "17 cycles"), ("OPXYZ", "29 cycles")):
+            self.assertTrue(
+                any(identifier in p.text and fact in p.text for p in passages)
+            )
+
+    def test_technical_identifier_keeps_adjacent_operation_table(self) -> None:
+        text = "General instruction timing I/O wait cycle discussion. " * 1500
+        text += (
+            "\nOPXYZ\nOperation description: " + "Registers transfer stored data. " * 45
+        )
+        text += "\nTiming table: repeating case 37 cycles; final case 29 cycles.\n"
+        text += "Unrelated background. " * 1500
+        summary, passages, _ = hierarchical_summary(
+            text, "OPXYZ instruction timing I/O wait cycle"
+        )
+        self.assertIn("repeating case 37 cycles; final case 29 cycles", summary)
+        self.assertTrue(
+            any("OPXYZ" in p.text and "37 cycles" in p.text for p in passages)
+        )
+
     def test_tail_evidence_and_exact_offsets(self) -> None:
         text = "Routine unrelated information. " * 5000
         text += "\nThe zephyr warranty lasts 73 months.\n"
@@ -100,7 +128,17 @@ class LargeFetchTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(first["url"], "https://example.org/final")
             self.assertEqual(first["consulted_at"], second["consulted_at"])
             self.assertIn("passages", first)
-            self.assertLessEqual(len(str(first["text"]).encode()), 2000)
+            from packages.evidence import estimated_tokens
+
+            self.assertLessEqual(estimated_tokens(str(first["text"])), 4000)
+            synthesis = first["synthesis"]
+            passages = first["passages"]
+            assert isinstance(synthesis, dict) and isinstance(passages, list)
+            self.assertEqual(synthesis["source_characters"], len(text))
+            for passage in passages:
+                self.assertIn(
+                    text[passage["start"] : passage["end"]], str(first["text"])
+                )
 
     async def test_original_question_used_and_failed_fetch_not_cached(self) -> None:
         text = "Unrelated filler. " * 5000 + "Zephyr warranty: 73 months."

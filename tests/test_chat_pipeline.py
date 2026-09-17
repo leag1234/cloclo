@@ -78,7 +78,7 @@ class CitationTests(unittest.IsolatedAsyncioTestCase):
                     if isinstance(outcome, RuntimeError):
                         with self.assertRaises(RuntimeError):
                             await process(request, item)
-                        self.assertEqual(item.cout_eur, 0.05)
+                        self.assertEqual(item.cout_eur, 0.10)
                     else:
                         await process(request, item)
                         self.assertEqual(item.cout_eur, 0.01)

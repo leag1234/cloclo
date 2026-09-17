@@ -1,5 +1,7 @@
 """Loopback OpenAI-compatible adapter with one journal row on every outcome."""
 
+from packages.profiles import PROFILES
+
 import asyncio
 import json
 import os
@@ -9,7 +11,8 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import ValidationError
-from packages.image_upload import UploadError, normalize_uploads
+from packages.image_upload import UploadError
+from services.orchestrator.image_store import prepare_uploads
 import html
 
 from services.orchestrator.chat_pipeline import process, source
@@ -39,7 +42,10 @@ app.include_router(mcp_router)
 def models() -> dict[str, object]:
     return {
         "object": "list",
-        "data": [{"id": "atlas", "object": "model", "created": 0, "owned_by": "atlas"}],
+        "data": [
+            {"id": name, "object": "model", "created": 0, "owned_by": "atlas"}
+            for name in PROFILES
+        ],
     }
 
 
@@ -118,7 +124,9 @@ async def chat(request: Request) -> Response:
                                 and p.get("type") == "text"
                                 and isinstance(p.get("text"), str)
                             )[:32000]
-                raw, item.uploads = normalize_uploads(raw)
+                raw, item.uploads, item.uploaded_images = await asyncio.to_thread(
+                    prepare_uploads, raw
+                )
                 payload = ChatRequest.model_validate(raw)
             except UploadError as exc:
                 status, code, detail = 413, exc.code, str(exc)
@@ -146,7 +154,10 @@ async def chat(request: Request) -> Response:
                 streaming = True
                 return stream_response(payload, item, started, process)
             await execute(
-                request, payload, item, max(0, 120 - (time.monotonic() - started))
+                request,
+                payload,
+                item,
+                max(0, payload.timeout_seconds - (time.monotonic() - started)),
             )
             if item.state != "done":
                 status = 502 if "provider_error" in item.erreurs else 504
@@ -157,7 +168,9 @@ async def chat(request: Request) -> Response:
         status, code, detail = exc.status, exc.code, exc.detail
     except TimeoutError:
         status, code = 504, "timeout"
-        limit = 5.0 if payload is None else 120.0 + item.startup_seconds
+        limit = (
+            5.0 if payload is None else payload.timeout_seconds + item.startup_seconds
+        )
         detail = f"Timeout: {time.monotonic() - started:.3f} seconds elapsed, limit {limit:.3f} seconds"
     except Exception:
         # Never reflect provider/transport exception text into logs or the client.
@@ -183,14 +196,36 @@ async def chat(request: Request) -> Response:
         "completion_tokens": item.tokens["out"],
         "total_tokens": sum(item.tokens.values()),
     }
-    base = {"id": item.request_id, "created": int(time.time()), "model": "atlas"}
+    assert payload is not None
+    base = {"id": item.request_id, "created": int(time.time()), "model": payload.model}
     message = {"role": "assistant", "content": item.reponse}
+    if item.reasoning:
+        message["reasoning_content"] = item.reasoning
     return JSONResponse(
         {
             **base,
             "object": "chat.completion",
             "choices": [{"index": 0, "message": message, "finish_reason": "stop"}],
             "usage": usage,
-            "atlas": {"images": item.images},
+            "atlas": {
+                "images": item.images,
+                "uploaded_images": item.uploaded_images,
+                "reasoning_effort": payload.reasoning_effort,
+                "max_output_tokens": payload.max_tokens,
+                "cost_eur": item.cout_eur,
+                "provider_model": item.provider_model,
+                "reasoning_retried": item.reasoning_retried,
+                "status": json.loads(Path("prompts/activity-labels.json").read_text())[
+                    payload.ui_locale
+                ]["reasoning_fallback"]
+                if item.reasoning_retried
+                else "",
+                "reasoning": {
+                    "collapsed": True,
+                    "trace_tokens": item.trace_tokens,
+                    "answer_tokens": item.answer_tokens,
+                    "estimated": item.token_split_estimated,
+                },
+            },
         }
     )

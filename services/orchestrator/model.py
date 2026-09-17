@@ -1,8 +1,12 @@
 """Model-independent client; provider selection and prices belong to the gateway."""
 
+from packages.profiles import PROFILES
+
 import json
+from packages.tool_history import final_messages
 import re
 from decimal import Decimal
+from pathlib import Path
 from time import monotonic
 from typing import Literal
 
@@ -19,6 +23,7 @@ class Configuration(BaseModel):
     input_eur_per_mtok: Decimal = Field(ge=0, allow_inf_nan=False)
     output_eur_per_mtok: Decimal = Field(ge=0, allow_inf_nan=False)
     max_tokens: int = Field(gt=0, le=2048)
+    gateway_reserves_quality: bool = False
 
 
 class WireCall(BaseModel):
@@ -30,7 +35,7 @@ class WireCall(BaseModel):
 
 class WireUsage(BaseModel):
     prompt_tokens: int = Field(ge=0, strict=True)
-    completion_tokens: int = Field(ge=0, le=2048, strict=True)
+    completion_tokens: int = Field(ge=0, le=19000, strict=True)
 
 
 class Observation(BaseModel):
@@ -42,10 +47,19 @@ class Observation(BaseModel):
 
 
 class WireTurn(BaseModel):
+    provider_model: str = Field(default="", max_length=200)
     observation: Observation | None = None
     usage: WireUsage
     model_config = ConfigDict(extra="forbid", strict=True)
-    text: str = Field(max_length=32000)
+    cost_eur: Decimal | None = Field(
+        default=None, ge=0, le=Decimal("0.20"), allow_inf_nan=False, strict=False
+    )
+    reasoning: str = Field(default="", max_length=256000)
+    trace_tokens: int = Field(default=0, ge=0)
+    answer_tokens: int = Field(default=0, ge=0)
+    token_split_estimated: bool = False
+    reasoning_retried: bool = False
+    text: str = Field(max_length=128000)
     calls: list[WireCall] = Field(max_length=10)
 
 
@@ -70,6 +84,28 @@ class GatewayModel:
         self.sink: Sink | None = None
         self.reasoning_effort = "none"
         self.stream_turn = 0
+        self.profile: str | None = None
+        self.max_tokens = configuration.max_tokens
+        self.provider_model = ""
+        self.spent = Decimal(0)
+        self.reasoning = ""
+        self.trace_tokens = 0
+        self.answer_tokens = 0
+        self.token_split_estimated = False
+        self.reasoning_retried = False
+
+    def configure_quality(self, profile: str, max_tokens: int) -> None:
+        if profile not in PROFILES:
+            raise ValueError("invalid_profile")
+        self.profile, self.max_tokens = profile, max_tokens
+        self.reasoning_effort = "none"
+
+    @property
+    def allowance(self) -> Decimal:
+        return max(
+            Decimal(0),
+            Decimal("0.10" if self.profile is not None else "0.05") - self.spent,
+        )
 
     @staticmethod
     async def post(url: str, payload: Message, timeout: float) -> Message:
@@ -148,14 +184,30 @@ class GatewayModel:
 
     def estimate(self, messages: list[Message]) -> Reservation:
         incoming = (
-            len(
-                json.dumps(
-                    {"messages": messages, "tools": self.tools}, ensure_ascii=False
-                ).encode()
+            max(
+                len(
+                    json.dumps(
+                        {
+                            "messages": value,
+                            "tools": self.available_tools(messages)
+                            if self.profile
+                            else self.tools,
+                        },
+                        ensure_ascii=False,
+                    ).encode()
+                )
+                for value in (messages, final_messages(messages))
+                if self.profile or value == messages
             )
             + 256
         )
-        if self.prefix and messages[: len(self.prefix)] == self.prefix:
+        # Profile recovery retains the full input bound on unknown usage. A
+        # previously measured prefix cannot shrink that possible reservation.
+        if (
+            not self.profile
+            and self.prefix
+            and messages[: len(self.prefix)] == self.prefix
+        ):
             incoming = (
                 self.prompt_tokens
                 + len(
@@ -165,6 +217,18 @@ class GatewayModel:
                 )
                 + 256
             )
+        if self.profile:
+            # Hold the remaining allowance; the gateway reserves each actual attempt.
+            primary_cost = (
+                incoming * self.configuration.input_eur_per_mtok
+                + self.max_tokens * self.configuration.output_eur_per_mtok
+            ) / 1_000_000
+            return Reservation(
+                incoming * 2 + self.max_tokens + 3000,
+                self.allowance
+                if self.configuration.gateway_reserves_quality
+                else max(primary_cost, self.allowance),
+            )
         outgoing = self.configuration.max_tokens
         cost = (
             incoming * self.configuration.input_eur_per_mtok
@@ -172,12 +236,67 @@ class GatewayModel:
         ) / 1_000_000
         return Reservation(incoming + outgoing, cost)
 
+    def available_tools(self, messages: list[Message]) -> list[dict[str, object]]:
+        if any(
+            message.get("role") == "tool"
+            and isinstance(message.get("content"), str)
+            and '"error": "tool_quota_exhausted"' in str(message["content"])
+            for message in messages
+        ):
+            return []
+        completed = {m.get("tool_call_id") for m in messages if m.get("role") == "tool"}
+        counts: dict[str, int] = {}
+        for message in messages:
+            calls = message.get("tool_calls")
+            if not isinstance(calls, list):
+                continue
+            for call in calls:
+                if not isinstance(call, dict) or call.get("id") not in completed:
+                    continue
+                function = call.get("function")
+                if isinstance(function, dict) and isinstance(function.get("name"), str):
+                    name = function["name"]
+                    counts[name] = counts.get(name, 0) + 1
+        if sum(counts.values()) >= 10:
+            return []
+        ceilings = {"web_search": 3, "web_fetch": 8}
+        available = []
+        for tool in self.tools:
+            function = tool.get("function")
+            if isinstance(function, dict):
+                name = str(function.get("name"))
+                if counts.get(name, 0) < ceilings.get(name, 10):
+                    remaining = min(
+                        10 - sum(counts.values()),
+                        ceilings.get(name, 10) - counts.get(name, 0),
+                    )
+                    available.append(
+                        {
+                            **tool,
+                            "function": {
+                                **function,
+                                "description": str(function.get("description", ""))
+                                + Path("prompts/tool-quota.txt")
+                                .read_text()
+                                .format(remaining=remaining),
+                            },
+                        }
+                    )
+        return available
+
     async def complete(self, messages: list[Message], timeout: float) -> Turn:
         payload: Message = {
             "messages": messages,
-            "tools": self.tools,
+            "tools": self.available_tools(messages),
             "timeout": timeout,
         }
+        if self.profile:
+            payload.update(
+                profile=self.profile,
+                max_tokens=self.max_tokens,
+                reasoning_effort=self.reasoning_effort,
+                budget_eur=str(self.allowance),
+            )
         if self.observing:
             payload.update(local_enabled=self.local_enabled, observe=True)
         reserved = self.estimate(messages)
@@ -193,18 +312,26 @@ class GatewayModel:
                         "turn": self.stream_turn,
                         "phase": "generating",
                         "reserved_eur": str(self.estimate(messages).cost),
-                        "max_output_tokens": self.configuration.max_tokens,
+                        "max_output_tokens": self.max_tokens,
                     }
                 )
                 wire = await receive(
                     self.url + "/agent/stream", payload, timeout, self.sink
                 )
             result = WireTurn.model_validate(wire)
+            if (
+                not self.profile
+                and result.usage.completion_tokens > self.configuration.max_tokens
+            ):
+                raise ValueError("output_budget")
+            if self.profile and result.usage.completion_tokens > self.max_tokens + 3000:
+                raise ValueError("output_budget")
             if self.sink is not None:
                 await self.sink(
                     {
                         "turn": self.stream_turn,
                         "phase": "intermediate" if result.calls else "final",
+                        "tools": [c.name for c in result.calls],
                     }
                 )
         finally:
@@ -221,7 +348,27 @@ class GatewayModel:
             usage.prompt_tokens * self.configuration.input_eur_per_mtok
             + usage.completion_tokens * self.configuration.output_eur_per_mtok
         ) / 1_000_000
-        if result.observation is not None and result.observation.fallback:
+        if self.profile:
+            if result.cost_eur is None or result.cost_eur > reserved.cost:
+                raise ValueError("invalid_profile_cost")
+            self.provider_model = result.provider_model
+            cost = result.cost_eur
+            self.spent += cost
+            self.reasoning += result.reasoning
+            self.trace_tokens += result.trace_tokens
+            self.answer_tokens += result.answer_tokens
+            self.token_split_estimated |= result.token_split_estimated
+            self.reasoning_retried |= result.reasoning_retried
+            if result.reasoning_retried:
+                # Recovery can request tools; its following turn must finish
+                # without restarting the reasoning that already failed.
+                self.reasoning_effort = "none"
+                self.max_tokens = 3000
+        if (
+            not self.profile
+            and result.observation is not None
+            and result.observation.fallback
+        ):
             # The primary may have been billed without returning usage. Retain the full reservation.
             cost = reserved.cost
         return Turn(

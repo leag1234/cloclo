@@ -50,7 +50,10 @@ def user(text: str) -> dict[str, object]:
 
 def main() -> None:
     report: dict[str, object] = {
-        "mode": "live" if os.environ.get("JOURNEYS_LIVE") == "1" else "replay"
+        "mode": "live"
+        if os.environ.get("JOURNEYS_LIVE") == "1"
+        or os.environ.get("JOURNEYS_REFRESH") == "1"
+        else "replay"
     }
     if os.environ.get("JOURNEYS_RESUME"):
         report["resumed_recorded_prefix"] = True
@@ -58,6 +61,13 @@ def main() -> None:
     report["web_mode"] = (
         "live" if os.environ.get("JOURNEYS_REFRESH") == "1" else report["mode"]
     )
+    if os.environ.get("JOURNEYS_REFRESH") == "1":
+        report.update(
+            acquisition_mode="mixed",
+            image_mode="replay",
+            web_mode="mixed",
+            inference_mode="mixed",
+        )
     path = Path("BRAIN/eval/journeys.json")
     path.parent.mkdir(parents=True, exist_ok=True)
     try:

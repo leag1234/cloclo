@@ -28,7 +28,7 @@ async def receive(
                     raise RuntimeError("gateway_error")
                 async for line in response.content:
                     total += len(line)
-                    if total > 1000000:
+                    if total > (8000000 if payload.get("profile") else 1000000):
                         raise ValueError("stream_limit")
                     if not line.strip():
                         continue
@@ -39,6 +39,11 @@ async def receive(
                         raise ValueError("invalid_stream")
                     if set(event) == {"result"} and isinstance(event["result"], dict):
                         result = event["result"]
+                    elif set(event) == {"phase"} and event["phase"] in {
+                        "reasoning_fallback",
+                        "provider_fallback",
+                    }:
+                        await sink(event)
                     elif set(event) == {"delta"} and isinstance(event["delta"], dict):
                         delta = event["delta"]
                         if not delta or not set(delta) <= {

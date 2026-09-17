@@ -11,12 +11,11 @@ import aiohttp
 from pydantic import BaseModel, Field
 
 from services.orchestrator.cache import Cache
-from services.orchestrator.content import select_passages as select_content
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.loop import Call, Limits, Message, Query, run
 from services.orchestrator.model import GatewayModel
-from services.orchestrator.tools import Fetch, Rag, Runtime
+from services.orchestrator.tools import Rag, Runtime
 from services.orchestrator.stream_client import sink_context
 from services.orchestrator.vision import process_vision
 from services.orchestrator.followup import is_followup, image_iteration
@@ -39,21 +38,18 @@ class Passages(BaseModel):
     passages: list[Passage] = Field(max_length=8)
 
 
-def select_passages(passages: list[Passage], query: str = "") -> list[dict[str, str]]:
-    selected: list[dict[str, str]] = []
-    for passage in sorted(passages, key=lambda p: p.score, reverse=True):
-        candidate = {
-            "chunk_id": passage.chunk_id,
-            "source": passage.source,
-            "text": (
-                "\n".join(p.text for p in select_content(passage.text, query, 1199))
-                if query and len(passage.text.encode()) > 4096
-                else passage.text
-            ),
-        }
-        if len(json.dumps([*selected, candidate], ensure_ascii=False).encode()) <= 4096:
-            selected.append(candidate)
-    return selected
+def select_passages(
+    passages: list[Passage], query: str = "", token_budget: int = 1000
+) -> list[dict[str, str]]:
+    from packages.evidence import whole_chunks
+
+    return whole_chunks(
+        [
+            {"chunk_id": p.chunk_id, "source": p.source, "text": p.text}
+            for p in sorted(passages, key=lambda p: p.score, reverse=True)
+        ],
+        token_budget,
+    )
 
 
 def retrieval_url() -> str:
@@ -109,8 +105,19 @@ class ChatTools(Runtime):
         self.item = item
         self.allow_image = allow_image
         self.image_prompt: str | None = None
+        self.source_truncated = False
 
     async def execute(self, call: Call, timeout: float) -> Message:
+        sink = sink_context.get()
+        urls: list[str] = []
+        try:
+            arguments = json.loads(call.arguments)
+            if call.name == "web_fetch" and isinstance(arguments.get("url"), str):
+                urls.append(arguments["url"])
+        except (ValueError, AttributeError):
+            pass
+        if sink:
+            await sink({"phase": "tool_started", "tool": call.name, "urls": urls})
         if call.name == "generate_image":
             if not self.allow_image:
                 return {"error": "tool_unavailable"}
@@ -123,20 +130,18 @@ class ChatTools(Runtime):
                 return {"error": "invalid_image_arguments"}
         if call.name != "rag_search":
             output = await super().execute(call, timeout)
-            # Keep enough source text for synthesis within the unchanged request cap.
             data = output.get("data")
-            if call.name == "web_fetch" and isinstance(data, dict):
-                text = str(data.get("text", ""))
-                data["text"] = "\n".join(
-                    p.text
-                    for p in select_content(
-                        text,
-                        Fetch.model_validate_json(call.arguments).query
-                        or self.question,
-                        400,
-                    )
-                )
-                data["truncated"] = len(str(data["text"])) < len(text)
+            if isinstance(data, dict):
+                self.source_truncated |= data.get("truncated") is True
+                if isinstance(data.get("url"), str):
+                    urls = [data["url"]]
+                results = data.get("results")
+                if isinstance(results, list):
+                    urls = [
+                        str(r["link"])
+                        for r in results
+                        if isinstance(r, dict) and isinstance(r.get("link"), str)
+                    ]
             if "error" in output:
                 self.item.erreurs.append(str(output["error"]))
             sink = sink_context.get()
@@ -145,11 +150,22 @@ class ChatTools(Runtime):
                     {
                         "phase": "tool_finished",
                         "tool": call.name,
+                        "urls": urls,
                         "ok": "error" not in output,
                     }
                 )
+            if sink and isinstance(data, dict):
+                if data.get("synthesis"):
+                    await sink(
+                        {"phase": "synthesized", "tool": call.name, "urls": urls}
+                    )
+                if data.get("truncated"):
+                    await sink(
+                        {"phase": "source_truncated", "tool": call.name, "urls": urls}
+                    )
             return output
         started = time.monotonic()
+        succeeded = False
         try:
             request = Rag.model_validate_json(call.arguments)
             result = Passages.model_validate(
@@ -157,16 +173,28 @@ class ChatTools(Runtime):
                     retrieval_url() + "/search", request.model_dump(), timeout
                 )
             )
+            succeeded = True
             passages = [p.model_dump() for p in result.passages]
             self.item.chunks_recuperes.extend(passages)
             return {
                 "trust": "untrusted",
-                "data": {"passages": select_passages(result.passages, request.query)},
+                "data": {
+                    "passages": select_passages(result.passages, request.query, 8000)
+                },
             }
         except (ValueError, RuntimeError, TimeoutError):
             self.item.erreurs.append("retrieval_unavailable")
             return {"error": "retrieval_unavailable"}
         finally:
+            if sink:
+                await sink(
+                    {
+                        "phase": "tool_finished",
+                        "tool": call.name,
+                        "urls": [],
+                        "ok": succeeded,
+                    }
+                )
             self.item.latence_ms["retrieval"] += (time.monotonic() - started) * 1000
 
 
@@ -201,9 +229,10 @@ async def process(request: ChatRequest, item: Interaction) -> None:
         model.tools.append(declaration())
     model.observing = True
     model.sink = sink_context.get()
-    model.reasoning_effort = request.reasoning_effort
+    model.configure_quality(request.model, request.max_tokens)
+    item.reasoning_effort = request.reasoning_effort
     model.local_enabled = os.environ.get("GPU_LOCAL", "0") == "1"
-    item.cout_eur = 0.05  # Conservative upper bound until the loop returns its ledger.
+    item.cout_eur = 0.1  # Conservative upper bound until the loop returns its ledger.
     tools = ChatTools(item, request.messages[-1].text, allow_image=not followup)
     try:
         result = await run(
@@ -215,7 +244,14 @@ async def process(request: ChatRequest, item: Interaction) -> None:
             + Path("prompts/web-chat.txt").read_text()
             + (Path("prompts/followup.txt").read_text() if followup else "")
             + language_instruction(request.lang),
-            Limits(wall_clock=max(0, 120 - (time.monotonic() - started))),
+            Limits(
+                profile=request.model,
+                tokens=262144,
+                cost=Decimal("0.10"),
+                wall_clock=max(
+                    0, request.timeout_seconds - (time.monotonic() - started)
+                ),
+            ),
             history=[
                 {"role": m.role, "content": m.text} for m in request.messages[:-1]
             ],
@@ -236,8 +272,18 @@ async def process(request: ChatRequest, item: Interaction) -> None:
             item.erreurs.append(result.reason)
         if result.state == "done" and not followup:
             await render_citations(item)
+        if tools.source_truncated:
+            labels = json.loads(Path("prompts/activity-labels.json").read_text())
+            item.reponse += (
+                "\n\n" + labels.get(request.ui_locale, labels["en"])["source_truncated"]
+            )
     finally:
         item.tokens = {"in": model.input_tokens, "out": model.output_tokens}
+        item.provider_model = model.provider_model
+        item.reasoning = model.reasoning
+        item.trace_tokens, item.answer_tokens = model.trace_tokens, model.answer_tokens
+        item.token_split_estimated = model.token_split_estimated
+        item.reasoning_retried = model.reasoning_retried
         item.latence_ms["generation"] = model.generation_ms
         if model.observations and item.task_type != "imagegen":
             item.modele_utilise = model.observations[-1].provider

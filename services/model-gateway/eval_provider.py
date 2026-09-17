@@ -153,7 +153,7 @@ class EvalProvider:
             "max_tokens": 2048,
             "stream": True,
             "stream_options": {"include_usage": True},
-            "reasoning_effort": "none" if role == "system" else "low",
+            "reasoning_effort": "none",
         }
         request = Request(
             endpoint + "/chat/completions",

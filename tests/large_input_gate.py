@@ -9,6 +9,7 @@ import re
 import tempfile
 import time
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from threading import Thread
 from typing import Any
@@ -20,7 +21,7 @@ from http_gateway import serve
 from test_storage import StorageTests
 from services.orchestrator.cache import Cache
 from services.orchestrator.content import select_passages
-from services.orchestrator.loop import Query, run
+from services.orchestrator.loop import Limits, Query, run
 from services.orchestrator.model import Configuration, GatewayModel
 from services.orchestrator.tools import Fetch, Runtime
 from services.retrieval.pipeline import ingest
@@ -51,6 +52,7 @@ async def check() -> None:
         archive["calls"] = []
     config = Configuration.model_validate(archive["configuration"])
     model = GatewayModel("http://recording.invalid", config)
+    model.configure_quality("atlas", 3000)
     provider = AgentProvider() if record else None
     index = 0
 
@@ -121,6 +123,7 @@ async def check() -> None:
                 model,
                 runtime,
                 Path("prompts/agent.txt").read_text(),
+                limits=Limits(profile="atlas", tokens=262144, cost=Decimal("0.10")),
                 history=[
                     {
                         "role": "tool",
@@ -131,7 +134,7 @@ async def check() -> None:
                     }
                 ],
             )
-        assert web_result.state == "done" and not web_result.reason
+        assert web_result.state == "done" and not web_result.reason, web_result.reason
         assert_formula(web_result.text)
         answer = web_result.text.casefold()
         assert "cancel" in answer and "uncancel" in answer
@@ -191,6 +194,7 @@ async def check() -> None:
                 for p in passages
             )
             model = GatewayModel("http://recording.invalid", config)
+            model.configure_quality("atlas", 3000)
             with patch.object(GatewayModel, "post", staticmethod(transport)):
                 document_result = await run(
                     Query(question=QUESTION, lang="en"),
@@ -198,6 +202,7 @@ async def check() -> None:
                     runtime,
                     Path("prompts/agent.txt").read_text()
                     + Path("prompts/chat.txt").read_text(),
+                    limits=Limits(profile="atlas", tokens=262144, cost=Decimal("0.10")),
                     history=[
                         {
                             "role": "tool",

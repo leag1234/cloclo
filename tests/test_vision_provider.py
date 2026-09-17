@@ -34,6 +34,7 @@ class VisionProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body["model"], provider.config["model"])
         self.assertEqual(body["messages"][1:], value["messages"])
         self.assertNotIn("tools", body)
+        self.assertEqual(body["reasoning_effort"], "none")
         self.assertIn(
             Path("prompts/chat.txt").read_text(), body["messages"][0]["content"]
         )

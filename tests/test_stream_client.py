@@ -10,6 +10,58 @@ from test_budgets import Tools
 
 
 class StreamBudgetTests(unittest.IsolatedAsyncioTestCase):
+    async def test_model_recovery_stays_non_reasoning_after_tool_turn(self) -> None:
+        model = self.model()
+        model.configure_quality("atlas-glm", 3000)
+        first = {
+            "text": "",
+            "calls": [
+                {"id": "calc", "name": "calculator", "arguments": '{"expr":"8/2"}'}
+            ],
+            "usage": {"prompt_tokens": 20, "completion_tokens": 100},
+            "cost_eur": "0.001",
+            "reasoning_retried": True,
+        }
+        second = {
+            "text": "The result is 4.",
+            "calls": [],
+            "usage": {"prompt_tokens": 30, "completion_tokens": 10},
+            "cost_eur": "0.001",
+        }
+        messages: list[dict[str, object]] = [
+            {"role": "user", "content": "Calculate this quantity."}
+        ]
+        with patch("services.orchestrator.model.receive", new_callable=AsyncMock) as io:
+            io.side_effect = [first, second]
+            await model.complete(messages, 100)
+            answer = await model.complete(
+                [
+                    *messages,
+                    {
+                        "role": "assistant",
+                        "tool_calls": [
+                            {
+                                "id": "calc",
+                                "type": "function",
+                                "function": {
+                                    "name": "calculator",
+                                    "arguments": '{"expr":"8/2"}',
+                                },
+                            }
+                        ],
+                    },
+                    {"role": "tool", "tool_call_id": "calc", "content": "4"},
+                ],
+                40,
+            )
+        self.assertEqual(answer.text, "The result is 4.")
+        self.assertEqual(io.call_args_list[0].args[1]["reasoning_effort"], "none")
+        recovered = io.call_args_list[1].args[1]
+        self.assertEqual(recovered["reasoning_effort"], "none")
+        self.assertEqual(recovered["max_tokens"], 3000)
+        self.assertEqual(recovered["messages"][0], messages[0])
+        self.assertTrue(model.reasoning_retried)
+
     def model(self) -> GatewayModel:
         model = GatewayModel(
             "http://127.0.0.1:1",

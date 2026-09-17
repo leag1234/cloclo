@@ -43,8 +43,14 @@ async def finish(
             item,
             request.seed,
             language=request.lang,
-            budget=Decimal("0.05") - result.cost,
-            timeout=max(0, 120 - (monotonic() - started)),
+            budget=max(
+                Decimal(0),
+                min(
+                    Decimal("0.05"),
+                    Decimal("0.10") - result.cost,
+                ),
+            ),
+            timeout=max(0, min(120, request.timeout_seconds - (monotonic() - started))),
         )
         sink = sink_context.get()
         if sink:

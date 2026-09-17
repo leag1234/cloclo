@@ -15,7 +15,8 @@ from unittest.mock import Mock, patch
 from fastapi.testclient import TestClient
 from gateway_cpu import CPUModels
 from http_gateway import serve
-from vision import VisionProvider
+import quality
+from agent_provider import AgentProvider, AgentRequest
 from services.orchestrator.chat_api import app
 
 ROOT = Path("tests/cassettes/vision")
@@ -29,16 +30,15 @@ QUESTIONS = [
 def main() -> None:
     record = os.environ.get("ATLAS_M12_MODE", "replay") == "record"
     archive: list[dict[str, Any]] = [] if record else json.loads(RECORDING.read_text())
-    original = VisionProvider.post
+    original = quality.complete
     count = 0
 
-    async def transport(
-        self: VisionProvider, body: dict[str, object], timeout: float
-    ) -> object:
+    async def transport(self: AgentProvider, request: AgentRequest) -> object:
         nonlocal count
         count += 1
+        body = request.model_dump(exclude={"timeout"})
         if record:
-            response = await original(self, body, timeout)
+            response = await original(self, request)
             archive.append({"request": body, "response": response})
             RECORDING.write_text(json.dumps(archive, ensure_ascii=False) + "\n")
             return response
@@ -67,7 +67,7 @@ def main() -> None:
                     "ATLAS_INTERACTION_DIR": directory,
                 },
             ),
-            patch.object(VisionProvider, "post", transport),
+            patch.object(quality, "complete", transport),
             TestClient(app) as client,
         ):
             answers = []

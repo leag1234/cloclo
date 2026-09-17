@@ -56,7 +56,12 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         rest = self.cache.get(str(first["handle"]))
         self.assertIsNotNone(rest)
         assert rest is not None
-        self.assertEqual(str(first["text"]) + str(rest["text"]), text)
+        self.assertEqual(rest["text"], text)
+        self.assertTrue(first["selected"])
+        synthesis = first["synthesis"]
+        assert isinstance(synthesis, dict)
+        self.assertEqual(synthesis["method"], "hierarchical_extractive")
+        self.assertEqual(synthesis["source_characters"], len(text))
         self.assertIn("consulted_at", first)
 
     async def test_timeout_and_extraction_error(self) -> None:

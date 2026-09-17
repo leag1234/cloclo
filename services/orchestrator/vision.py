@@ -1,4 +1,4 @@
-"""Vision branch uses the gateway and never persists uploaded image bytes."""
+"""Vision branch materializes owned image references only for the current request."""
 
 import os
 import json
@@ -18,7 +18,7 @@ from services.orchestrator.stream_client import sink_context
 
 class VisionUsage(BaseModel):
     prompt_tokens: int = Field(ge=0, strict=True)
-    completion_tokens: int = Field(ge=0, le=2048, strict=True)
+    completion_tokens: int = Field(ge=0, le=19000, strict=True)
 
 
 class VisionObservation(BaseModel):
@@ -27,10 +27,16 @@ class VisionObservation(BaseModel):
 
 
 class VisionReply(BaseModel):
-    text: str = Field(min_length=1, max_length=32000)
+    provider_model: str = Field(default="", max_length=200)
+    text: str = Field(min_length=1, max_length=128000)
     usage: VisionUsage
-    cost_eur: Decimal = Field(ge=0, le=Decimal("0.05"), allow_inf_nan=False)
+    cost_eur: Decimal = Field(ge=0, le=Decimal("0.20"), allow_inf_nan=False)
     observation: VisionObservation
+    reasoning: str = Field(default="", max_length=256000)
+    trace_tokens: int = Field(default=0, ge=0)
+    answer_tokens: int = Field(default=0, ge=0)
+    token_split_estimated: bool = False
+    reasoning_retried: bool = False
 
 
 async def process_vision(request: ChatRequest, item: Interaction) -> None:
@@ -54,7 +60,8 @@ async def process_vision(request: ChatRequest, item: Interaction) -> None:
             await sink({"delta": {"content": item.reponse}})
         return
     started = time.monotonic()
-    item.cout_eur = 0.05  # Retain reservation on missing/invalid provider usage.
+    item.reasoning_effort = request.reasoning_effort
+    item.cout_eur = 0.1  # Retain reservation on missing/invalid provider usage.
     item.task_type = "vision"
     item.images = [im for message in request.messages for im in message.images]
     item.modele_utilise, item.route_decision = "escalade", "complexe"
@@ -65,12 +72,24 @@ async def process_vision(request: ChatRequest, item: Interaction) -> None:
                 + "/vision/complete",
                 {
                     "messages": [m.model_dump() for m in request.messages],
-                    "timeout": 115.0,
+                    "timeout": request.timeout_seconds - 5.0,
                     "lang": request.lang,
+                    "profile": request.model,
+                    "max_tokens": request.max_tokens,
                 },
-                115.0,
+                request.timeout_seconds - 5.0,
             )
         )
+        if result.cost_eur > Decimal("0.10"):
+            raise ValueError("invalid_vision_cost")
+        item.provider_model = result.provider_model
+        item.reasoning = result.reasoning
+        item.trace_tokens, item.answer_tokens = (
+            result.trace_tokens,
+            result.answer_tokens,
+        )
+        item.token_split_estimated = result.token_split_estimated
+        item.reasoning_retried = result.reasoning_retried
         text = result.text
         for message in request.messages:
             if isinstance(message.content, list):
@@ -82,6 +101,10 @@ async def process_vision(request: ChatRequest, item: Interaction) -> None:
                         )
         sink = sink_context.get()
         if sink is not None:
+            if result.reasoning:
+                await sink({"delta": {"reasoning_content": result.reasoning}})
+            if result.reasoning_retried:
+                await sink({"phase": "reasoning_fallback"})
             await sink({"delta": {"content": text}})
         item.reponse, item.state = text, "done"
         item.tokens = {

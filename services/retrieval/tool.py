@@ -7,6 +7,7 @@ import sys
 from pydantic import BaseModel, ConfigDict, Field
 from services.retrieval.search import Gateway, rank
 from services.retrieval.store import Store
+from packages.evidence import whole_chunks
 
 
 class Request(BaseModel):
@@ -25,14 +26,17 @@ def main() -> None:
     print(
         json.dumps(
             {
-                "passages": [
-                    {
-                        "chunk_id": c.chunk_id,
-                        "text": c.text.encode()[:400].decode("utf-8", errors="ignore"),
-                        "source": c.source,
-                    }
-                    for c in chunks
-                ]
+                "passages": whole_chunks(
+                    [
+                        {
+                            "chunk_id": c.chunk_id,
+                            "text": c.text,
+                            "source": c.source,
+                        }
+                        for c in chunks
+                    ],
+                    1000,
+                )
             },
             ensure_ascii=False,
         )

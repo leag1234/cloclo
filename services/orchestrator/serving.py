@@ -12,6 +12,7 @@ from urllib.request import urlopen
 from urllib.error import URLError
 
 from packages.configuration import CHAT_REQUIRED_ENV, require_env
+from services.orchestrator.webui import configure
 
 import uvicorn
 from gateway_cpu import CPUModels
@@ -55,6 +56,13 @@ def docker_run(name: str, image: str, options: list[str]) -> None:
 
 def webui(name: str, persistent: bool) -> None:
     options = ["--network", "host", "--env-file", "infra/chat-ui.env"]
+    options.extend(
+        [
+            "-v",
+            str(Path("services/orchestrator/chat-ui.css").resolve())
+            + ":/app/backend/open_webui/static/custom.css:ro",
+        ]
+    )
     if persistent:
         options.extend(["-v", "atlas-chat-ui:/app/backend/data"])
     docker_run(name, WEBUI_IMAGE, options)
@@ -164,6 +172,7 @@ def run() -> None:
             webui("atlas-chat-ui", True)
             launched = True
             wait_http("http://127.0.0.1:3000")
+            configure()
             print(
                 "ATLAS ready: http://localhost:3000 (SSH tunnel), GPU_LOCAL="
                 + os.environ.get("GPU_LOCAL", "0"),

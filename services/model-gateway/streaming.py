@@ -30,16 +30,19 @@ class Delta(BaseModel):
 class StreamChoice(BaseModel):
     index: Literal[0]
     delta: Delta
-    finish_reason: Literal["stop", "tool_calls"] | None = None
+    finish_reason: Literal["stop", "tool_calls", "length"] | None = None
 
 
 class Frame(BaseModel):
+    error: None = None
     choices: list[StreamChoice] = Field(max_length=1)
     usage: dict[str, object] | None = None
 
 
 class StreamDecoder:
-    def __init__(self) -> None:
+    def __init__(self, allow_length: bool = False) -> None:
+        self.allow_length = allow_length
+        self.reasoning = ""
         self.buffer = bytearray()
         self.total = 0
         self.text = ""
@@ -50,7 +53,9 @@ class StreamDecoder:
 
     def feed(self, piece: bytes) -> list[dict[str, object]]:
         self.total += len(piece)
-        if self.total > 800000 or (self.result is not None and piece.strip()):
+        if self.total > (8000000 if self.allow_length else 800000) or (
+            self.result is not None and piece.strip()
+        ):
             raise ValueError("stream_limit_or_trailing_data")
         self.buffer.extend(piece)
         events: list[dict[str, object]] = []
@@ -85,6 +90,8 @@ class StreamDecoder:
                         events.append({"delta": {key: value}})
                         if key == "content":
                             self.text += value
+                        else:
+                            self.reasoning += value
                 for call in delta.tool_calls:
                     target = self.calls.setdefault(
                         call.index, {"id": "", "name": "", "arguments": ""}
@@ -126,7 +133,11 @@ class StreamDecoder:
                 ],
             }
         )
-        if not self.text and not calls:
+        if not self.allow_length and completion.usage.completion_tokens > 2048:
+            raise ValueError("output_budget")
+        if self.reason == "length" and not self.allow_length:
+            raise ValueError("incomplete_stream")
+        if not self.text and not calls and not self.allow_length:
             raise ValueError("empty_stream")
         if len({c["id"] for c in calls}) != len(calls):
             raise ValueError("duplicate_call")
@@ -137,6 +148,21 @@ class StreamDecoder:
             "calls": calls,
             "usage": completion.usage.model_dump(),
         }
+        if self.allow_length:
+            details = (self.usage or {}).get("completion_tokens_details")
+            reasoning_tokens = (
+                details.get("reasoning_tokens") if isinstance(details, dict) else None
+            )
+            if reasoning_tokens is not None and (
+                type(reasoning_tokens) is not int
+                or not 0 <= reasoning_tokens <= completion.usage.completion_tokens
+            ):
+                raise ValueError("invalid_reasoning_usage")
+            self.result.update(
+                finish_reason=self.reason,
+                reasoning=self.reasoning,
+                reasoning_tokens=reasoning_tokens,
+            )
 
     def finish(self) -> None:
         if self.buffer.strip() or self.result is None:

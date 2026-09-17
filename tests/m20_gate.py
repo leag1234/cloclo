@@ -1,7 +1,7 @@
 """M20 HTTP journeys with explicitly recorded external inference and GPU startup."""
 
 import base64
-from contextlib import ExitStack
+from contextlib import ExitStack, aclosing
 import copy
 import gzip
 import json
@@ -29,6 +29,7 @@ import image_lifecycle
 from vision import VisionProvider
 from journeys.m20 import run_m20
 from serverless_support import environment
+from provider_recording import ExactHistory, capture_stream, replay_stream
 from j8_gate import startup_journey
 
 ARCHIVE = Path("tests/cassettes/m20.json.gz")
@@ -36,17 +37,21 @@ ARCHIVE = Path("tests/cassettes/m20.json.gz")
 
 def main() -> None:
     live = os.environ.get("M20_LIVE") == "1"
+    refresh = os.environ.get("M20_REFRESH") == "1"
+    previous = json.loads(gzip.decompress(ARCHIVE.read_bytes()))
+    historical_used: set[int] = set()
+    image_modes: list[str] = []
     resume = os.environ.get("M20_RESUME")
     rows: list[dict[str, Any]] = (
         json.loads(gzip.decompress(Path(resume).read_bytes()))
         if resume
-        else ([] if live else json.loads(gzip.decompress(ARCHIVE.read_bytes())))
+        else ([] if live or refresh else previous)
     )
     prefix = len(rows) if resume else 0
     position = 0
 
     def replaying() -> bool:
-        return not live or position < prefix
+        return not (live or refresh) or position < prefix
 
     inside = False
 
@@ -71,6 +76,17 @@ def main() -> None:
         assert row["kind"] == kind and row["request"] == request, (position, kind)
         return copy.deepcopy(row["response"])
 
+    def historical(kind: str, request: Any) -> Any:
+        for index, row in enumerate(previous):
+            if (
+                index not in historical_used
+                and row["kind"] == kind
+                and row["request"] == request
+            ):
+                historical_used.add(index)
+                return record(kind, request, copy.deepcopy(row["response"]))
+        raise AssertionError("unrecorded_historical_m20_" + kind)
+
     def wrap(cls: Any, name: str, kind: str) -> Any:
         original = getattr(cls, name)
 
@@ -93,6 +109,12 @@ def main() -> None:
         value = {k: v for k, v in request.items() if k != "timeout"}
         if replaying():
             return replay("image", value)
+        if refresh and any(
+            row["kind"] == "image" and row["request"] == value for row in previous
+        ):
+            image_modes.append("replay")
+            return historical("image", value)
+        image_modes.append("live")
         inside = True
         try:
             return record("image", value, await original_image(request))
@@ -105,6 +127,8 @@ def main() -> None:
     def ready() -> bool:
         if inside:
             return original_ready()
+        if refresh and not replaying():
+            return bool(historical("ready", {}))
         return bool(
             replay("ready", {})
             if replaying()
@@ -115,6 +139,11 @@ def main() -> None:
         nonlocal inside
         if replaying():
             saved = replay("startup", {})
+            if "missing" in saved:
+                raise MissingConfiguration(tuple(saved["missing"]))
+            return
+        if refresh:
+            saved = historical("startup", {})
             if "missing" in saved:
                 raise MissingConfiguration(tuple(saved["missing"]))
             return
@@ -131,23 +160,32 @@ def main() -> None:
         finally:
             inside = False
 
+    unchanged = ExactHistory(previous)
     original_stream = stream_transport.attempt
 
     async def stream(request: Any, model: str, timeout: float) -> Any:
         value = request.model_dump(exclude={"timeout"})
-        if replaying():
-            for event in replay("stream", value):
-                yield event
+        saved = unchanged.take("stream", value) if refresh else None
+        if saved is not None:
+            record("stream", value, saved)
+            async with aclosing(replay_stream(saved)) as events:
+                async for event in events:
+                    yield event
             return
-        events = []
-        async for event in original_stream(request, model, timeout):
-            events.append(event)
-            if "result" in event:
-                record("stream", value, events)
-            yield event
+        source = (
+            replay_stream(replay("stream", value))
+            if replaying()
+            else capture_stream(
+                original_stream(request, model, timeout),
+                lambda events: record("stream", value, events),
+            )
+        )
+        async with aclosing(source):
+            async for event in source:
+                yield event
 
     def cold_start() -> None:
-        if not replaying():
+        if not replaying() and not refresh:
             # End the earlier launcher's trap before creating its replacement.
             for path in Path("/proc").glob("[0-9]*/cmdline"):
                 try:
@@ -182,18 +220,28 @@ def main() -> None:
 
     report_path = Path("BRAIN/eval/journeys.json")
     report = json.loads(report_path.read_text()) if report_path.exists() else {}
-    report["m20_mode"] = "mixed" if resume else "live" if live else "replay"
+    report["m20_mode"] = "mixed" if resume or refresh else "live" if live else "replay"
     report["m20_journey_modes"] = {
-        f"J{n}": "replay" if not live or (resume and n < 26) else "live"
+        f"J{n}": "mixed"
+        if refresh
+        else "replay"
+        if not live or (resume and n < 26)
+        else "live"
         for n in range(21, 27)
     }
-    report.setdefault("mode", report["m20_mode"])
+    report.setdefault("mode", "live" if live or refresh else "replay")
+    if refresh:
+        report["m20_external_modes"] = {
+            "inference": "mixed",
+            "image": image_modes,
+            "startup": "replay",
+        }
     with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
         stack.enter_context(
             patch.dict(
                 os.environ,
                 {
-                    **({} if live else environment()),
+                    **({} if live or refresh else environment()),
                     "ATLAS_GATEWAY_URL": "http://127.0.0.1:18010",
                     "ATLAS_PUBLIC_URL": "http://127.0.0.1:18020",
                     "ATLAS_IMAGE_DIR": directory + "/images",
@@ -318,7 +366,7 @@ def main() -> None:
             gateway.server_close()
             report_path.parent.mkdir(parents=True, exist_ok=True)
             report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2))
-        if not live:
+        if not live and not refresh:
             assert position == len(rows), "unused_m20_exchanges"
     with patch.dict(os.environ, environment()):
         report.update(startup_journey())

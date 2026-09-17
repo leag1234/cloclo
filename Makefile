@@ -134,8 +134,7 @@ serve-devapi: ## local developer API, individual keys and quotas; no GPU
 verify-m17: ## integration journeys through the public chat API
 	@bash scripts/verify-m17.sh
 test-journeys: ## recorded external exchanges through the real HTTP stack
-	@PYTHONPATH=.:tests:services/model-gateway python3 tests/journey_server.py
-	@PYTHONPATH=.:tests:services/model-gateway python3 tests/m20_gate.py
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/journey_runner.py
 
 .PHONY: test-devapi verify-m15
 test-devapi: ## developer API: real local HTTP and recorded provider streams
@@ -171,3 +170,7 @@ verify-m19: ## explicit intent, language and permanent settings locks
 verify-m20: ## real-usage journeys, honest failures and unified startup
 	@PYTHONPATH=.:tests:services/model-gateway python3 -m unittest tests.test_service_delivery
 	@bash scripts/verify-m20.sh
+
+.PHONY: verify-m21
+verify-m21: ## reasoning, expert evidence and native activity
+	@bash scripts/verify-m21.sh

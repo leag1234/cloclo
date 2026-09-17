@@ -1,17 +1,19 @@
 """M12 sovereign vision with a conservative reservation before any paid call."""
 
+from packages.profiles import PROFILES
+
 import asyncio
 import json
 import os
 from decimal import Decimal
 from pathlib import Path
 from time import monotonic
-from typing import Literal
+from typing import Literal, Self
 from packages.language import conversation_language, language_instruction
 
 import aiohttp
 import yaml
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from agent_provider import Completion
 from packages.images import VisionInput
@@ -20,7 +22,23 @@ from packages.context_limit import ContextExceeded
 
 class VisionRequest(VisionInput):
     lang: Literal["fr", "de", "es", "it", "en"] = "fr"
-    timeout: float = Field(gt=0, le=120, default=120)
+    timeout: float = Field(gt=0, le=300, default=120)
+    profile: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    max_tokens: int | None = Field(
+        default=None, ge=1, le=16000, exclude_if=lambda value: value is None
+    )
+
+    @property
+    def budget(self) -> Decimal:
+        return Decimal("0.10" if self.profile is not None else "0.05")
+
+    @model_validator(mode="after")
+    def deadline_limit(self) -> Self:
+        if self.profile is not None and self.profile not in PROFILES:
+            raise ValueError("invalid_profile")
+        if self.timeout > 120:
+            raise ValueError("timeout_budget")
+        return self
 
 
 class VisionProvider:
@@ -54,7 +72,7 @@ class VisionProvider:
                 tokens + self.config["max_tokens"], self.config["context_tokens"]
             )
         reservation = self.cost(tokens, self.config["max_tokens"])
-        if reservation > Decimal("0.05"):
+        if reservation > request.budget:
             raise RuntimeError("cost_budget")
         return tokens, reservation
 
@@ -62,8 +80,8 @@ class VisionProvider:
         started = monotonic()
         request = VisionRequest.model_validate(payload)
         incoming, reserved = self.reserve(request)
-        prompt = Path("prompts/vision.txt").read_text()
-        prompt += Path("prompts/chat.txt").read_text()
+        prompt = Path("prompts/chat.txt").read_text()
+        prompt += Path("prompts/vision.txt").read_text()
         if sum(len(message.images) for message in request.messages) > 1:
             prompt += Path("prompts/vision-multiple.txt").read_text()
         pixels = [
@@ -89,19 +107,49 @@ class VisionProvider:
             raise ContextExceeded(
                 incoming + self.config["max_tokens"], self.config["context_tokens"]
             )
-        if reserved > Decimal("0.05"):
+        if reserved > request.budget:
             raise RuntimeError("cost_budget")
         messages = [{"role": "system", "content": prompt}]
         messages.extend(m.model_dump() for m in request.messages)
+        if request.profile is not None:
+            # Full-pixel reservation already covers high detail; do not let a
+            # provider's automatic downsampling discard identification evidence.
+            for message in messages:
+                content = message.get("content")
+                if isinstance(content, list):
+                    for part in content:
+                        if isinstance(part, dict) and part.get("type") == "image_url":
+                            part["image_url"].setdefault("detail", "high")
         body = {
             "model": self.config["model"],
             "messages": messages,
             "max_tokens": self.config["max_tokens"],
             "temperature": 0,
+            "reasoning_effort": "none",
         }
         remaining = request.timeout - (monotonic() - started)
         if remaining <= 0:
             raise TimeoutError("timeout")
+        if request.profile is not None:
+            from agent_provider import AgentProvider, AgentRequest
+            from quality import complete
+
+            options: dict[str, object] = {
+                "messages": messages,
+                "tools": [],
+                "timeout": remaining,
+                "local_enabled": False,
+                "observe": True,
+                "profile": request.profile,
+            }
+            if request.max_tokens is not None:
+                options["max_tokens"] = request.max_tokens
+            answer = await complete(
+                AgentProvider(), AgentRequest.model_validate(options)
+            )
+            if not answer.get("text") or answer.get("calls"):
+                raise RuntimeError("provider_response_invalid")
+            return answer
         async with asyncio.timeout(remaining):
             data = await self.post(body, remaining)
         result = Completion.model_validate(data)
@@ -111,6 +159,7 @@ class VisionProvider:
             or not choice.message.content
             or choice.message.tool_calls
             or usage.prompt_tokens > incoming
+            or usage.completion_tokens > self.config["max_tokens"]
         ):
             raise RuntimeError("provider_response_invalid")
         cost = self.cost(usage.prompt_tokens, usage.completion_tokens)

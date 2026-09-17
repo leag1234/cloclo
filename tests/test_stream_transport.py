@@ -3,6 +3,7 @@
 from collections.abc import AsyncIterator
 from contextlib import aclosing
 import os
+import json
 import unittest
 from unittest.mock import patch
 
@@ -49,6 +50,132 @@ class Session:
 
 
 class TransportTests(unittest.IsolatedAsyncioTestCase):
+    async def test_vision_none_is_explicit_and_empty_tools_are_omitted(
+        self,
+    ) -> None:
+        from agent_provider import AgentRequest
+        from stream_transport import attempt
+
+        session = Session()
+        with (
+            patch.dict(os.environ, environment()),
+            patch("stream_transport.aiohttp.ClientSession", return_value=session),
+        ):
+            request = AgentRequest(
+                messages=[{"role": "user", "content": "Describe."}],
+                tools=[],
+                timeout=5.0,
+            )
+            _ = [
+                e
+                async for e in attempt(
+                    request, ServerlessPolicy().models["vision"], 5.0
+                )
+            ]
+        assert isinstance(session.body, dict)
+        self.assertNotIn("tools", session.body)
+        self.assertEqual(session.body["reasoning_effort"], "none")
+
+    async def test_failure_diagnostics_do_not_log_untrusted_payloads(self) -> None:
+        from agent_provider import AgentRequest
+        from stream_transport import attempt
+
+        class InvalidContent(Content):
+            async def iter_chunked(self, size: int) -> AsyncIterator[bytes]:
+                yield b'data: {"secret": "private-provider-payload"}\n\n'
+
+        for status in (429, 200):
+            session = Session()
+            session.response.status = status
+            session.response.content = InvalidContent()
+            with (
+                patch.dict(os.environ, environment()),
+                patch("stream_transport.aiohttp.ClientSession", return_value=session),
+                self.assertLogs("stream_transport", level="WARNING") as logs,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "provider_error"):
+                    _ = [
+                        event
+                        async for event in attempt(
+                            AgentRequest(
+                                messages=[
+                                    {"role": "user", "content": "private-question"}
+                                ],
+                                tools=[],
+                                timeout=5.0,
+                            ),
+                            ServerlessPolicy().models["text"],
+                            5.0,
+                        )
+                    ]
+            diagnostic = json.loads(logs.records[0].getMessage())
+            self.assertEqual(diagnostic["event"], "provider_stream_failure")
+            self.assertEqual(diagnostic["content_chars"], 0)
+            self.assertEqual(diagnostic["reasoning_chars"], 0)
+            self.assertEqual(diagnostic["tool_calls"], 0)
+            self.assertIsNone(diagnostic["finish_reason"])
+            self.assertFalse(diagnostic["usage_present"])
+            self.assertEqual(
+                diagnostic["category"], "http" if status == 429 else "validation"
+            )
+            if status == 429:
+                self.assertEqual(diagnostic["status"], 429)
+            else:
+                self.assertEqual(diagnostic["validation_types"], ["missing"])
+            self.assertNotIn("private-provider-payload", str(logs.output))
+            self.assertNotIn("private-question", str(logs.output))
+
+    async def test_answer_only_preserves_tool_schemas_at_http_boundary(self) -> None:
+        session = Session()
+        tools = [{"type": "function", "function": {"name": "web_search"}}]
+        with (
+            patch.dict(os.environ, environment()),
+            patch("stream_transport.aiohttp.ClientSession", return_value=session),
+        ):
+            _ = [
+                event
+                async for event in AgentProvider().stream(
+                    {
+                        "messages": [{"role": "user", "content": "Bonjour"}],
+                        "tools": tools,
+                        "tool_choice": "none",
+                        "timeout": 5.0,
+                        "local_enabled": False,
+                    }
+                )
+            ]
+        assert isinstance(session.body, dict)
+        self.assertEqual(session.body["tools"], tools)
+        self.assertEqual(session.body["tool_choice"], "none")
+
+    async def test_profile_finalization_has_no_active_tool_template(self) -> None:
+        from agent_provider import AgentRequest
+        from stream_transport import attempt
+        from packages.tool_history import final_messages
+
+        session = Session()
+        messages: list[dict[str, object]] = [
+            {"role": "user", "content": "What does the source say?"},
+            {"role": "tool", "tool_call_id": "read-1", "content": "Full evidence."},
+        ]
+        with (
+            patch.dict(os.environ, environment()),
+            patch("stream_transport.aiohttp.ClientSession", return_value=session),
+        ):
+            req = AgentRequest(
+                messages=messages,
+                tools=[{"type": "function", "function": {"name": "web_fetch"}}],
+                profile="atlas",
+                tool_choice="none",
+                timeout=5.0,
+            )
+            _ = [e async for e in attempt(req, ServerlessPolicy().models["code"], 5.0)]
+        assert isinstance(session.body, dict)
+        self.assertNotIn("tools", session.body)
+        self.assertNotIn("tool_choice", session.body)
+        self.assertEqual(session.body["messages"], final_messages(messages))
+        self.assertEqual(req.messages, messages)
+
     async def test_progress_and_close_before_terminal(self) -> None:
         session = Session()
         with (
@@ -78,7 +205,7 @@ class TransportTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(session.response.content.closed)
             assert isinstance(session.body, dict)
             self.assertEqual(session.body["max_tokens"], 2048)
-            self.assertEqual(session.body["reasoning_effort"], "low")
+            self.assertEqual(session.body["reasoning_effort"], "none")
 
     async def test_terminal_usage_is_validated(self) -> None:
         session = Session()

@@ -25,27 +25,22 @@ def main() -> None:
     archive: dict[str, Any] = (
         {"calls": []} if record else json.loads(gzip.decompress(RECORDING.read_bytes()))
     )
-    original = AgentProvider._complete
+    original = AgentProvider.complete
     if record:
         archive["configuration"] = AgentProvider().configuration(False)
 
     async def transport(
         self: AgentProvider,
-        request: AgentRequest,
-        endpoint: str,
-        model: str,
-        key: str,
-        timeout: float,
+        payload: object,
     ) -> dict[str, object]:
+        request = AgentRequest.model_validate(payload)
         assert request.local_enabled is False
-        payload = json.loads(
-            json.dumps({"messages": request.messages, "tools": request.tools})
-        )
+        stable = request.model_dump(exclude={"timeout"})
         if record:
-            response = await original(self, request, endpoint, model, key, timeout)
-            archive["calls"].append({"request": payload, "response": response})
+            response = await original(self, payload)
+            archive["calls"].append({"request": stable, "response": response})
             return response
-        rows = [r for r in archive["calls"] if r["request"] == payload]
+        rows = [r for r in archive["calls"] if r["request"] == stable]
         if len(rows) != 1:
             raise RuntimeError("unrecorded_chat_request")
         response = rows[0]["response"]
@@ -72,7 +67,7 @@ def main() -> None:
             patch.object(
                 AgentProvider, "configuration", return_value=archive["configuration"]
             ),
-            patch.object(AgentProvider, "_complete", transport),
+            patch.object(AgentProvider, "complete", transport),
             patch.object(AgentProvider, "stream", recorded_stream),
             patch(
                 "services.orchestrator.chat_api.Interaction",
