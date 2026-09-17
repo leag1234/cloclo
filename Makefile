@@ -66,7 +66,7 @@ eval-web: ## end-to-end E6; quality subject to human answer keys and judge
 
 .PHONY: eval-routing test-fallback
 eval-routing: ## E8: confusion matrix and critical under-routing
-	@PYTHONPATH=services/model-gateway python3 tests/routing_eval.py
+	@PYTHONPATH=.:services/model-gateway python3 tests/routing_eval.py
 test-fallback: ## closed local endpoint then replay of the recorded Scaleway response
 	@PYTHONPATH=services/model-gateway:tests python3 -m unittest test_cascade -v
 
