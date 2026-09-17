@@ -26,11 +26,13 @@ pass "prompts ask for expertise, derivation and an explicit conclusion"
 
 # Model selector (deep mode was abandoned: measured unusable on all three provider models
 # on 2026-09-17 — see reports/M21.md). What must be exposed now is a choice of MODELS.
-for m in "atlas-glm" "atlas-fast"; do
+# Profiles are named after the actual models (owner decision 2026-09-17).
+for m in "atlas-qwen" "atlas-glm" "atlas-deepseek"; do
   grep -rqE "$m" services/orchestrator/ services/model-gateway/ 2>/dev/null \
     || fail "model $m is not exposed: the selector must offer the configured provider models"
 done
-grep -rqE "atlas-deep" services/orchestrator/ services/model-gateway/ 2>/dev/null \
+# Word-anchored: "atlas-deep" must not match "atlas-deepseek".
+grep -rqE "atlas-deep\b" services/orchestrator/ services/model-gateway/ 2>/dev/null \
   && fail "atlas-deep is still exposed: deep mode was abandoned with measured evidence"
 # reasoning_effort must be sent EXPLICITLY on every call: the provider default changed
 # mid-day on 2026-09-17 and silently emptied every answer.
