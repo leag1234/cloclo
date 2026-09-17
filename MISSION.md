@@ -112,3 +112,14 @@ Definition of done: make verify-m20 passes locally and on GitHub CI; J1–J26 pa
 through the public chat API; MISSION.md stays under 8,000 bytes and the decisions
 log exists. Record the approved merge and completion in BRAIN. No unmeasured image
 quality claim or replay presented as live evidence is acceptable.
+
+## Standing facts — never archive these (they are active rules, not history)
+- **GitHub token**: the exposed token was REVOKED and replaced on 2026-09-13; write access
+  was verified (API write 201, delete 200). The incident is CLOSED. Do not ask for
+  confirmation again, do not stop on it.
+- **GPU budget**: attested by the owner. `GPU_MAX_EUR_H=2.00`, 30 EUR cap per milestone,
+  800 EUR monthly budget with alerts. A theoretical shutdown flaw is a note, not a stop.
+- **External services**: a failure counter is per-session, never permanent. A stored
+  failure from an earlier session is not a reason to refuse a first attempt today.
+- When archiving to `docs/decisions-log.md`, move HISTORY only. Anything that must be
+  applied on every session stays in MISSION.md.
