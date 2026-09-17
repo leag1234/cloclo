@@ -154,3 +154,23 @@ provider-default regression, not a model failure. Log it as such, retry once wit
 
 This is an external change, not an implementation defect: the earlier J27/J29 "quality"
 rejections must be re-evaluated once the parameter is sent explicitly.
+
+### Never assume the shape of a provider reply (owner principle, 2026-09-17)
+M21 was blocked for hours because the gateway assumed an answer would arrive in `content`.
+Scaleway changed its default and the text went to `reasoning` instead, so the pipeline saw
+empty answers and stopped. The lesson is NOT about where the model runs — a self-hosted
+model can return an empty, truncated or oddly shaped reply just as easily. The lesson is
+that the system must **verify** what it received instead of assuming it.
+
+Rule for every provider call (text, vision, image, embeddings, tools):
+- Treat the reply as untrusted data. Validate its shape before using it.
+- Handle explicitly: empty `content`; text delivered in an unexpected field; `finish_reason`
+  of `length` or `content_filter`; missing `usage`; malformed or double-encoded JSON;
+  partial or interrupted streams; HTTP success with an error body.
+- On any of these, do not fail silently and do not invent a fallback answer. Log what was
+  actually received (fields present, sizes, finish_reason, tokens), apply a defined recovery
+  (explicit parameters, one retry, alternate model), and surface the incident.
+- Send every parameter that affects behaviour explicitly — `reasoning_effort` above all.
+  Provider defaults change without notice and must never be relied upon.
+- Add regression tests that feed the gateway these malformed replies and assert it degrades
+  gracefully with a clear message, rather than returning nothing.
