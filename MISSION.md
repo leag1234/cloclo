@@ -132,3 +132,87 @@ Reasoning mode is unusable on this provider regardless of model. Standard mode w
 all three. Record this table in `reports/M21.md`. The model selector (atlas / atlas-glm /
 atlas-fast) is therefore the way to compare quality; `reasoning_effort` stays `"none"`
 everywhere and the deep mode is not to be re-attempted without a new owner decision.
+
+## M22 — Search before asserting, exceed the source, better vision
+
+Source: five-case comparison corpus, 2026-09-17, same questions on ATLAS (three models) and
+on ChatGPT/Claude. M21 closed the context gap (full pages, full chunks, expertise prompts).
+What remains is not a lack of knowledge but a lack of **discipline about when to search**,
+plus a weak vision model. All three items below are measured.
+
+### D1 — Time-dependent facts must be searched BEFORE the first answer
+Case: "quel est le prix de l'IPO de SpaceX". qwen answered with confidence "SpaceX has
+never gone public" (false since 2026-06-12) without searching. glm made the same claim,
+then searched and corrected itself. deepseek searched first and answered correctly.
+Rule: any question whose answer can change over time — is X public, who leads Y, what
+does Z cost, is W still available, latest version of, current status of — triggers a web
+search **before** the model states anything. Training-time knowledge is a hypothesis to
+verify, never a fact to assert. Also: the Paris siege answer from qwen said "no web
+search was needed for these documented events" and then contained a factual error
+(pigeons "for balloon communications"); confidence without verification is the defect.
+When sources give different figures for the same fact, say so and explain the difference
+(SpaceX: 135 USD offer price vs 150 USD opening price — both correct, different things).
+
+### D2 — Exceed the provided source when the question asks for more than it contains
+Case: National Geographic article on the 8-year pinhole exposure, question "dis-moi
+comment fabriquer ce type de camera". All three models restated the article, including
+Pritchard's line that "the chemistry for developing the paper is straightforward". In
+solargraphy the paper is NOT developed — it is scanned, because the image prints out
+directly. ChatGPT and Claude knew this because they searched beyond the article (58
+sources for ChatGPT). The article was a news piece about a record; the question was a
+how-to. That mismatch should have triggered searches on the topic itself.
+Rule: read the given source for what it contains; search for what the QUESTION needs.
+When the question is a how-to, a comparison or a recommendation and the source is a news
+item, a testimony or a single reference, run 1–3 targeted searches on the subject. When
+a source contradicts what other sources say, report the contradiction rather than
+repeating the source.
+
+### D3 — Replace pixtral-12b for vision; add a graded vision benchmark
+Case: guitar chord photo. Ground truth (owner, low E to high e): 5-5-7-5-5-7 (full barre
+on fret 5, two fingers on fret 7). Results on the same photo, same prompt:
+| model | reading | time |
+|---|---|---|
+| pixtral-12b-2409 (current) | one finger per fret marker 3-5-7-9, "Em7" | 2 s — absurd |
+| qwen3.5-397b | frets 1-2-2, hesitant | 13 s — wrong |
+| mistral-small-3.2-24b | three fingers on fret 2, "Am" | 2 s — wrong |
+| **gemma-4-26b-a4b-it** | **barre on fret 5**, fingers on 5/6/7, "A shape" | **1 s — closest** |
+ChatGPT and Claude Opus also misread this photo. Fine fretboard reading is hard for
+everyone; the point is that pixtral is the weakest option available.
+Required: route the vision role to `gemma-4-26b-a4b-it`; keep pixtral as fallback.
+Add `tests/vision_bench/` with annotated photos (the guitar photo + its 6 positions is
+the first; the owner will add more). Score = positions correct out of N (string AND
+fret), plus "structure recognised" (yes/no) and "chord family compatible" (yes/no).
+The gate is **non-regression**: the chosen vision model must score >= the previous one on
+the bench. No absolute threshold — no model, frontier included, passes this photo cleanly.
+
+### D4 — Keep the model's narration out of the answer
+deepseek's Paris answer began "Je vais rechercher des informations… Je vais consulter une
+source… J'ai une source détaillée. Je peux maintenant synthétiser." This belongs in the
+activity indicator (M21/D5), not in the answer body. Strip planning/narration sentences
+from the final text; surface them as activity states.
+
+### Observations recorded for the model-selection decision (not actions)
+- glm-5.2 is consistently 2–7× slower than the other two (35.8 s vs 4–6 s on the Paris
+  question) and streams visibly slower; it is often the most nuanced (distinguishes
+  documented facts from rumour) but once answered a different question than asked (Z80).
+- deepseek-v4-flash: fastest, searches by default, few factual errors, states its own
+  uncertainty ("not established here by measured source"). Best trade-off on the five
+  cases so far; not yet tested on the owner's real workloads (code, analysis, writing).
+- qwen3.5-397b: fastest to answer, least likely to search, most factual errors.
+The default model is NOT changed in this milestone. Decision deferred until 2–3 cases on
+real professional workloads are in the corpus.
+
+### Journeys (verbatim, public chat API)
+J34 "quel est le prix de l'IPO de SpaceX" → a web search occurs before the answer; the
+    answer names a date and a price, and distinguishes offer vs opening price if sources
+    differ. No "never gone public".                                            [2026-09-17]
+J35 "qui est le PDG de <a company whose CEO changed in the last 12 months>" → search first.
+J36 National Geographic article + "comment fabriquer ce type de camera" → at least one
+    search beyond the given URL; the answer states that solargraphy paper is scanned, not
+    chemically developed, and notes the article's line is misleading.        [2026-09-17]
+J37 guitar photo → vision bench score recorded; >= previous model's score.   [2026-09-17]
+J38 any question → no "Je vais rechercher…" / "Let me verify…" sentences in the answer
+    body; activity states carry them instead.
+
+**Definition of done**: `make verify-m22` passes; J1–J38 pass; `tests/vision_bench/`
+exists with at least one annotated photo and a scoring script; vision routes to gemma.
