@@ -1,8 +1,7 @@
 # MISSION — ATLAS-0
 
 Build [docs/13](docs/13-poc-spec.md); read AGENTS.md, docs/11 and docs/14 first.
-Settled history remains unchanged in [decisions log](docs/decisions-log.md),
-not mandatory context. M0–M20 delivered; M21 current; no later milestone.
+History: [decisions log](docs/decisions-log.md). M0–M20 delivered; M21 current; no later milestone.
 
 Completion requires `make verify-mN` and green GitHub `ci`. Never modify workflows, CODEOWNERS or scripts/verify-*; never
 weaken assertions. Branches and PRs only; no direct pushes to main. Follow the
@@ -85,9 +84,9 @@ than a per-chunk byte cap. Download whole page (2 MB cap permitted), extract BEF
 size decisions; budget extracted text, not HTML. Verbatim page:
 https://www.nationalgeographic.com/premium/article/longest-known-exposure-pinhole-uk
 Question: “comment fabriquer ce type de camera”. Answer must contain at least3 of
-Ilford/Bayfordbury/cider/Multigrade. Original page measured400859 bytes, no paywall.
+Ilford/Bayfordbury/cider/Multigrade. Original page400859 bytes, no paywall.
 
-D4: The32 MB body increase (601a548) only unblocked photos. Store uploads once with
+D4: Store uploads once with
 image_store.py; history uses references, materializing current-turn evidence only.
 Ten turns with one new photo each must produce no size error.
 
@@ -112,21 +111,14 @@ Non-regression: M17–M20/J1–J26; standard atlas retains speed and cost. Done 
 make verify-m21 locally and green GitHub ci; J1–J33 through public chat API; all four
 measured causes removed. MISSION <=8000 bytes. Report live/replay honestly.
 
-### Budget exception — owner decision 2026-09-17
-AUTHORIZED: deep/high0.10 EUR per request supersedes docs/13 POC-P6; all other paths
-retain0.05 EUR. Measured deep output9700 tokens costs~0.035 EUR at3.60 EUR/M;
-0.05 EUR reservations reject heavy requests. This owner exception is authoritative;
-do not block on this contradiction.
-
 ### M21 — Asynchronous deep mode (owner decision, 2026-09-17)
 
-Measured: deep reasoning alone took ~96s; the120s deadline caused recovery with
-an incorrect derivation. Standard returned a correct6888-character Z80 answer;
-deep used another platform's18/23-cycle timings.
+Measured: deep reasoning took~96s;120s caused incorrect recovery. Standard
+answered correctly; deep used another platform's18/23-cycle timings.
 
 1. **Deadline:** atlas-deep300s; atlas120s. D5 activity starts within the first
 second, names the phase (“Réflexion…”) and displays elapsed time throughout.
-A slow correct answer is acceptable.
+Correctness takes priority.
 2. **Recovery:** on deep failure/timeout, rerun the question without reasoning
 with the full prompt and context, within the budget. Return the complete answer
 and state that deep did not complete. Never salvage an interrupted derivation.
@@ -134,20 +126,31 @@ and state that deep did not complete. Never salvage an interrupted derivation.
 profiles on the same question; report lower deep accuracy honestly, never force
 an assertion to pass.
 
-### Budget raised for full-context tool chains (owner decision, 2026-09-17) — supersedes ALL earlier per-request caps
-AUTHORIZED, and this is now the single authoritative statement of per-request caps:
-- `atlas` (standard): **0.10 EUR** per request (was 0.05).
-- `atlas-deep`: **0.20 EUR** per request (was 0.10).
-Any lower figure in docs/13, in earlier MISSION entries or in code comments is SUPERSEDED.
-Do not stop on a contradiction with those older figures; apply these.
+### Authoritative request budgets — owner decision 2026-09-17
 
-Rationale, measured on 2026-09-17: removing the 2 000-byte web cut and the 400-byte RAG cut
-(M21/D3) multiplied the context carried through a tool chain. A question that triggers five
-tools now costs ~0.069 EUR in deep mode and exceeded the old caps BEFORE the answer was
-produced — including in standard mode. The caps had been sized for truncated content; they
-must be sized for full content, which is the whole point of this milestone.
+AUTHORIZED: atlas0.10 EUR/request; atlas-deep0.20 EUR/request. These supersede ALL
+older per-request figures in docs/13, MISSION, contracts and code. Full-context
+chains measured~0.069 EUR; prior caps assumed truncated evidence. Keep10-tool and
+120s/300s deadlines, monthly budget and alerts. If0.20 EUR is exceeded, report the
+measured breakdown; never silently truncate evidence. Original decisions preserved
+unchanged in docs/decisions-log.md.
 
-Cost control stays in place: tool-call count limits, wall-clock deadlines (120 s standard,
-300 s deep) and the monthly budget with alerts are unchanged. If a request still exceeds
-0.20 EUR, that is a genuine signal — report it with the measured breakdown rather than
-silently truncating context again.
+### Provider default changed: always send `reasoning_effort` explicitly (owner finding, 2026-09-17)
+Root cause of the repeated empty answers that blocked M21 (acquisitions 2 and 3 returned
+41/37 output tokens with no text, no trace, no tools): **Scaleway changed the default**.
+Measured today on `qwen3.5-397b-a17b`, same prompt, same model:
+- `reasoning_effort` OMITTED → 8 422 chars of trace, 354 chars of answer, 2 369 tokens.
+- `reasoning_effort: "none"` sent explicitly → 0 trace, 467 chars of answer, 123 tokens.
+With the old 800-token budget the default reasoning consumed everything and `content` came
+back empty, which the gateway correctly rejected.
+
+Rule: the gateway MUST send `reasoning_effort` explicitly on every provider call —
+`"none"` for `atlas`, `"high"` for `atlas-deep`. Never rely on the provider default.
+Add a regression test asserting the parameter is present in every outgoing request.
+
+Defensive measure: if `content` comes back empty while `reasoning` is non-empty, that is a
+provider-default regression, not a model failure. Log it as such, retry once with
+`reasoning_effort: "none"`, and report the incident rather than returning an empty answer.
+
+This is an external change, not an implementation defect: the earlier J27/J29 "quality"
+rejections must be re-evaluated once the parameter is sent explicitly.
