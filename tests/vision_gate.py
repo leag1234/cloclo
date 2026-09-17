@@ -17,6 +17,7 @@ from gateway_cpu import CPUModels
 from http_gateway import serve
 import quality
 from agent_provider import AgentProvider, AgentRequest
+from serverless import ServerlessPolicy
 from services.orchestrator.chat_api import app
 
 ROOT = Path("tests/cassettes/vision")
@@ -65,6 +66,11 @@ def main() -> None:
                 {
                     "ATLAS_GATEWAY_URL": f"http://127.0.0.1:{server.server_port}",
                     "ATLAS_INTERACTION_DIR": directory,
+                    # The standalone gateway needs the same configured role as
+                    # the launcher, even when CI has no provider environment.
+                    "ESCALATION_MODEL": os.environ.get(
+                        "ESCALATION_MODEL", ServerlessPolicy().models["text"]
+                    ),
                 },
             ),
             patch.object(quality, "complete", transport),
