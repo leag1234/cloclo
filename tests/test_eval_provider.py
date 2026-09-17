@@ -104,6 +104,45 @@ class StreamTests(unittest.TestCase):
 
 
 class ProviderTests(unittest.TestCase):
+    def test_reference_uses_distinct_non_reasoning_configured_role(self) -> None:
+        import os
+        from pathlib import Path
+        from unittest.mock import patch
+        import yaml
+        from eval_provider import EvalProvider
+
+        routing = yaml.safe_load(
+            Path("services/model-gateway/routing.yaml").read_text()
+        )
+        with patch.dict(os.environ, {}, clear=True):
+            provider = EvalProvider()
+        self.assertEqual(
+            provider.roles["reference"], routing["serverless"]["fast"]["model"]
+        )
+        self.assertEqual(len(set(provider.roles.values())), 3)
+
+    def test_replay_rejects_matching_messages_from_another_model(self) -> None:
+        from unittest.mock import patch
+        from m5_gate import RecordedProvider
+
+        provider = RecordedProvider("replay")
+        messages = [{"role": "user", "content": "synthetic question"}]
+        provider.records = [
+            {
+                "role": "reference",
+                "messages": messages,
+                "result": {"model": "retired-test-model"},
+            }
+        ]
+        with patch.object(
+            provider.provider,
+            "complete",
+            side_effect=AssertionError("unexpected_network"),
+        ) as send:
+            with self.assertRaisesRegex(ValueError, "unrecorded_request"):
+                provider.complete("reference", messages)
+            send.assert_not_called()
+
     def test_transport_uses_usage_and_never_sends_reference_key_to_system(self) -> None:
         import io
         from unittest.mock import patch
@@ -131,6 +170,7 @@ class ProviderTests(unittest.TestCase):
             self.assertEqual(result["telemetry"]["tokens"], 110)
             sent = json.loads(send.call_args.args[0].data)
             self.assertEqual(sent["model"], "test-system")
+            self.assertEqual(sent["reasoning_effort"], "none")
             self.assertTrue(sent["stream_options"]["include_usage"])
             self.assertNotIn("response_format", sent)
             with patch("eval_provider.urlopen") as send:

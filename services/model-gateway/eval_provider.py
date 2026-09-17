@@ -109,10 +109,15 @@ def summarize_stream(
 
 class EvalProvider:
     def __init__(self) -> None:
+        routing = yaml.safe_load(Path(__file__).with_name("routing.yaml").read_text())[
+            "serverless"
+        ]
         self.roles = {
-            "system": os.environ["ESCALATION_MODEL"],
-            "production": os.environ["JUDGE_MODEL"],
-            "reference": "gpt-oss-120b",
+            "system": os.environ.get("ESCALATION_MODEL", routing["text"]["model"]),
+            "production": os.environ.get("JUDGE_MODEL", routing["code"]["model"]),
+            "reference": os.environ.get(
+                "REFERENCE_JUDGE_MODEL", routing["fast"]["model"]
+            ),
         }
         self.prices = yaml.safe_load(
             Path(__file__).with_name("pricing.yaml").read_text()

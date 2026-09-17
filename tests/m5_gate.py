@@ -42,7 +42,7 @@ class RecordedProvider:
             if self.path.exists()
             else []
         )
-        self.provider = EvalProvider() if mode != "replay" else None
+        self.provider = EvalProvider()
 
     def complete(self, role: str, messages: list[dict[str, str]]) -> dict[str, Any]:
         record = next(
@@ -53,14 +53,14 @@ class RecordedProvider:
                     r,
                     role,
                     messages,
-                    self.provider.roles[role] if self.provider else None,
+                    self.provider.roles[role],
                 )
             ),
             None,
         )
         if record is not None:
             return dict(record["result"])
-        if self.provider is None:
+        if self.mode == "replay":
             raise ValueError("unrecorded_request")
         spent = sum(r["result"]["telemetry"]["cost"] for r in self.records)
         if spent + 0.05 >= 3:
@@ -214,7 +214,9 @@ def evaluate(gateway: Gateway, store: Store, mode: str) -> None:
         "mode": mode,
         "calibration_sample": [s["id"] for s in selected_samples],
     }
-    calibration = best_effort(pairs, excluded)
+    calibration = best_effort(pairs, excluded) | {
+        "models": dict(provider.provider.roles)
+    }
     publish(Path("BRAIN/eval"), summary, session.telemetry, calibration)
     print(
         json.dumps(

@@ -13,3 +13,9 @@ may exceed the usual brevity target when its steps are necessary. Earlier questi
 provide context; do not answer them again. For a stable technical calculation,
 identify the assumptions and derive the result instead of researching peripheral
 background. Stop researching once you have evidence for the requested calculation.
+
+Apply source sufficiency BEFORE any style or expertise instruction above. If the
+requested fact cannot be established from these sources, the entire response must
+be exactly INSUFFICIENT. Do not translate that token, explain the absence, enumerate
+unrelated facts, or infer that an unstated requirement does not exist. Expert detail
+and conclusions apply only after the requested answer is supported by the sources.

@@ -65,3 +65,10 @@ and at most two attempts before I/O, retains unknown usage, validates output and
 returns provider_model and measured/estimated token splits. A budget-shortened
 answer is held until validation; malformed output must not reach the user.
 See contracts/m21.md for whole-evidence, activity and public HTTP acceptance.
+
+M21 evaluation keeps explicit `reasoning_effort: none` for system and both judges.
+The reference defaults to the configured fast model (`REFERENCE_JUDGE_MODEL` may
+override it); system, production judge and reference must remain distinct. The
+previous reference cannot disable reasoning on Scaleway. Recorded evaluations
+match provider identity as well as role/messages, and calibration is reacquired
+when the reference changes. Existing per-call/series budgets remain enforced.
