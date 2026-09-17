@@ -40,7 +40,7 @@ class Filter:
         body: dict[str, Any],
         __event_emitter__: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
     ) -> dict[str, Any]:
-        if body.get("model") not in {"atlas", "atlas-glm", "atlas-fast"}:
+        if body.get("model") not in {"atlas-qwen", "atlas-glm", "atlas-deepseek"}:
             return body
         for message in body.get("messages", []):
             if message.get("role") != "user" or not isinstance(

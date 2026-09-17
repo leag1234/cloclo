@@ -45,6 +45,6 @@ serverless:
       qwen3-embedding-8b: {context: 32768, dimensions: 1024}
 
 public_profiles:
-  atlas: text
+  atlas-qwen: text
   atlas-glm: code
-  atlas-fast: fast
+  atlas-deepseek: fast

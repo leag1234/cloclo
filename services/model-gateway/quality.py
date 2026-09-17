@@ -156,7 +156,7 @@ async def stream_quality(
         )
         if (
             index == 0
-            and request.profile == "atlas"
+            and request.profile == "atlas-qwen"
             and recovery + policy.cost(model, incoming, current.max_tokens)
             > budget - spent
         ):

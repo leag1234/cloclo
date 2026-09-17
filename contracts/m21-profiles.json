@@ -1,5 +1,5 @@
 {
-  "models": ["atlas", "atlas-glm", "atlas-fast"],
+  "models": ["atlas-qwen", "atlas-glm", "atlas-deepseek"],
   "max_output_tokens": 3000,
   "max_seconds": 120,
   "max_cost_eur": "0.10",
