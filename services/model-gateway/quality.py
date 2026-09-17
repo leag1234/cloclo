@@ -16,6 +16,7 @@ from packages.tool_history import (
     is_history_answer,
     possible_history_answer,
 )
+from packages.profiles import PROFILES
 from packages.evidence import estimated_tokens
 from packages.images import image_info
 from serverless import ServerlessPolicy, classify_task
@@ -146,7 +147,7 @@ async def stream_quality(
         )
         if (
             index == 0
-            and request.profile == "atlas-qwen"
+            and request.profile == PROFILES[0]
             and recovery + policy.cost(model, incoming, current.max_tokens)
             > budget - spent
         ):
