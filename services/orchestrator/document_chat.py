@@ -62,7 +62,7 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
         os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"),
         local_enabled=False,
     )
-    model.configure_quality(request.model, request.max_tokens)
+    model.configure_quality(request.model, request.max_tokens, has_attachments=True)
     model.tools = []
     model.observing = True
     model.sink = sink
@@ -100,11 +100,11 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
         messages[1]["content"] = json.dumps(
             {"hierarchical_attachment_evidence": sources}, ensure_ascii=False
         )
-    item.cout_eur = 0.10
+    item.cout_eur = 0.30
     try:
-        if model.estimate(messages).cost > Decimal("0.10"):
+        if model.estimate(messages).cost > Decimal("0.30"):
             raise GatewayError(
-                "cost_budget", 413, "Document request reservation exceeds 0.10 EUR"
+                "cost_budget", 413, "Document request reservation exceeds 0.30 EUR"
             )
         result = await model.complete(
             messages, max(0, request.timeout_seconds - (time.monotonic() - started))
@@ -124,7 +124,7 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
             "document_generation_failed",
             502,
             f"Document generation failed: {measured} estimated input/output tokens; "
-            f"context limit 262144 tokens, request cost limit 0.10 EUR, "
+            f"context limit 262144 tokens, request cost limit 0.30 EUR, "
             f"elapsed {time.monotonic() - started:.1f}s of {request.timeout_seconds:.0f}s. "
             "The full attachment was extracted; no corpus retrieval was used.",
         ) from exc

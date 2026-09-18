@@ -134,10 +134,22 @@ async def stream_quality(
             )
     # Research is optional once another selection turn plus the full-context
     # answer no longer fit. Keep all acquired evidence and the selected effort.
-    if request.tools and (
-        policy.cost(model, incoming, request.max_tokens)
-        + policy.cost(model, incoming, 3000)
-        > budget
+    # File operations are the requested deliverable, so an answer-only turn
+    # cannot substitute for them. Each attempt still reserves its full bound
+    # below; lacking funds must stop explicitly rather than promise a file.
+    file_tools = any(
+        isinstance(function := tool.get("function"), dict)
+        and function.get("name") in {"terminal_command", "publish_document"}
+        for tool in request.tools
+    )
+    if (
+        request.tools
+        and not file_tools
+        and (
+            policy.cost(model, incoming, request.max_tokens)
+            + policy.cost(model, incoming, 3000)
+            > budget
+        )
     ):
         request = request.model_copy(
             update={
@@ -307,6 +319,22 @@ async def stream_quality(
             )
         trace_tokens += count
         answer_tokens += usage.completion_tokens - count
+        malformed_arguments = False
+        calls = result.get("calls")
+        if isinstance(calls, list):
+            for call in calls:
+                if isinstance(call, dict):
+                    try:
+                        arguments = json.loads(str(call.get("arguments", "")))
+                        malformed_arguments |= not isinstance(arguments, dict)
+                    except ValueError:
+                        malformed_arguments = True
+        if malformed_arguments:
+            logging.getLogger(__name__).warning(
+                json.dumps({"event": "invalid_tool_arguments", "attempt": index + 1})
+            )
+            if index or visible_content:
+                raise RuntimeError("invalid_tool_arguments")
         malformed = is_history_answer(str(result.get("text", "")))
         if malformed:
             logging.getLogger(__name__).warning(
@@ -342,6 +370,7 @@ async def stream_quality(
         # Empty terminal responses retain validated billing, then get one retry.
         if (
             malformed
+            or malformed_arguments
             or incomplete
             or (not str(result.get("text", "")).strip() and not result.get("calls"))
         ):
