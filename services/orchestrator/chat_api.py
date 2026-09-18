@@ -209,6 +209,9 @@ async def chat(request: Request) -> Response:
             "usage": usage,
             "atlas": {
                 "images": item.images,
+                "files": item.files,
+                "terminal_commands": item.terminal_commands,
+                "terminal_failed_commands": item.terminal_failed_commands,
                 "uploaded_images": item.uploaded_images,
                 "reasoning_effort": payload.reasoning_effort,
                 "max_output_tokens": payload.max_tokens,
