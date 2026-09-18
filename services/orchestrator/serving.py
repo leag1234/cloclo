@@ -1,6 +1,7 @@
 """One-command local CPU stack; cloud provisioning is deliberately absent."""
 
 import os
+import json
 import signal
 import subprocess
 import threading
@@ -55,7 +56,35 @@ def docker_run(name: str, image: str, options: list[str]) -> None:
 
 
 def webui(name: str, persistent: bool) -> None:
-    options = ["--network", "host", "--env-file", "infra/chat-ui.env"]
+    from services.orchestrator.terminal_stack import NETWORK, network_gateway
+
+    gateway = network_gateway()
+    os.environ["TERMINAL_SERVER_CONNECTIONS"] = json.dumps(
+        [
+            {
+                "id": "atlas-files",
+                "url": "http://open-terminal:8000",
+                "key": os.environ["OPEN_TERMINAL_API_KEY"],
+                "auth_type": "bearer",
+                "config": {"chat_uploads": "filesystem"},
+                "enabled": True,
+            }
+        ]
+    )
+    options = [
+        "--network",
+        NETWORK,
+        "--env-file",
+        "infra/chat-ui.env",
+        "-e",
+        "HOST=0.0.0.0",
+        "-e",
+        "TERMINAL_SERVER_CONNECTIONS",
+        "-e",
+        f"OPENAI_API_BASE_URL=http://{gateway}:8020/v1",
+        "-e",
+        f"ATLAS_ADAPTER_URL=http://{gateway}:8020",
+    ]
     options.extend(
         [
             "-v",
@@ -75,7 +104,7 @@ def wait_http(url: str, timeout: float = 120) -> None:
             with urlopen(url, timeout=2) as response:
                 if response.status == 200:
                     return
-        except (URLError, TimeoutError):
+        except (URLError, TimeoutError, ConnectionError):
             time.sleep(0.2)
     raise RuntimeError("service_start_timeout")
 
@@ -166,23 +195,23 @@ def run() -> None:
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, stop_requested)
-    with stack():
-        launched = False
+    from services.orchestrator.terminal_stack import terminal, user_interface
+
+    # Open Terminal owns only user files; its loopback publisher is not a host mount.
+    with terminal("atlas-open-terminal", "127.0.0.1:8000"), stack():
+        os.environ["ATLAS_TERMINAL_ENABLED"] = "1"
         try:
-            webui("atlas-chat-ui", True)
-            launched = True
-            wait_http("http://127.0.0.1:3000")
-            configure()
-            print(
-                "ATLAS ready: http://localhost:3000 (SSH tunnel), GPU_LOCAL="
-                + os.environ.get("GPU_LOCAL", "0"),
-                flush=True,
-            )
-            while not stopping:
-                time.sleep(0.2)
+            with user_interface("atlas-chat-ui", True):
+                configure()
+                print(
+                    "ATLAS ready: http://localhost:3000 (SSH tunnel), GPU_LOCAL="
+                    + os.environ.get("GPU_LOCAL", "0"),
+                    flush=True,
+                )
+                while not stopping:
+                    time.sleep(0.2)
         finally:
-            if launched:
-                docker("stop", "atlas-chat-ui")
+            os.environ.pop("ATLAS_TERMINAL_ENABLED", None)
 
 
 def main() -> None:

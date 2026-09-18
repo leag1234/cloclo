@@ -17,7 +17,8 @@ from urllib.request import Request, urlopen
 from packages.profiles import PROFILES
 from provider_recording import ExactHistory, capture_stream, replay_stream
 from serverless_support import environment
-from services.orchestrator.serving import docker, stack, wait_http, webui
+from services.orchestrator.serving import stack
+from native_ui import native_ui
 from services.orchestrator.webui import configure
 from services.orchestrator.tools import Runtime
 import stream_transport
@@ -190,11 +191,7 @@ def main() -> None:
         assert re.search(r"report|diff[eé]r|postpon", answer, re.I), "missing_end"
         assert re.search(r"sept|seven|\b7\b", answer, re.I), "missing_second_attachment"
         # Exercise the real Open WebUI upload/inlet/proxy, not just adapter file parts.
-        ui_started = False
-        try:
-            webui("atlas-m23-ui", False)
-            ui_started = True
-            wait_http("http://127.0.0.1:3000")
+        with native_ui("atlas-m23-ui"):
             configure()
 
             def ui_call(
@@ -258,9 +255,6 @@ def main() -> None:
             )
             assert re.search(r"sept|seven|\b7\b", text, re.I)
             evidence["J41_native_ui"] = {"text": text, "original_files": 2}
-        finally:
-            if ui_started:
-                docker("stop", "atlas-m23-ui")
         logs = [
             json.loads(line)
             for path in Path(root + "/logs").glob("*.jsonl")
