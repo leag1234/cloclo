@@ -8,5 +8,62 @@
     "Turn these notes into slides I can download, with a printable copy.",
     "Ergänze die Tabelle um ein Diagramm und behalte die Formeln.",
     "Reorganise ce texte avec des titres et une table des matieres."
-  ]
+  ],
+  "capability_phrasings": {
+    "reading": {
+      "positive": [
+        "Que disent ces deux pièces jointes ?",
+        "Compare ces deux documents.",
+        "Quels chiffres figurent dans ce tableau ?",
+        "EXPLIQUE MOI CES DONNEES",
+        "Summarize both attachments.",
+        "Was steht in diesen Unterlagen?"
+      ],
+      "negative": "Explique les formats bureautiques sans ouvrir de document."
+    },
+    "producing": {
+      "positive": [
+        "Prépare des diapositives sur ce sujet avec une version imprimable.",
+        "Rends-le téléchargeable.",
+        "Je veux emporter ce travail et le présenter demain.",
+        "TRANSFORME CES NOTES EN SUPPORT DE PRESENTATION",
+        "Create a slide deck and a printable PDF from these notes.",
+        "Erstelle eine Präsentation und eine druckbare Fassung."
+      ],
+      "negative": "Explique comment préparer un support, ne génère aucun fichier."
+    },
+    "transforming": {
+      "positive": [
+        "Corrige ce document.",
+        "Ajoute les comparaisons dans un nouvel onglet avec un graphique.",
+        "Remets ces paragraphes en ordre avec des titres et un sommaire.",
+        "COMPARE MARS A MARS DE LANNEE PRECEDENTE",
+        "Fix the spelling while preserving styles, images and formulas.",
+        "Ergänze die Tabelle um ein Diagramm und behalte die Formeln."
+      ],
+      "negative": "Décris les erreurs sans modifier les pièces jointes."
+    },
+    "search": {
+      "positive": [
+        "Sur un Amstrad CPC, quels sont les timings de OUTI et OTIR en microsecondes ?",
+        "Vérifie ces durées.",
+        "Quelles sources spécifiques à cette machine confirment ces chiffres ?",
+        "VERIFIE SUR LE WEB LES DUREES DE CES INSTRUCTIONS",
+        "Find CPC-specific evidence for these instruction timings.",
+        "Prüfe diese Zeitangaben anhand gerätespezifischer Quellen."
+      ],
+      "negative": "Explique seulement comment une recherche fonctionne, sans la lancer."
+    },
+    "activity": {
+      "positive": [
+        "Explique longuement comment structurer un document technique, sans outil.",
+        "Développe cette explication.",
+        "Donne une analyse complète de ces paragraphes avec tes connaissances générales.",
+        "DETAILLE CES PRINCIPES SANS RECHERCHE",
+        "Explain the structure of this long document without using web tools.",
+        "Erkläre diesen langen Text ohne Internetsuche."
+      ],
+      "negative": "Réponds uniquement oui."
+    }
+  }
 }
