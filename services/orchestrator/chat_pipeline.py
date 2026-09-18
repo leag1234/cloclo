@@ -107,6 +107,12 @@ class ChatTools(Runtime):
         self.allow_image = allow_image
         self.image_prompt: str | None = None
         self.source_truncated = False
+        self.model: GatewayModel | None = None
+        self.terminal = None
+        if os.environ.get("ATLAS_TERMINAL_ENABLED") == "1":
+            from services.orchestrator.terminal_client import TerminalClient
+
+            self.terminal = TerminalClient(item.request_id)
 
     async def execute(self, call: Call, timeout: float) -> Message:
         sink = sink_context.get()
@@ -119,6 +125,29 @@ class ChatTools(Runtime):
             pass
         if sink:
             await sink({"phase": "tool_started", "tool": call.name, "urls": urls})
+        if call.name in {"terminal_command", "publish_document"}:
+            from services.orchestrator.terminal_client import Command, Publish
+
+            if self.terminal is None:
+                return {"error": "terminal_unavailable"}
+            try:
+                if call.name == "terminal_command":
+                    output = await self.terminal.execute(
+                        Command.model_validate_json(call.arguments).command, timeout
+                    )
+                    if self.model is not None and self.model.has_attachments:
+                        output = self.document_evidence(output)
+                else:
+                    publication = Publish.model_validate_json(call.arguments)
+                    output = await self.terminal.publish(
+                        publication.path, publication.strategy, timeout
+                    )
+                    self.item.files = list(self.terminal.files)
+                    self.item.file_strategies = list(self.terminal.strategies)
+                return {"trust": "untrusted", "data": output}
+            except (ValueError, RuntimeError, aiohttp.ClientError, TimeoutError):
+                self.item.erreurs.append("terminal_operation_failed")
+                return {"error": "terminal_operation_failed"}
         if call.name == "generate_image":
             if not self.allow_image:
                 return {"error": "tool_unavailable"}
@@ -223,6 +252,43 @@ class ChatTools(Runtime):
                 )
             self.item.latence_ms["retrieval"] += (time.monotonic() - started) * 1000
 
+    def document_evidence(self, output: Message) -> Message:
+        """Apply M10 to complete output before reserving another inference."""
+        from services.orchestrator.content import hierarchical_summary
+
+        entries = output.get("output")
+        if (
+            self.model is None
+            or output.get("exit_code") != 0
+            or not isinstance(entries, list)
+        ):
+            return output
+        text = "\n".join(
+            entry["data"]
+            for entry in entries
+            if isinstance(entry, dict) and isinstance(entry.get("data"), str)
+        )
+        size = len(text.encode())
+        reservation = size * 2 * self.model.configuration.input_eur_per_mtok / 1_000_000
+        # Retain room for history, escaped tool results and the final answer.
+        if size <= 131072 and reservation <= self.model.allowance / 2:
+            return output
+        summary, _, sections = hierarchical_summary(text, self.question)
+        metadata: dict[str, str | int | bool] = {
+            "hierarchical_synthesis": True,
+            "source_characters": len(text),
+            "source_bytes": size,
+            "sections_examined": sections,
+            "remaining_budget_eur": str(self.model.allowance),
+            "estimated_evidence_reservation_eur": str(reservation),
+        }
+        self.item.documents.append(metadata)
+        return {
+            **output,
+            "output": [{"type": "output", "data": summary}],
+            "synthesis": metadata,
+        }
+
 
 async def process(request: ChatRequest, item: Interaction) -> None:
     from services.orchestrator.narration import clean_answer
@@ -234,16 +300,16 @@ async def process(request: ChatRequest, item: Interaction) -> None:
 
 async def _process(request: ChatRequest, item: Interaction) -> None:
     # Attachments take precedence over project/corpus commands and lexical routing.
-    if request.documents:
+    if request.documents and os.environ.get("ATLAS_TERMINAL_ENABLED") != "1":
         from services.orchestrator.document_chat import process_documents
 
         await process_documents(request, item)
         return
     from services.orchestrator.project_commands import select
 
-    if await select(request, item, retrieval_url()):
+    if not request.documents and await select(request, item, retrieval_url()):
         return
-    if request.project_id is not None:
+    if request.project_id is not None and not request.documents:
         from services.orchestrator.project_chat import process_project
 
         await process_project(request, item)
@@ -255,7 +321,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
     if followup:
         item.task_type = "followup"
     iteration = image_iteration(request.messages)
-    if not followup and request.messages[-1].images:
+    if not followup and request.messages[-1].images and not request.documents:
         await process_vision(request, item)
         return
     started = time.monotonic()
@@ -284,10 +350,19 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             if isinstance(function := tool.get("function"), dict)
             and function.get("name") != "web_fetch"
         ]
-    if followup:
+    if followup and os.environ.get("ATLAS_TERMINAL_ENABLED") != "1":
         model.tools = []
     else:
         model.tools.append(declaration())
+    if os.environ.get("ATLAS_TERMINAL_ENABLED") == "1":
+        model.tools.extend(json.loads(Path("prompts/file-tools.json").read_text()))
+        if request.documents:
+            model.tools = [
+                t
+                for t in model.tools
+                if isinstance(function := t.get("function"), dict)
+                and function.get("name") != "rag_search"
+            ]
     if not corpus_allowed(request.messages[-1].text):
         model.tools = [
             tool
@@ -297,11 +372,31 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         ]
     model.observing = True
     model.sink = sink_context.get()
-    model.configure_quality(request.model, request.max_tokens)
+    model.configure_quality(
+        request.model, request.max_tokens, has_attachments=bool(request.documents)
+    )
     item.reasoning_effort = request.reasoning_effort
     model.local_enabled = os.environ.get("GPU_LOCAL", "0") == "1"
-    item.cout_eur = 0.1  # Conservative upper bound until the loop returns its ledger.
+    item.cout_eur = (
+        0.30 if request.documents else 0.10
+    )  # Reserved until ledger returns.
     tools = ChatTools(item, request.messages[-1].text, allow_image=not followup)
+    tools.model = model
+    file_context = ""
+    if tools.terminal is not None:
+        await tools.terminal.initialize()
+        paths = [
+            await tools.terminal.upload(document, request.timeout_seconds)
+            for document in request.documents
+        ]
+        file_context = (
+            Path("prompts/files.txt").read_text()
+            + "\n"
+            + json.dumps(
+                {"request_directory": tools.terminal.root, "attachments": paths},
+                ensure_ascii=False,
+            )
+        )
     try:
         result = await run(
             Query(question=iteration or request.messages[-1].text, lang=request.lang),
@@ -316,11 +411,13 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                 else ""
             )
             + (Path("prompts/followup.txt").read_text() if followup else "")
-            + language_instruction(request.lang),
+            + language_instruction(request.lang)
+            + file_context,
             Limits(
                 profile=request.model,
                 tokens=262144,
-                cost=Decimal("0.10"),
+                cost=Decimal("0.30" if request.documents else "0.10"),
+                has_attachments=bool(request.documents),
                 wall_clock=max(
                     0, request.timeout_seconds - (time.monotonic() - started)
                 ),
@@ -339,6 +436,16 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             result.state,
             float(result.cost),
         )
+        if tools.terminal is not None:
+            item.terminal_commands = tools.terminal.commands
+            item.terminal_failed_commands = tools.terminal.failed_commands
+            item.files = tools.terminal.files
+            if result.state == "done" and item.files:
+                from services.orchestrator.file_results import render_files
+
+                item.reponse = render_files(
+                    item.reponse, item.files, tools.terminal.strategies, request.lang
+                )
         if result.state == "done" and tools.image_prompt is not None:
             await finish(request, item, result, tools.image_prompt, started)
             return
