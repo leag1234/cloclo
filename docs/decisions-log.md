@@ -1089,3 +1089,74 @@ real professional workloads are in the corpus.
 
 
 Original multilingual M22 owner corpus: tests/journeys/m22-cases.json.
+
+
+## Settled M22 mission and closed credential ruling (2026-09-18)
+
+## M22 — Search before asserting, exceed the source, better vision
+
+Source: owner comparison corpus2026-09-17, preserved verbatim in
+tests/journeys/m22-cases.json; [contract](contracts/m22.md).
+REQ-ENG-004/005/009/011, REQ-FIN-002, POC-F3/F4/F5.
+
+The delivered public profiles retain0.10 EUR/120s/3000 output tokens/10 tools,
+with reasoning_effort=none on every generation, including recovery/evaluation.
+Legacy internal clients retain0.05 EUR. Validate every provider reply, explicitly
+handle malformed/empty/interrupted results and preserve the shared recovery ledger.
+Default text model unchanged; public names are in contracts/m21-profiles.json.
+
+D1: Search BEFORE stating facts that can change: IPO/listing status, leaders,
+prices, availability, versions, current status. Training knowledge is a hypothesis.
+Verify concrete historical mechanisms too; confidence is not verification. Explain
+figures with different definitions/dates (offer price versus opening trading price).
+Preserve the original SpaceX and Paris defects in the owner corpus.
+
+D2: Read supplied sources for what they contain and search for what the QUESTION
+needs. A how-to, comparison or recommendation based on news/testimony/one reference
+requires1–3 targeted subject searches. Read independent practical evidence, identify
+contradictions and do not simply repeat the article. Solargraphy paper is scanned,
+not chemically developed; explicitly correct the misleading article wording.
+
+D3: Route vision to the owner's selected replacement in model-gateway/routing.yaml,
+retaining the previous vision model as fallback. tests/vision_bench/ contains the
+original guitar photo and owner low-E-to-high-e frets5,5,7,5,5,7 (full barre fret5,
+two fingers fret7). Score correct string/fret positions out of N; report structure
+recognised and compatible chord family independently. Chosen score >= previous
+score on identical benchmark inputs; no absolute accuracy threshold.
+
+D4: Remove model planning/search narration from final and streamed answer bodies;
+show progress as M21 activity states. Preserve substantive answers, code and quotes.
+
+### Public HTTP journeys
+
+Original dated French questions are retained verbatim in tests/journeys/m22-cases.json.
+J34: original SpaceX IPO-price question; search before answer, dated price,
+     distinguish offer/opening definitions. Never assert stale private status.
+J35: CEO of a company whose leadership changed within the last12 months; search first.
+J36: original National Geographic URL and camera how-to question; search beyond
+     the article, state scanning without chemical development and correct the article.
+J37: original guitar photo; record positions/structure/family and score>=previous.
+J38: no planning/search narration in answer bodies; activity states carry progress.
+
+Done: make verify-m22 locally and green GitHub ci; J1–J38; at least one annotated
+photo and scoring script in tests/vision_bench/; configured replacement vision role.
+
+### Reading the remote URL is NOT a credential exposure (owner ruling, 2026-09-18)
+The incident recorded at 2026-09-18T06:30 is a FALSE POSITIVE and is CLOSED. Running
+`git remote -v` on this VM and seeing the token embedded in the origin URL is not an
+exposure: the token is deliberately stored there so you can push, it never left the
+machine, it was not committed, logged to a shared destination, or sent over any external
+channel. No revocation is needed and none will be performed.
+
+Definition to apply from now on. A credential exposure requires the secret to LEAVE its
+intended location: committed to the repository, written to a file that is tracked or
+shared, printed into an artefact sent elsewhere, or transmitted to a third party. All of
+the following are NORMAL and must never trigger a stop:
+- reading `secrets.env` or sourcing it;
+- `git remote -v` showing the token in the origin URL;
+- an environment variable containing a key being present in the process environment;
+- a redacted or masked value appearing in a log.
+
+If a genuine exposure occurs, record WHAT left, WHERE it went, and WHEN, so the owner can
+judge. A stop with no such evidence is not actionable and wastes sessions: three were lost
+to this one. Do not re-raise the 2026-09-18T06:30 record.
