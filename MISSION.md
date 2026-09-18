@@ -100,3 +100,145 @@ J38: no planning/search narration in answer bodies; activity states carry progre
 
 Done: make verify-m22 locally and green GitHub ci; J1–J38; at least one annotated
 photo and scoring script in tests/vision_bench/; configured replacement vision role.
+
+## M23 — Readable rendering: typography, code blocks, spacing
+
+Source: side-by-side comparison of the same answer rendered by Claude and by ATLAS
+(2026-09-18, Python venv debugging question). The content was comparable; the ATLAS
+rendering was markedly harder to read. Every difference below is a rendering choice, not
+a model choice, and is fixed in `services/orchestrator/chat-ui.css` (already mounted into
+the container by `serving.py`).
+
+### Constraint: survive Open WebUI upgrades
+Open WebUI generates utility classes that change between versions. Target, in order of
+preference: (1) CSS custom properties exposed by the theme, (2) semantic elements
+(`pre`, `code`, `p`, `li`, `h2`), (3) attribute patterns (`[class*="bg-gray-"]`), and only
+as a last resort a generated class name. Every rule carries a comment stating what it
+targets and why, so a future upgrade can be repaired quickly. Before writing rules,
+inspect the running UI to list the CSS variables the theme actually exposes and record
+them in `reports/M23.md`.
+
+### D1 — Body typography
+Claude renders body text in a serif at a comfortable size with softened contrast; ATLAS
+uses a dense sans-serif in near-black.
+- Define `--atlas-body-font: Georgia, "Iowan Old Style", "Times New Roman", serif` and
+  `--atlas-body-size` / `--atlas-line-height` on `:root`, then apply them through
+  `var(...)`. **Do not use `!important` on the font** so that a user preference in Open
+  WebUI can still override it; if the theme exposes its own font variable, redefine that
+  variable instead of the property.
+- Soften body colour from pure black to a very dark grey; keep WCAG AA contrast.
+- Owner decision: serif by default. Switching the whole rendering back must be a
+  one-line change to `--atlas-body-font`.
+
+### D2 — Code blocks: remove the furniture
+Observed on ATLAS: every block, including one-liners, carries a "Collapse / Save / Copy"
+toolbar, line numbers, and a highlighted active line. Claude shows a plain block with a
+light background and a thin border.
+- Hide line numbers and the per-block toolbar by default; expose a copy affordance on
+  hover only.
+- Remove active-line highlighting.
+- Light background, thin border, generous inner padding, no heavy shadow.
+- Keep horizontal scrolling for long lines; never wrap code.
+
+### D3 — Inline code
+Short identifiers (`pip`, `python3`) must read as discreet capsules inside the sentence:
+subtle background, no border, slightly smaller monospace, enough padding not to touch the
+surrounding words. Today's contrast breaks the reading flow.
+
+### D4 — Line length and spacing
+- Cap the text column at 680–720 px; keep code blocks free to use the available width.
+- Increase spacing between sections (`h2`, `h3`) and between list items; the current
+  rendering is compact and sections run into each other.
+- Keep the existing green user-message styling from M21 unchanged.
+
+### D5 — Dark mode parity
+Every rule above has a dark-mode counterpart. The current file already handles
+`.dark .user-message`; extend the same approach so the reading experience matches.
+
+### D6 — Generated code is always in English
+Observed 2026-09-18: asked in French, the models produce identifiers, comments and
+docstrings in French. ChatGPT and Claude emit English code regardless of the conversation
+language, which is the established convention — and this repository itself has been in
+English since M16. French identifiers make the output unusable in a shared codebase.
+
+Rule, to be added to `prompts/chat.txt` and `prompts/chat-agent.txt`:
+- **In English, always**: variable, function, class and file names; comments; docstrings;
+  log and error messages intended for developers; commit messages.
+- **In the user's language**: the prose around the code — explanations, section titles,
+  the answer itself.
+- **Context-dependent**: strings displayed to end users. If the user asks for an interface
+  for French speakers, the visible labels stay French while the code around them stays
+  English. The model must distinguish code from the content it carries.
+This applies to every profile and to the developer API (M15), where the clients are
+Codex and Claude Code.
+
+### D7 — The activity indicator must also cover pure thinking
+Observed 2026-09-18: on a long-document synthesis with no tool call, the screen shows only
+a blinking cursor while the model works. M21/D5 required an indicator within 2 s naming
+the current phase, but it only fires on tool steps; plain generation shows nothing.
+
+Required: the indicator appears within 2 s of the request for EVERY request, including
+those with no tool call, and stays visible until the first token of the answer reaches the
+screen. It names the phase ("Réflexion…", "Lecture du document…", "Rédaction…") and shows
+elapsed time. When tokens start streaming, the indicator gives way to the text; it must
+never disappear leaving nothing behind. A request that takes 30 s with no tool call must
+show a live state for those 30 s.
+
+### D8 — Attached documents are never read (blocking capability gap)
+Observed 2026-09-18: a ~60-page PDF was attached and "fais-moi une synthèse d'une page" was
+asked. The answer reported that only three short fragments were available (an eReceipt
+header, a mention of a data management plan, a table-of-contents line "9.3 Subcontractors")
+and honestly refused to synthesise. Meanwhile the internal RAG searched the test corpus
+(logistics, GDPR, medical, telework, marketing) and returned unrelated documents.
+
+Root cause: `prepare_uploads()` in `services/orchestrator/image_store.py` skips every part
+whose type is not `image_url`. **There is no document path at all.** What the model saw were
+fragments that Open WebUI had extracted with its own retrieval before forwarding the
+request — ATLAS never received the file.
+
+Required:
+- **Receive the whole file.** Disable Open WebUI's own document retrieval for attachments
+  so the file reaches the adapter intact (or accept its upload endpoint and fetch the
+  original). Document the setting in `runbooks/chat.md`.
+- **Extract and read it in full**: PDF, DOCX, TXT, MD, CSV. Put the extracted text in the
+  model context. A 60-page document is roughly 40 000 tokens and fits comfortably in the
+  262 144-token window. Report extraction failures explicitly (scanned PDF with no text
+  layer, password-protected file) instead of silently delivering fragments.
+- **Only above the window**, apply the M10 hierarchical synthesis — never random sampling
+  of chunks, and never the corpus RAG.
+- **Never route an attached document to the corpus RAG.** A file attached to the
+  conversation and the indexed corpus are two different things; a question about the
+  attachment must not return corpus documents.
+- Log, per request: file name, size, pages, extracted characters, whether hierarchical
+  synthesis was applied.
+
+This is the most common professional use of the assistant (summarise a report, a spec, a
+contract) and it currently does not work at all.
+
+### Verification
+A gate cannot judge aesthetics. `verify-m23` checks what is objectively checkable:
+- `chat-ui.css` defines the `--atlas-*` custom properties and uses them via `var()`;
+- no `!important` on any `font-family` declaration;
+- rules exist for `pre`, `code`, inline code, column width and section spacing;
+- dark-mode counterparts exist for each new rule;
+- every rule block carries an explanatory comment;
+- `prompts/chat.txt` and `prompts/chat-agent.txt` state the English-code rule;
+- the activity indicator is emitted on request start, not only on tool events;
+- a document path exists in `prepare_uploads` (not only `image_url`), with an extractor;
+- `reports/M23.md` lists the theme variables found in the running UI, and states which
+  selectors are version-fragile and how to repair them.
+The final judgement is the owner's, on screen, after `make serve`.
+
+**Journey** J41: attach a multi-page PDF and ask for a one-page synthesis → the answer
+covers sections from the beginning, middle AND end of the document; the log records the
+extracted character count; the corpus RAG is not queried.                    [2026-09-18]
+
+**Journey** J40: a request with NO tool call (e.g. summarise a long attached document) →
+an activity state is emitted within 2 s and updated until the first answer token.[2026-09-18]
+
+**Journey** J39: ask, in French, for a small Python function with a docstring. The returned
+code must carry English identifiers, comments and docstring, while the surrounding
+explanation stays French.                                                    [2026-09-18]
+
+**Definition of done**: `make verify-m23` passes; J39 passes; the owner confirms the
+rendering on the same debugging answer used for the 2026-09-18 comparison.
