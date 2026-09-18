@@ -27,7 +27,9 @@ def detected_language(text: str) -> str | None:
     detector = importlib.import_module("langdetect")
     detector.DetectorFactory.seed = 0
     try:
-        scores = detector.detect_langs(text)
+        # Capitalization carries emphasis, not language. The statistical detector
+        # misclassifies all-uppercase French instructions as English otherwise.
+        scores = detector.detect_langs(text.lower() if text.isupper() else text)
     except detector.lang_detect_exception.LangDetectException:
         return None
     language = str(scores[0].lang)

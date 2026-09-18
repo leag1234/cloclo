@@ -11,5 +11,31 @@
     "Summarize both attachments",
     "Fasse beide Anlagen zusammen"
   ],
-  "negative": "Explain what a document summary is without opening any attachment."
+  "negative": "Explain what a document summary is without opening any attachment.",
+  "code_phrasings": [
+    {
+      "text": "Écris une petite fonction Python qui calcule la moyenne avec une docstring et explique son utilisation.",
+      "language": "fr"
+    },
+    {
+      "text": "Fonction moyenne documentée.",
+      "language": "fr"
+    },
+    {
+      "text": "CALCULE UNE MOYENNE EN PYTHON AVEC UNE DOCSTRING ET UN EXEMPLE.",
+      "language": "fr"
+    },
+    {
+      "text": "J'ai une liste de nombres : montre comment obtenir leur moyenne, avec une fonction documentée et son utilisation.",
+      "language": "fr"
+    },
+    {
+      "text": "Write a small average function with a docstring and explain its use.",
+      "language": "en"
+    },
+    {
+      "text": "Schreibe eine kleine Python-Funktion für den Mittelwert mit Docstring und erkläre ihre Verwendung.",
+      "language": "de"
+    }
+  ]
 }

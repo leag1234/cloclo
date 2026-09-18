@@ -12,6 +12,7 @@ from uuid import uuid4
 
 @dataclass
 class Interaction:
+    documents: list[dict[str, str | int | bool]] = field(default_factory=list)
     uploaded_images: list[str] = field(default_factory=list)
     provider_model: str = ""
     reasoning_effort: str = "none"

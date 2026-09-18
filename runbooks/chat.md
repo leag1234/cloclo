@@ -77,3 +77,29 @@ Stop other disposable test stacks before M21 verification; they share ports.
 records real provider exchanges for J27–J33. `make verify-m21` checks the complete
 journey report, including earlier regressions. Compare live/replay labels and the
 quality breakdown in reports/M21.md; only green GitHub ci certifies completion.
+
+## M23 attachments and readable answers
+
+`make serve` installs the owned native inlet from `infra/openwebui_images.py`.
+`BYPASS_EMBEDDING_AND_RETRIEVAL=True` disables attachment embeddings. The inlet
+consumes attached file IDs before Open WebUI's retrieval handler, verifies ownership
+using the authenticated UI user, reads original bytes from Open WebUI storage and
+forwards standard `type=file` parts with `file.filename` and base64 `file.file_data`.
+It never fetches client-supplied URLs. Do not disable the managed inlet: doing so
+restores Open WebUI's own attachment processing. An unavailable original is an
+explicit error, never a fragment fallback.
+
+The adapter accepts PDF, DOCX, UTF-8 TXT, MD and CSV; at most eight documents,
+16 MiB per file and 32 MiB per HTTP request. PDF text layers are required on every
+page. Password-protected PDFs fail explicitly. The interaction journal records
+filename, raw bytes, pages (zero when the format has no page model), extracted
+characters and hierarchical processing. Documents bypass corpus/project retrieval.
+The existing gateway retains its conservative context and cost reservations;
+only context above262144 estimated tokens uses the M10 hierarchy. The estimator
+never authorizes spending; a conservative gateway budget refusal remains possible. No extraction is
+silently labelled complete after an error.
+
+The default reading font is controlled by `--atlas-body-font` in chat-ui.css;
+Open WebUI's user font preference still overrides it. Code scrolls horizontally,
+copy appears on hover or keyboard focus, and both themes share readable spacing.
+Visual acceptance remains an owner check on the original Python debugging answer.

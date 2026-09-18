@@ -7,12 +7,15 @@ from uuid import UUID
 from pydantic import ConfigDict, Field, model_validator
 from packages.images import VisionInput, VisionMessage
 
+from services.orchestrator.documents import Attachment
+
 ChatMessage = VisionMessage
 
 
 class ChatRequest(VisionInput):
     model_config = ConfigDict(extra="ignore", strict=True)
     model: str = PROFILES[0]
+    documents: list[Attachment] = Field(default_factory=list, max_length=8)
     project_id: str | None = None
     conversation_id: str | None = None
     stream: bool = False

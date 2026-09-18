@@ -139,7 +139,7 @@ class DevGatewayTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(request.messages[1].tool_call_id, "call-a")
         body = json.loads(gateway.prepare(request).body)
         self.assertEqual(body["tools"][0]["type"], "function")
-        self.assertEqual(body["messages"][0]["tool_calls"][0]["type"], "function")
+        self.assertEqual(body["messages"][1]["tool_calls"][0]["type"], "function")
         with self.assertRaises(ValueError):
             Request.model_validate({"messages": messages[:1], "tools": [tool]})
         with self.assertRaises(ValueError):

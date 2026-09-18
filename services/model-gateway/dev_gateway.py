@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from decimal import Decimal, ROUND_CEILING
 import json
 import os
+from pathlib import Path
 from typing import Any, Literal
 
 import aiohttp
@@ -36,6 +37,9 @@ def prepare(request: Request) -> Plan:
     for message in body["messages"]:
         if not message["tool_calls"]:
             message.pop("tool_calls")
+    body["messages"].insert(
+        0, {"role": "system", "content": Path("prompts/code-language.txt").read_text()}
+    )
     body.update(
         model=model,
         max_tokens=request.max_tokens,

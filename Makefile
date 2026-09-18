@@ -178,3 +178,10 @@ verify-m21: ## reasoning, expert evidence and native activity
 .PHONY: verify-m22
 verify-m22: ## search discipline, graded vision and narration
 	@bash scripts/verify-m22.sh
+
+.PHONY: verify-m23 test-m23
+verify-m23: ## readable rendering, English code and complete document attachments
+	@bash scripts/verify-m23.sh
+	@$(MAKE) test-m23
+test-m23: ## exact recorded public HTTP journeys J39-J41
+	@PYTHONPATH=.:tests:services/model-gateway python3 tests/m23_gate.py

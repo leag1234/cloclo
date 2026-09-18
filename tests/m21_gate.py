@@ -18,7 +18,7 @@ from uuid import UUID
 
 import stream_transport
 from serverless_support import environment
-from provider_recording import capture_stream, capture_tool, replay_stream
+from provider_recording import ExactHistory, capture_stream, capture_tool, replay_stream
 from services.orchestrator.serving import stack
 from services.orchestrator.tools import Runtime
 
@@ -63,7 +63,11 @@ def assert_guitar_geometry(text: str) -> None:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    live = os.environ.get("M21_LIVE") == "1"
+    refresh = os.environ.get("M21_REFRESH") == "1"
+    live = os.environ.get("M21_LIVE") == "1" or refresh
+    unchanged = ExactHistory(
+        json.loads(gzip.decompress(ARCHIVE.read_bytes())) if refresh else []
+    )
     resume = os.environ.get("M21_RESUME")
     rows: list[dict[str, Any]] = (
         json.loads(gzip.decompress(Path(resume).read_bytes()))
@@ -104,14 +108,19 @@ def main() -> None:
 
     async def stream(request: Any, model: str, timeout: float) -> Any:
         value = {**request.model_dump(exclude={"timeout"}), "provider_model": model}
-        source = (
-            replay_stream(replay("stream", value))
-            if replaying()
-            else capture_stream(
-                original_stream(request, model, timeout),
-                lambda events: record("stream", value, events),
+        saved = unchanged.take("stream", value) if refresh and not replaying() else None
+        if saved is not None:
+            record("stream", value, saved)
+            source = replay_stream(saved)
+        else:
+            source = (
+                replay_stream(replay("stream", value))
+                if replaying()
+                else capture_stream(
+                    original_stream(request, model, timeout),
+                    lambda events: record("stream", value, events),
+                )
             )
-        )
         async with aclosing(source):
             async for event in source:
                 yield event
@@ -121,8 +130,16 @@ def main() -> None:
 
         async def transport(self: Runtime, request: Any, timeout: float) -> Any:
             value = request.model_dump()
-            if replaying():
-                saved = replay(name, value)
+            saved = (
+                replay(name, value)
+                if replaying()
+                else unchanged.take(name, value)
+                if refresh
+                else None
+            )
+            if saved is not None:
+                if not replaying():
+                    record(name, value, saved)
                 if "recorded_exception" in saved:
                     errors = {"ValueError": ValueError, "TimeoutError": TimeoutError}
                     raise errors[saved["recorded_exception"]](saved["message"])
@@ -137,7 +154,7 @@ def main() -> None:
     report_path = Path("BRAIN/eval/journeys.json")
     report = json.loads(report_path.read_text()) if report_path.exists() else {}
     report["mode"] = "live" if live else "replay"
-    report["m21_acquisition"] = "mixed" if resume else report["mode"]
+    report["m21_acquisition"] = "mixed" if resume or refresh else report["mode"]
     report["m21_replayed_prefix_exchanges"] = prefix
     evidence: dict[str, Any] = {}
 

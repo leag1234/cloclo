@@ -6,15 +6,143 @@
   border-radius: 1rem;
   padding: 0.75rem 1rem;
 }
+/* Preserve the M21 dark user-message palette. */
 .dark .user-message {
   background: #16432c !important;
   color: #eafff0 !important;
   border-color: #377b50;
 }
+/* Existing nested utility backgrounds must inherit the green bubble. */
 .user-message [class*="bg-gray-"],
 .user-message [class*="bg-white"] {
   background-color: transparent !important;
 }
+/* Existing nested text keeps the accessible green-bubble foreground. */
 .user-message [class*="text-gray-"] {
   color: inherit !important;
 }
+
+/* Defaults are centralized: changing --atlas-body-font switches the reading font. */
+:root {
+  --atlas-body-font: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --atlas-body-size: 1.0625rem;
+  --atlas-line-height: 1.75;
+  --atlas-column: 700px;
+  --atlas-section-space: 1.8em;
+  --atlas-text: #303030;
+  --atlas-code-bg: #f5f5f3;
+  --atlas-code-border: #d9d9d5;
+}
+/* Dark values cascade into every shared geometry rule without changing layout. */
+.dark {
+  --atlas-text: #e3e3df;
+  --atlas-code-bg: #242625;
+  --atlas-code-border: #454944;
+}
+/* Theme font fallback honors Open WebUI's user-selected --app-font-family. */
+:where(.markdown:not(.user-message), .dark .markdown:not(.user-message)) {
+  --font-sans: var(--app-font-family, var(--atlas-body-font));
+  --font-primary: var(--font-sans);
+  --tw-prose-body: var(--atlas-text);
+  --tw-prose-invert-body: var(--atlas-text);
+  --tw-prose-headings: var(--atlas-text);
+  --tw-prose-invert-headings: var(--atlas-text);
+  --tw-prose-bold: var(--atlas-text);
+  --tw-prose-invert-bold: var(--atlas-text);
+  --tw-prose-quotes: var(--atlas-text);
+  --tw-prose-invert-quotes: var(--atlas-text);
+  --tw-prose-links: var(--atlas-text);
+  --tw-prose-invert-links: var(--atlas-text);
+  font-family: var(--atlas-body-font);
+  font-family: var(--app-font-family, var(--atlas-body-font));
+  font-size: var(--atlas-body-size);
+  line-height: var(--atlas-line-height);
+  color: var(--atlas-text);
+  max-width: none;
+}
+/* Semantic prose has a readable measure; code wrappers retain available width. */
+.markdown :is(p, ul, ol, h1, h2, h3, blockquote),
+.dark .markdown :is(p, ul, ol, h1, h2, h3, blockquote) {
+  max-width: var(--atlas-column);
+}
+/* Section separation is identical in both themes. */
+.markdown h2, .dark .markdown h2 { margin-top: var(--atlas-section-space); margin-bottom: 0.7em; }
+/* Subsections retain hierarchy with slightly less space than major sections. */
+.markdown h3, .dark .markdown h3 { margin-top: 1.4em; margin-bottom: 0.6em; }
+/* Separate list items without widening the prose column in either theme. */
+.markdown li + li, .dark .markdown li + li { margin-top: 0.55em; }
+/* Plain blocks and CodeMirror use the same theme palette and thin border. */
+.markdown :is(pre, .cm-editor), .dark .markdown :is(pre, .cm-editor) {
+  background: var(--atlas-code-bg) !important;
+  color: var(--atlas-text);
+  border: 1px solid var(--atlas-code-border);
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  box-shadow: none !important;
+  max-width: 100%;
+  overflow-x: auto;
+}
+/* Code always scrolls horizontally; neither theme may wrap long source lines. */
+.markdown :is(pre, pre code, .cm-content, .cm-line),
+.dark .markdown :is(pre, pre code, .cm-content, .cm-line) {
+  white-space: pre !important;
+  overflow-wrap: normal !important;
+  word-break: normal;
+  font-family: var(--font-mono, monospace);
+}
+/* Inline identifiers are subtle capsules; exclude block code in both themes. */
+.markdown :not(pre) > code, .dark .markdown :not(pre) > code {
+  background: var(--atlas-code-bg);
+  color: var(--atlas-text);
+  border: 0;
+  border-radius: 0.25em;
+  padding: 0.15em 0.3em;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.88em;
+}
+/* Tailwind prose decoration would add distracting backticks to capsules. */
+.markdown :not(pre) > code::before, .markdown :not(pre) > code::after,
+.dark .markdown :not(pre) > code::before, .dark .markdown :not(pre) > code::after { content: none; }
+/* CodeMirror semantic classes hide line numbers, gutters and active-line tint. */
+.markdown .cm-gutters, .markdown .cm-lineNumbers,
+.dark .markdown .cm-gutters, .dark .markdown .cm-lineNumbers { display: none; }
+/* Preserve text selection but remove the idle active-line highlight. */
+.markdown .cm-activeLine, .dark .markdown .cm-activeLine { background: transparent !important; }
+/* v0.11.3 toolbar wrapper: use its copy control, not generated utility hashes. */
+.markdown div:has(> .copy-code-button), .dark .markdown div:has(> .copy-code-button) {
+  position: absolute;
+  right: 0.5rem;
+  top: 0.5rem;
+  z-index: 20;
+}
+/* Collapse/save/run furniture is hidden; leave the keyboard-focusable copy action. */
+.markdown div:has(> .copy-code-button) > :not(.copy-code-button),
+.dark .markdown div:has(> .copy-code-button) > :not(.copy-code-button) { display: none; }
+/* Remove toolbar title and its reserved height using structural selectors. */
+.markdown div:has(> div > .copy-code-button),
+.dark .markdown div:has(> div > .copy-code-button) {
+  position: relative;
+  height: 0;
+  padding: 0;
+  background: transparent !important;
+}
+/* The toolbar's language title is furniture too. */
+.markdown div:has(> div > .copy-code-button) > :not(:has(.copy-code-button)),
+.dark .markdown div:has(> div > .copy-code-button) > :not(:has(.copy-code-button)) { display: none; }
+/* Undo the v0.11.3 toolbar overlap spacer; scope to its language wrapper. */
+.markdown div[class*="language-"]:has(pre, .cm-editor),
+.dark .markdown div[class*="language-"]:has(pre, .cm-editor) { margin-top: 0; }
+/* Empty toolbar offset div must not leave blank space above the code. */
+.markdown div[class*="language-"] > div:empty,
+.dark .markdown div[class*="language-"] > div:empty { display: none; }
+/* Copy appears on hover or keyboard focus; opacity keeps it reachable with Tab. */
+.markdown .copy-code-button, .dark .markdown .copy-code-button {
+  opacity: 0;
+  background: var(--atlas-code-bg) !important;
+  color: var(--atlas-text);
+}
+/* The existing dir=ltr code wrapper supplies hover and focus visibility. */
+.markdown [dir="ltr"]:hover .copy-code-button,
+.markdown [dir="ltr"]:focus-within .copy-code-button,
+.dark .markdown [dir="ltr"]:hover .copy-code-button,
+.dark .markdown [dir="ltr"]:focus-within .copy-code-button { opacity: 1; }

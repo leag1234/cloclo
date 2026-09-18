@@ -13,7 +13,8 @@
     "done": "Réponse terminée",
     "failed": "Échec",
     "synthesized": "Synthèse extractive de la source",
-    "source_truncated": "Attention : source incomplète"
+    "source_truncated": "Attention : source incomplète",
+    "reading_document": "Lecture du document…"
   },
   "en": {
     "thinking": "Thinking…",
@@ -29,7 +30,8 @@
     "done": "Answer complete",
     "failed": "Failed",
     "synthesized": "Extractive source synthesis",
-    "source_truncated": "Warning: incomplete source"
+    "source_truncated": "Warning: incomplete source",
+    "reading_document": "Reading document…"
   },
   "de": {
     "thinking": "Nachdenken…",
@@ -45,7 +47,8 @@
     "done": "Answer complete",
     "failed": "Failed",
     "synthesized": "Extractive source synthesis",
-    "source_truncated": "Warning: incomplete source"
+    "source_truncated": "Warning: incomplete source",
+    "reading_document": "Dokument wird gelesen…"
   },
   "es": {
     "thinking": "Reflexión…",
@@ -61,7 +64,8 @@
     "done": "Answer complete",
     "failed": "Failed",
     "synthesized": "Extractive source synthesis",
-    "source_truncated": "Warning: incomplete source"
+    "source_truncated": "Warning: incomplete source",
+    "reading_document": "Leyendo documento…"
   },
   "it": {
     "thinking": "Riflessione…",
@@ -77,6 +81,7 @@
     "done": "Answer complete",
     "failed": "Failed",
     "synthesized": "Extractive source synthesis",
-    "source_truncated": "Warning: incomplete source"
+    "source_truncated": "Warning: incomplete source",
+    "reading_document": "Lettura del documento…"
   }
 }
