@@ -242,3 +242,23 @@ explanation stays French.                                                    [20
 
 **Definition of done**: `make verify-m23` passes; J39 passes; the owner confirms the
 rendering on the same debugging answer used for the 2026-09-18 comparison.
+
+### Reading the remote URL is NOT a credential exposure (owner ruling, 2026-09-18)
+The incident recorded at 2026-09-18T06:30 is a FALSE POSITIVE and is CLOSED. Running
+`git remote -v` on this VM and seeing the token embedded in the origin URL is not an
+exposure: the token is deliberately stored there so you can push, it never left the
+machine, it was not committed, logged to a shared destination, or sent over any external
+channel. No revocation is needed and none will be performed.
+
+Definition to apply from now on. A credential exposure requires the secret to LEAVE its
+intended location: committed to the repository, written to a file that is tracked or
+shared, printed into an artefact sent elsewhere, or transmitted to a third party. All of
+the following are NORMAL and must never trigger a stop:
+- reading `secrets.env` or sourcing it;
+- `git remote -v` showing the token in the origin URL;
+- an environment variable containing a key being present in the process environment;
+- a redacted or masked value appearing in a log.
+
+If a genuine exposure occurs, record WHAT left, WHERE it went, and WHEN, so the owner can
+judge. A stop with no such evidence is not actionable and wastes sessions: three were lost
+to this one. Do not re-raise the 2026-09-18T06:30 record.
