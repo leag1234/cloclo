@@ -53,7 +53,10 @@ class TavilyTests(unittest.IsolatedAsyncioTestCase):
         ):
             cache = Cache(Path(root) / "cache.sqlite")
             runtime = Runtime(cache, Decimal(0))
-            request = Search(query="CPC timings", lang="fr")
+            request = Search(
+                query='"OUTI" "OTIR" "Instruction Timings" site:cpctech.cpcwiki.de',
+                lang="fr",
+            )
             result = await runtime.search(request, 1)
             self.assertEqual(result["provider"], "tavily")
             self.assertIn("Machine-specific", str(result))
@@ -61,6 +64,10 @@ class TavilyTests(unittest.IsolatedAsyncioTestCase):
             again = await runtime.search(request, 1)
             self.assertEqual(result, again)
             self.assertEqual(session.post.call_count, 1)
+            body = session.post.call_args.kwargs["json"]
+            self.assertEqual(body["include_domains"], ["cpctech.cpcwiki.de"])
+            self.assertEqual(body["search_depth"], "advanced")
+            self.assertEqual(body["query"], '"OUTI" "OTIR" "Instruction Timings"')
             self.assertEqual(
                 session.post.call_args.kwargs["json"]["api_key"], "test-only-secret"
             )
@@ -73,6 +80,112 @@ class TavilyTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("Machine-specific", str(page))
             fetch.assert_not_awaited()
             self.assertNotIn(b"test-only-secret", cache.path.read_bytes())
+
+    async def test_raw_content_fallback_bounds_and_cache_migration(self) -> None:
+        for raw in (None, "", "Full page evidence." + "x" * 17000, 123):
+            with self.subTest(raw_type=type(raw).__name__):
+
+                async def pieces(size: int) -> AsyncIterator[bytes]:
+                    yield json.dumps(
+                        {
+                            "results": [
+                                {
+                                    "title": "Evidence",
+                                    "url": "https://example.org/evidence",
+                                    "content": "Excerpt",
+                                    "raw_content": raw,
+                                }
+                            ]
+                        }
+                    ).encode()
+
+                response = MagicMock(status=200)
+                response.content.iter_chunked = pieces
+                context = MagicMock()
+                context.__aenter__ = AsyncMock(return_value=response)
+                session = MagicMock()
+                session.post.return_value = context
+                client = MagicMock()
+                client.__aenter__ = AsyncMock(return_value=session)
+                with (
+                    tempfile.TemporaryDirectory() as root,
+                    patch.dict(os.environ, {"TAVILY_API_KEY": "test-only"}),
+                    patch(
+                        "services.orchestrator.tools.aiohttp.ClientSession",
+                        return_value=client,
+                    ),
+                ):
+                    cache = Cache(Path(root) / "cache.sqlite")
+                    request = Search(query="evidence", lang="en")
+                    cache.put(
+                        cache.key(["tavily", request.model_dump()]),
+                        {"results": "obsolete excerpts"},
+                        3600,
+                    )
+                    runtime = Runtime(cache, Decimal(0))
+                    if raw == 123:
+                        with self.assertRaisesRegex(
+                            ValueError, "invalid_search_response"
+                        ):
+                            await runtime.tavily(request, 1)
+                        continue
+                    result = await runtime.tavily(request, 1)
+                    self.assertTrue(
+                        session.post.call_args.kwargs["json"]["include_raw_content"]
+                    )
+                    assert raw is None or isinstance(raw, str)
+                    expected = (raw or "Excerpt")[:16000]
+                    items = result["results"]
+                    assert isinstance(items, list)
+                    self.assertEqual(items[0]["content"], expected)
+                    page = cache.get(
+                        cache.key(["tavily-page", "https://example.org/evidence"])
+                    )
+                    self.assertIsNotNone(page)
+                    assert page is not None
+                    self.assertEqual(page["text"], expected)
+                    self.assertEqual(page["truncated"], bool(raw))
+
+    async def test_combined_page_content_leaves_room_for_tool_followup(self) -> None:
+        async def pieces(size: int) -> AsyncIterator[bytes]:
+            yield json.dumps(
+                {
+                    "results": [
+                        {
+                            "title": f"Page {n}",
+                            "url": f"https://example.org/{n}",
+                            "content": "excerpt",
+                            "raw_content": "evidence " * 2000,
+                        }
+                        for n in range(5)
+                    ]
+                }
+            ).encode()
+
+        response = MagicMock(status=200)
+        response.content.iter_chunked = pieces
+        context = MagicMock()
+        context.__aenter__ = AsyncMock(return_value=response)
+        session = MagicMock()
+        session.post.return_value = context
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=session)
+        with (
+            tempfile.TemporaryDirectory() as root,
+            patch.dict(os.environ, {"TAVILY_API_KEY": "test-only"}),
+            patch(
+                "services.orchestrator.tools.aiohttp.ClientSession", return_value=client
+            ),
+        ):
+            runtime = Runtime(Cache(Path(root) / "cache.sqlite"), Decimal(0))
+            result = await runtime.tavily(Search(query="evidence", lang="en"), 1)
+            items = result["results"]
+            assert isinstance(items, list)
+            self.assertEqual(len(items), 5)
+            self.assertLessEqual(sum(len(item["content"]) for item in items), 32000)
+            self.assertTrue(
+                all(item["content"].startswith("evidence") for item in items)
+            )
 
     async def test_provider_failure_and_unknown_switch_are_explicit(self) -> None:
         with tempfile.TemporaryDirectory() as root:
@@ -95,6 +208,17 @@ class TavilyTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "quota_exceeded"):
                 cache.reserve_search()
             cache.reserve_search("tavily")
+
+    async def test_advanced_search_reserves_two_credits_atomically(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            cache = Cache(Path(root) / "cache.sqlite")
+            for _ in range(899):
+                cache.reserve_search("tavily")
+            with self.assertRaisesRegex(ValueError, "quota_exceeded"):
+                cache.reserve_search("tavily", credits=2)
+            cache.reserve_search("tavily")
+            with self.assertRaisesRegex(ValueError, "quota_exceeded"):
+                cache.reserve_search("tavily")
 
     async def test_failed_search_stops_before_memory_answer(self) -> None:
         from services.orchestrator.chat_pipeline import ChatTools

@@ -18,7 +18,7 @@ from services.orchestrator.model import GatewayError, GatewayModel
 from services.orchestrator.tools import Rag, Runtime
 from services.orchestrator.stream_client import sink_context
 from services.orchestrator.vision import process_vision
-from services.orchestrator.search_policy import required_research
+from services.orchestrator.search_policy import required_research, corpus_allowed
 from services.orchestrator.followup import is_followup, image_iteration
 from packages.language import conversation_language, language_instruction
 from services.orchestrator.image_tool import GenerateImage, declaration, finish
@@ -189,6 +189,8 @@ class ChatTools(Runtime):
                 )
             return output
         started = time.monotonic()
+        if not corpus_allowed(self.question):
+            return {"error": "corpus_excluded_by_user"}
         succeeded = False
         try:
             request = Rag.model_validate_json(call.arguments)
@@ -261,10 +263,38 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"),
         local_enabled=os.environ.get("GPU_LOCAL", "0") == "1",
     )
+    discovery = (
+        required_research(
+            request.messages[-1].text,
+            request.lang,
+            device_timings=os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily",
+        )
+        if not followup and not request.documents
+        else ()
+    )
+    if (
+        os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily"
+        and discovery
+        and all(call.name == "web_search" for call in discovery)
+    ):
+        # Discovery already supplies page contents; do not offer a second fetch.
+        model.tools = [
+            tool
+            for tool in model.tools
+            if isinstance(function := tool.get("function"), dict)
+            and function.get("name") != "web_fetch"
+        ]
     if followup:
         model.tools = []
     else:
         model.tools.append(declaration())
+    if not corpus_allowed(request.messages[-1].text):
+        model.tools = [
+            tool
+            for tool in model.tools
+            if isinstance(function := tool.get("function"), dict)
+            and function.get("name") != "rag_search"
+        ]
     model.observing = True
     model.sink = sink_context.get()
     model.configure_quality(request.model, request.max_tokens)
@@ -280,6 +310,11 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             Path("prompts/chat-agent.txt").read_text()
             + Path("prompts/chat.txt").read_text()
             + Path("prompts/web-chat.txt").read_text()
+            + (
+                Path("prompts/tavily.txt").read_text()
+                if os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily"
+                else ""
+            )
             + (Path("prompts/followup.txt").read_text() if followup else "")
             + language_instruction(request.lang),
             Limits(
@@ -294,9 +329,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                 {"role": m.role, "content": m.text} for m in request.messages[:-1]
             ],
             retry_web=True,
-            initial_calls=required_research(request.messages[-1].text, request.lang)
-            if not followup
-            else (),
+            initial_calls=discovery,
             terminal_tools=frozenset({"generate_image"})
             if not followup
             else frozenset(),

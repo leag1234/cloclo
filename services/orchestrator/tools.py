@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -90,8 +91,11 @@ class Runtime:
         self.question = question
 
     def estimate(self, call: Call) -> Reservation:
+        # Reserve the advanced-search ceiling before any Tavily I/O.
+        multiplier = 2 if os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily" else 1
         return Reservation(
-            0, self.search_cost if call.name == "web_search" else Decimal(0)
+            0,
+            self.search_cost * multiplier if call.name == "web_search" else Decimal(0),
         )
 
     async def search(self, request: Search, timeout: float) -> Message:
@@ -159,14 +163,22 @@ class Runtime:
         return output
 
     async def tavily(self, request: Search, timeout: float) -> Message:
-        key = self.cache.key(["tavily", request.model_dump()])
+        key = self.cache.key(["tavily-bounded-domain-content", request.model_dump()])
         cached = self.cache.get(key)
         if cached is not None:
             return cached
         credential = os.environ.get("TAVILY_API_KEY", "")
         if not credential:
             raise ValueError("search_unavailable")
-        self.cache.reserve_search("tavily")
+        # Tavily has a structured domain filter; site: text alone can return
+        # unrelated pages. Preserve explicit user/model source restrictions.
+        domains = re.findall(r"(?<!\S)site:([a-zA-Z0-9.-]+)(?=\s|$)", request.query)
+        query = re.sub(r"(?<!\S)site:[a-zA-Z0-9.-]+(?=\s|$)", "", request.query).strip()
+        for domain in domains:
+            validate_url("https://" + domain)
+        if not query:
+            raise ValueError("invalid_search_query")
+        self.cache.reserve_search("tavily", credits=2 if domains else 1)
         async with aiohttp.ClientSession(
             timeout=http_timeout(timeout, SEARCH_TIMEOUT), trust_env=False
         ) as session:
@@ -174,9 +186,11 @@ class Runtime:
                 "https://api.tavily.com/search",
                 json={
                     "api_key": credential,
-                    "query": request.query,
+                    "query": query,
                     "max_results": request.n,
-                    "search_depth": "basic",
+                    "search_depth": "advanced" if domains else "basic",
+                    "include_raw_content": True,
+                    **({"include_domains": domains} if domains else {}),
                 },
                 allow_redirects=False,
             ) as response:
@@ -197,6 +211,9 @@ class Runtime:
             raise ValueError("invalid_search_response")
         consulted = datetime.now(timezone.utc).isoformat()
         items: list[Message] = []
+        # Bound the combined history, not only each page: later shell/publication
+        # turns must still fit the unchanged cumulative loop token allowance.
+        page_limit = min(16000, 32000 // max(1, min(len(results), request.n)))
         for result in results[: request.n]:
             if not isinstance(result, dict) or not all(
                 isinstance(result.get(field), str)
@@ -204,7 +221,11 @@ class Runtime:
             ):
                 raise ValueError("invalid_search_response")
             validate_url(result["url"])
-            text = result["content"][:16000]
+            raw = result.get("raw_content")
+            if raw is not None and not isinstance(raw, str):
+                raise ValueError("invalid_search_response")
+            source = raw or result["content"]
+            text = source[:page_limit]
             items.append(
                 {
                     "title": result["title"][:300],
@@ -223,7 +244,7 @@ class Runtime:
                     "text": text,
                     "consulted_at": consulted,
                     "provider": "tavily",
-                    "truncated": len(result["content"]) > len(text),
+                    "truncated": len(source) > len(text),
                 },
                 3600,
             )
