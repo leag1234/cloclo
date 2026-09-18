@@ -26,7 +26,7 @@ class JourneyReuseTests(unittest.TestCase):
                     json.dumps(
                         {
                             "mode": "replay",
-                            **{f"J{n}_check": True for n in range(1, 39)},
+                            **{f"J{n}_check": True for n in range(1, 50)},
                         }
                     )
                 )

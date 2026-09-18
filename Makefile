@@ -184,4 +184,12 @@ verify-m23: ## readable rendering, English code and complete document attachment
 	@bash scripts/verify-m23.sh
 	@$(MAKE) test-m23
 test-m23: ## exact recorded public HTTP journeys J39-J41
-	@PYTHONPATH=.:tests:services/model-gateway python3 tests/m23_gate.py
+	@if [[ "$${GITHUB_ACTIONS:-}" == true && "$${M23_LIVE:-}" != 1 ]]; then \
+	  PYTHONPATH=.:tests:services/model-gateway python3 tests/journey_runner.py; \
+	else \
+	  PYTHONPATH=.:tests:services/model-gateway python3 tests/m23_gate.py; \
+	fi
+
+.PHONY: verify-m24
+verify-m24: ## documents, contained file tools and actual rendering
+	@bash scripts/verify-m24.sh
