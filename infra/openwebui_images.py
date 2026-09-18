@@ -8,6 +8,7 @@ from pathlib import Path
 import hashlib
 from importlib import import_module
 import re
+import os
 from typing import Any
 
 import aiohttp
@@ -22,7 +23,8 @@ class Filter:
             timeout=aiohttp.ClientTimeout(total=15), trust_env=False
         ) as client:
             async with client.post(
-                "http://127.0.0.1:8020/images/upload",
+                os.environ.get("ATLAS_ADAPTER_URL", "http://127.0.0.1:8020")
+                + "/images/upload",
                 json={"url": url},
                 allow_redirects=False,
             ) as response:
