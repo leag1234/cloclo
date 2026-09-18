@@ -119,3 +119,23 @@ What still holds, and is the condition of this authorisation:
   stop it.
 Read-only remains the rule for every OTHER tool path (web fetch, retrieval, MCP).
 This is an explicit owner exception: apply it, do not stop on it again.
+
+### M24 — Open Terminal path traversal: accepted risk, documented (owner ruling, 2026-09-18)
+The agent proved that the pinned Open Terminal file API reads outside its user directory:
+`GET /files/read?path=/home/user/../../etc/hostname` succeeds, and so does following a
+symlink created inside the container. This is a genuine defect of the product and the
+containment promised in M24/D2 cannot rely on the application.
+
+Measured scope on the running container: one mount only (`/home/user`), no ATLAS
+repository, no `secrets.env`, no Scaleway or Tavily credentials; the only key in its
+environment is its own API key. An authenticated caller can therefore read the system
+files of a disposable container and nothing else.
+
+ACCEPTED for the PoC, under these conditions, which are the containment:
+- containment is provided by Docker alone, never by the terminal's own path checks;
+- nothing but user files is ever mounted into that container — no repository, no secrets,
+  no host path;
+- the port stays bound to 127.0.0.1 and the container is never publicly exposed;
+- `runbooks/files.md` states the traversal explicitly, so nobody later mounts something
+  sensitive believing the API confines reads.
+Do not stop on this again. Report the defect upstream to Open WebUI with the two probes.
