@@ -31,8 +31,9 @@ for m in "atlas-qwen" "atlas-glm" "atlas-deepseek"; do
   grep -rqE "$m" services/orchestrator/ services/model-gateway/ 2>/dev/null \
     || fail "model $m is not exposed: the selector must offer the configured provider models"
 done
-# Word-anchored: "atlas-deep" must not match "atlas-deepseek".
-grep -rqE "atlas-deep\b" services/orchestrator/ services/model-gateway/ 2>/dev/null \
+# "atlas-deep" must not match "atlas-deepseek": \b is not portable in ERE, so we
+# explicitly require that no alphanumeric character follows.
+grep -rqE "atlas-deep([^a-zA-Z0-9-]|$)" services/orchestrator/ services/model-gateway/ 2>/dev/null \
   && fail "atlas-deep is still exposed: deep mode was abandoned with measured evidence"
 # reasoning_effort must be sent EXPLICITLY on every call: the provider default changed
 # mid-day on 2026-09-17 and silently emptied every answer.
