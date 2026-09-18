@@ -102,31 +102,24 @@ during generation.
   of falling back silently on model knowledge. Four corpus cases were scored on degraded
   searches without anyone noticing.
 
-### Validation journeys (the owner's own cases, verbatim)
-J42 "Fais-moi une présentation de /e/OS et Murena, et tu mets dans un pptx téléchargeable,
-    et aussi l'équivalent pdf — ceci seulement à partir des infos connues dans ton modèle
-    et ce que tu peux télécharger publiquement, tu ne fais pas appel à la mémoire présente
-    dans notre environnement" → a .pptx AND a .pdf are returned as downloadable files; the
-    corpus RAG is not queried; the deck has a title slide and several content slides.
-J43 "Prends ce fichier word et corrige les fautes d'orthographe et nettoie la structure
-    avec des paragraphes bien clairs, des titres structurés et une table des matières"
-    [attach a .docx] → a corrected .docx is returned; the answer states whether the file
-    was regenerated or edited in place.
-J44 "Dans cette feuille de calcul, extrais les achats du mois de mars, compare-les avec
-    ceux du mois de mars de l'année précédente, et crée un nouvel onglet avec les chiffres
-    comparés et un graphique d'évolution" [attach a .xlsx] → a .xlsx is returned with the
-    new sheet and an embedded chart; the figures are correct.
-J45 attach a 20+ page PDF and ask for a one-page synthesis → the answer covers the
-    beginning, middle and end of the document (the M23/D8 case, now served by the terminal).
-J46 attach a password-protected or scanned PDF → an explicit failure message naming the
-    cause, not a partial answer built on fragments.
-J47 attach a PDF around 180 000 tokens → the synthesis is produced (0.30 EUR ceiling), or
-    the M10 hierarchical synthesis is applied; never a flat refusal.          [2026-09-18]
-J48 "Sur un Amstrad CPC, quels sont les timings de OUTI et OTIR en microsecondes ?" →
-    a web search is performed through Tavily and the answer cites a CPC-specific source;
-    if the quota is exhausted, the answer SAYS so instead of answering from memory.
-J49 any answer rendered in the browser → a code block shows no line numbers and no
-    toolbar; body text is serif; a screenshot proves it.                      [2026-09-18]
+### Validation journeys
+
+Original dated multilingual owner wording is preserved byte-for-byte inside
+[tests/journeys/m24-cases.json](../tests/journeys/m24-cases.json), under
+owner_validation_verbatim. These are binding acceptance cases:
+
+- J42: downloadable /e/OS and Murena presentation plus PDF, using model knowledge
+  and public sources only; no corpus retrieval, title and multiple content slides.
+- J43: correct attached Word spelling and structure, headings and table of contents;
+  return DOCX and state regeneration versus editing in place.
+- J44: compare March purchases with the previous March; preserve the workbook,
+  add a comparison sheet and embedded evolution chart with correct figures.
+- J45: synthesize a PDF of at least20 pages; cover beginning, middle and end.
+- J46: explicitly identify scanned/password-protected PDF failure.
+- J47: synthesize approximately180000 tokens within0.30 EUR or use M10 hierarchy.
+- J48: search CPC OUTI/OTIR timings through Tavily, cite CPC-specific evidence;
+  explicitly disclose quota exhaustion instead of answering from memory.
+- J49: screenshot actual serif prose and code without line numbers/default toolbar.
 
 ### Note on the model's role
 The plumbing is proven; what is not yet known is whether the model drives the terminal
