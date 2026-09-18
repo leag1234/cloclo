@@ -268,3 +268,20 @@ per journey: which model, how many terminal commands, how many failed, total sec
 documents the containment; `make serve` starts the terminal with everything else;
 `reports/M24.md` carries the before/after screenshots proving the rendering and the
 activity indicator changed on screen.
+
+### M24 supersedes the read-only tool restriction (owner ruling, 2026-09-18)
+`docs/13` POC-W3 restricted model tools to read-only. M24 requires a shell with write
+access, so the two conflict. AUTHORIZED: for the Open Terminal path only, the read-only
+restriction is SUPERSEDED by the containment described in M24/D2.
+
+What is granted: executing Python and shell commands inside the Open Terminal Docker
+container, and creating or modifying files in its dedicated volume.
+What still holds, and is the condition of this authorisation:
+- the container has no route to the VM's internal services (8010/8020/8030), no Scaleway
+  credentials, and no mount of the ATLAS repository;
+- its volume carries user files only, nothing of the platform;
+- the port is bound to 127.0.0.1;
+- `runbooks/files.md` states plainly what the terminal can and cannot reach, and how to
+  stop it.
+Read-only remains the rule for every OTHER tool path (web fetch, retrieval, MCP).
+This is an explicit owner exception: apply it, do not stop on it again.
