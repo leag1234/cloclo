@@ -124,6 +124,8 @@ def store_uploaded(url: str) -> str:
 def prepare_uploads(value: Any) -> tuple[Any, list[dict[str, int]], list[str]]:
     if not isinstance(value, dict) or not isinstance(value.get("messages"), list):
         return value, [], []
+    # Only file parts create document inputs; ignore untrusted internal fields.
+    value["documents"] = []
     messages = value["messages"]
     if not 1 <= len(messages) <= 100:
         return value, [], []
@@ -140,6 +142,16 @@ def prepare_uploads(value: Any) -> tuple[Any, list[dict[str, int]], list[str]]:
         _, normalized = normalize_uploads({"messages": [message]})
         changes.extend(normalized)
         for part in message["content"]:
+            if isinstance(part, dict) and part.get("type") == "file":
+                from services.orchestrator.documents import Attachment
+
+                attachment = Attachment.model_validate(part.get("file"))
+                value["documents"].append(attachment.model_dump())
+                part.clear()
+                part.update(
+                    type="text", text="[Attachment: " + attachment.filename + "]"
+                )
+                continue
             if not isinstance(part, dict) or part.get("type") != "image_url":
                 continue
             data = part.get("image_url")

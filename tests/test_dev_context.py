@@ -29,7 +29,18 @@ class DevContextTests(unittest.TestCase):
             context_answer(reply.json()["choices"][0]["message"]["content"]), expected
         )
         upstream = json.loads(env.inputs[0])
-        self.assertEqual(upstream["messages"], payload["messages"])
+        self.assertEqual(
+            upstream["messages"][0],
+            {
+                "role": "system",
+                "content": Path("prompts/code-language.txt").read_text(),
+            },
+        )
+        self.assertEqual(upstream["messages"][1:], payload["messages"])
+        self.assertEqual(
+            hashlib.sha256(env.inputs[0].encode()).hexdigest(),
+            fixture["gateway_request_sha256"],
+        )
         usage = env.store.usage("alice")
         self.assertEqual(usage["requests"], 1)
         charged = usage["charged_micro_eur"]

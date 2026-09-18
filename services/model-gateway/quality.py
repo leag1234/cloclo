@@ -98,17 +98,40 @@ async def stream_quality(
     # A large evidence input can exceed the primary's conservative reservation
     # even when the configured alternate can answer within the same ledger.
     alternate = policy.models[fallback_role]
-    if (
-        policy.cost(model, incoming, 1) > budget
-        and policy.cost(alternate, incoming, 1) <= budget
-    ):
-        role, model = fallback_role, alternate
-        fallback = True
-        logging.getLogger(__name__).info(
-            json.dumps(
-                {"event": "quality_affordable_alternate", "budget_eur": str(budget)}
+    if policy.cost(model, incoming, 1) > budget:
+        selected = None
+        if policy.cost(alternate, incoming, 1) <= budget:
+            selected = fallback_role
+        elif task != "vision":
+            # Preserve complete attachment context when both configured expert
+            # roles exceed the cap. Only already configured public text roles are
+            # eligible; no input sampling or larger cost allowance is permitted.
+            affordable_roles = [
+                candidate
+                for candidate in dict.fromkeys(policy.public_profiles.values())
+                if incoming + request.max_tokens
+                <= policy.config[candidate]["capabilities"][policy.models[candidate]][
+                    "context"
+                ]
+                and policy.cost(policy.models[candidate], incoming, request.max_tokens)
+                <= budget
+            ]
+            if affordable_roles:
+                selected = min(
+                    affordable_roles,
+                    key=lambda candidate: policy.cost(
+                        policy.models[candidate], incoming, request.max_tokens
+                    ),
+                )
+                fallback_role = policy.config[selected]["fallback"]
+        if selected is not None:
+            role, model = selected, policy.models[selected]
+            fallback = True
+            logging.getLogger(__name__).info(
+                json.dumps(
+                    {"event": "quality_affordable_alternate", "budget_eur": str(budget)}
+                )
             )
-        )
     # Research is optional once another selection turn plus the full-context
     # answer no longer fit. Keep all acquired evidence and the selected effort.
     if request.tools and (

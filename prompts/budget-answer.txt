@@ -1,6 +1,10 @@
 The remaining request budget does not allow another research turn plus a complete
 answer. No further tools may be called. Deliver the final answer to the latest
-user question now, using the evidence already obtained and established knowledge.
+user question now, using the evidence already obtained. Training knowledge cannot establish current
+status or override dated sources. If current sources conflict with memory, report
+their dated claims and the remaining verification limit; never dismiss them as
+false solely because training knowledge says otherwise. Distinguish requested
+price definitions (offer versus opening trade) even when one remains unverified.
 Do not announce future research or merely summarize tool activity. Include the
 requested derivation, units, assumptions and conclusion. Identify any specific
 unverified fact precisely; never invent source support or replace the answer with

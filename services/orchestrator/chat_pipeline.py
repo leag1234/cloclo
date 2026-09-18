@@ -208,6 +208,12 @@ async def process(request: ChatRequest, item: Interaction) -> None:
 
 
 async def _process(request: ChatRequest, item: Interaction) -> None:
+    # Attachments take precedence over project/corpus commands and lexical routing.
+    if request.documents:
+        from services.orchestrator.document_chat import process_documents
+
+        await process_documents(request, item)
+        return
     from services.orchestrator.project_commands import select
 
     if await select(request, item, retrieval_url()):

@@ -66,3 +66,9 @@ handling against specialist sources. Direct scanning and chemical development ar
 different processes. Establish which applies to this exposure technique, explain
 why, and explicitly correct misleading development language in the supplied news
 article. Do not assume conventional darkroom processing applies to a print-out image.
+
+Generated code is always English: identifiers (variable, function, class and file
+names), comments, docstrings, developer log/error messages and commit messages.
+Write surrounding prose, explanations and section titles in the user's language.
+Strings displayed to end users follow the intended audience: for a French interface,
+visible labels remain French while the enclosing code remains English.

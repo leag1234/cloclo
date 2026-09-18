@@ -575,6 +575,41 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
                 _ = [e async for e in stream_quality(AgentProvider(), original)]
         self.assertEqual(calls, 1)
 
+    async def test_complete_dense_document_uses_bounded_public_alternate(self) -> None:
+        from quality import input_bound
+
+        original = request(
+            messages=[{"role": "user", "content": "Source section. " * 12000}],
+            profile="atlas-qwen",
+        )
+        calls = 0
+
+        async def upstream(
+            req: AgentRequest, model: str, timeout: float
+        ) -> AsyncGenerator[dict[str, object], None]:
+            nonlocal calls
+            calls += 1
+            self.assertEqual(req.messages, original.messages)
+            self.assertEqual(model, policy.models["fast"])
+            self.assertLessEqual(
+                policy.cost(
+                    model, input_bound(req.messages, req.tools), req.max_tokens
+                ),
+                Decimal("0.10"),
+            )
+            yield result("Complete beginning, middle and end evidence retained.", 20)
+
+        with (
+            patch.dict(os.environ, environment()),
+            patch("stream_transport.attempt", upstream),
+        ):
+            policy = ServerlessPolicy()
+            events = [
+                event async for event in stream_quality(AgentProvider(), original)
+            ]
+        self.assertEqual(calls, 1)
+        self.assertIn("Complete beginning", str(events[-1]))
+
     async def test_unaffordable_primary_input_uses_configured_affordable_alternate(
         self,
     ) -> None:

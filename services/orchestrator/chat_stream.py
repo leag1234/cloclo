@@ -38,7 +38,8 @@ def response(
         queue: asyncio.Queue[dict[str, object] | None] = asyncio.Queue(maxsize=8)
         pending = ""
         turn = 0
-        activity = "thinking" if payload.reasoning_effort == "high" else "answering"
+        activity = "reading_document" if payload.documents else "thinking"
+        answer_started = False
         activity_urls: list[str] = []
         last_activity = time.monotonic()
         citation_numbers: dict[str, int] = {}
@@ -62,6 +63,8 @@ def response(
                     "description": f"{description} ({elapsed:.1f}s)",
                     "done": done,
                     "elapsed_seconds": elapsed,
+                    "action": "atlas_activity",
+                    "hidden": done and answer_started,
                     "urls": activity_urls,
                 },
             }
@@ -138,6 +141,7 @@ def response(
                     "provider_fallback",
                     "synthesized",
                     "source_truncated",
+                    "reading_document",
                 }:
                     activity = phase
                 elif phase == "narration":
@@ -308,7 +312,10 @@ def response(
                     event = await asyncio.wait_for(queue.get(), timeout=1)
                 except TimeoutError:
                     last_activity = time.monotonic()
-                    yield heartbeat()
+                    if not answer_started:
+                        yield heartbeat()
+                    else:
+                        yield ": keepalive\n\n"
                     continue
                 if event is None:
                     break
@@ -354,7 +361,25 @@ def response(
                                 "estimated": item.token_split_estimated,
                             },
                         }
-                if (
+                delta = event.get("delta")
+                event_metadata = event.get("atlas")
+                event_phase = (
+                    event_metadata.get("phase")
+                    if isinstance(event_metadata, dict)
+                    else None
+                )
+                if event_phase in {"tool_started", "intermediate"}:
+                    answer_started = False
+                first_content = (
+                    not answer_started
+                    and isinstance(delta, dict)
+                    and bool(delta.get("content"))
+                    and event_phase != "tool_details"
+                )
+                if first_content:
+                    answer_started = True
+                    output["event"] = status_event(done=True)
+                elif not answer_started and (
                     "atlas" in event
                     or event.get("finish")
                     or time.monotonic() - last_activity >= 1

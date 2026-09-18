@@ -33,3 +33,12 @@ class LanguageTests(unittest.TestCase):
         self.assertFalse(
             matches(metadata + "[An English source](https://example.org)", "fr")
         )
+
+
+class UppercaseLanguageTests(unittest.TestCase):
+    def test_uppercase_instruction_retains_french_prose_language(self) -> None:
+        from packages.language import detected_language
+
+        text = "CALCULE UNE MOYENNE EN PYTHON AVEC UNE DOCSTRING ET UN EXEMPLE."
+        self.assertEqual(detected_language(text), "fr")
+        self.assertEqual(detected_language(text), detected_language(text.lower()))
