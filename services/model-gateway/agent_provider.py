@@ -72,7 +72,7 @@ class Completion(BaseModel):
 class AgentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     messages: list[dict[str, object]] = Field(min_length=1, max_length=100)
-    tools: list[dict[str, object]] = Field(min_length=0, max_length=5)
+    tools: list[dict[str, object]] = Field(min_length=0, max_length=8)
     tool_choice: Literal["auto", "none"] = Field(
         default="auto", exclude_if=lambda value: value == "auto"
     )
@@ -86,6 +86,9 @@ class AgentRequest(BaseModel):
     reasoning_effort: Literal["none", "low", "high"] = Field(
         default="none", exclude_if=lambda value: value == "none"
     )
+    has_attachments: bool = Field(
+        default=False, exclude_if=lambda value: value is False
+    )
     budget_eur: str | None = Field(
         default=None, max_length=40, exclude_if=lambda value: value is None
     )
@@ -98,7 +101,8 @@ class AgentRequest(BaseModel):
             raise ValueError("timeout_budget")
         if self.profile is None:
             if (
-                self.max_tokens != 2048
+                self.has_attachments
+                or self.max_tokens != 2048
                 or self.budget_eur is not None
                 or self.reasoning_effort == "high"
             ):
@@ -111,7 +115,7 @@ class AgentRequest(BaseModel):
         if self.max_tokens > ceiling:
             raise ValueError("output_budget")
         self.reasoning_effort = "none"
-        cap = Decimal("0.10")
+        cap = Decimal("0.30" if self.has_attachments else "0.10")
         try:
             budget = Decimal(self.budget_eur) if self.budget_eur is not None else cap
         except InvalidOperation:
