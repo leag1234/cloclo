@@ -1,6 +1,8 @@
 """Explicit disruptive J8 check, excluded from unittest discovery and CI."""
 
 import json
+import os
+import secrets
 from pathlib import Path
 import subprocess
 import time
@@ -15,18 +17,25 @@ def ready() -> bool:
                 if response.status != 200:
                     return False
         return True
-    except (URLError, TimeoutError):
+    except (URLError, TimeoutError, ConnectionError):
         return False
 
 
 def main() -> None:
     if ready():
         raise RuntimeError("active_stack: stop user sessions before running J8")
+    # This journey starts real local services but never invokes search/inference.
+    # CI has no deployment secrets file; use a fresh key for its disposable terminal.
+    environment = dict(os.environ)
+    environment.setdefault("TAVILY_API_KEY", "test-only-startup-no-search")
+    environment.setdefault("OPEN_TERMINAL_API_KEY", secrets.token_urlsafe(32))
     processes = []
     with Path("BRAIN/m17-serve.log").open("w") as log:
         try:
             for _ in range(2):
-                process = subprocess.Popen(["make", "serve"], stdout=log, stderr=log)
+                process = subprocess.Popen(
+                    ["make", "serve"], stdout=log, stderr=log, env=environment
+                )
                 processes.append(process)
                 deadline = time.monotonic() + 240
                 while True:
@@ -42,7 +51,6 @@ def main() -> None:
             )
         finally:
             # Signal the recorded launcher; make does not forward termination.
-            import os
             import signal
 
             lock = Path("BRAIN/serve.lock")
