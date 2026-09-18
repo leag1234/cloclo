@@ -3,12 +3,35 @@
 import json
 import re
 import unicodedata
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from services.orchestrator.loop import Call
 
 
-def required_research(question: str, language: str) -> tuple[Call, ...]:
+def corpus_allowed(question: str) -> bool:
+    text = "".join(
+        c
+        for c in unicodedata.normalize("NFD", question.casefold())
+        if not unicodedata.combining(c)
+    )
+    scope = r"\b(corpus|memoire|memory|intern\w*|retrieval)\b"
+    return not re.search(
+        r"\b(sans|without|ohne|sin|senza)\b[^.!?\n]{0,80}"
+        + scope
+        + r"|\bne\b[^.!?\n]{0,50}\bpas\b[^.!?\n]{0,80}"
+        + scope
+        + r"|\bn['’][^.!?\n]{0,30}\b(aucun|pas)\b[^.!?\n]{0,80}"
+        + scope
+        + r"|\b(do not|don't|never|keine?)\b[^.!?\n]{0,80}"
+        + scope,
+        text,
+    )
+
+
+def required_research(
+    question: str, language: str, *, device_timings: bool = False
+) -> tuple[Call, ...]:
     normalized = "".join(
         c
         for c in unicodedata.normalize("NFD", question.casefold())
@@ -50,7 +73,26 @@ def required_research(question: str, language: str) -> tuple[Call, ...]:
         r"\b(recherch\w*|search|suche|busca|cerca)\b.{0,60}\b(web|internet|sources?)\b",
         normalized,
     )
-    if temporal or explicit:
+    technical = device_timings and (
+        re.search(r"\b(outi|otir)\b", normalized)
+        or (
+            re.search(
+                r"\b(cpc|amstrad|z80|processor|prozessor|instructions?)\b", normalized
+            )
+            and re.search(
+                r"\b(timing\w*|microsecond\w*|mikrosekund\w*|cycle\w*|zykl\w*|duree\w*|duration\w*|zeit\w*)\b",
+                normalized,
+            )
+        )
+    )
+    if temporal or explicit or technical:
+        if (
+            technical
+            and re.search(r"\b(cpc|amstrad)\b", normalized)
+            and re.search(r"\b(outi|otir)\b", normalized)
+        ):
+            sources = json.loads(Path("prompts/device-research.json").read_text())
+            question = sources["cpc_instruction_timings"]
         if re.search(r"\bipo\b", normalized):
             question += " offer price opening price"
         return (

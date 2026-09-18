@@ -49,13 +49,20 @@ class Cache:
                 (key, time.time() + ttl, json.dumps(value)),
             )
 
-    def reserve_search(self) -> None:
+    def reserve_search(self, provider: str = "serpapi", *, credits: int = 1) -> None:
+        if credits not in (1, 2):
+            raise ValueError("invalid_search_credits")
         month = time.strftime("%Y-%m", time.gmtime())
+        if provider not in {"serpapi", "tavily"}:
+            raise ValueError("invalid_search_provider")
+        if provider != "serpapi":
+            month = provider + ":" + month
         with self.connection() as db:
             db.execute("INSERT OR IGNORE INTO quota VALUES (?,0)", (month,))
             if (
                 db.execute(
-                    "UPDATE quota SET used=used+1 WHERE month=? AND used<900", (month,)
+                    "UPDATE quota SET used=used+? WHERE month=? AND used+?<=900",
+                    (credits, month, credits),
                 ).rowcount
                 != 1
             ):

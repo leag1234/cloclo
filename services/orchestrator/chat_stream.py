@@ -89,11 +89,12 @@ def response(
         async def content(text: str) -> None:
             # Retain only a possible citation suffix. Never expose an unresolved link.
             from services.orchestrator.chat_pipeline import render_citations
+            from services.orchestrator.file_results import canonical_links
 
             if not text:
                 return
             temporary = Interaction()
-            temporary.reponse = text
+            temporary.reponse = canonical_links(text, item.files)
             temporary.chunks_recuperes = item.chunks_recuperes
             if payload.project_id:
                 from services.orchestrator.project_chat import render_project_citations
@@ -235,6 +236,10 @@ def response(
                 pending += str(delta["content"])
                 suffix = re.search(r"(?<!\w)[`\[]?[a-f0-9]{1,64}$|[`\[]$", pending)
                 end = suffix.start() if suffix else len(pending)
+                if item.files:
+                    link = re.search(r"\[[^\]]*$|\[[^\]]*\](?:\([^)]*)?$", pending)
+                    if link:
+                        end = min(end, link.start())
                 await content(pending[:end])
                 pending = pending[end:]
 
@@ -248,6 +253,19 @@ def response(
                     if item.state != "done":
                         raise RuntimeError("request_stopped")
                     await content(pending + narration.finish())
+                    if item.files:
+                        from services.orchestrator.file_results import file_footer
+                        from packages.language import conversation_language
+
+                        await content(
+                            file_footer(
+                                item.files,
+                                item.file_strategies,
+                                conversation_language(
+                                    payload.messages, payload.ui_locale
+                                ),
+                            )
+                        )
                 await queue.put({"finish": True})
             except asyncio.CancelledError:
                 item.state = "cancelled"
@@ -345,6 +363,9 @@ def response(
                         }
                         output["atlas"] = {
                             "images": item.images,
+                            "files": item.files,
+                            "terminal_commands": item.terminal_commands,
+                            "terminal_failed_commands": item.terminal_failed_commands,
                             "uploaded_images": item.uploaded_images,
                             "cost_eur": item.cout_eur,
                             "provider_model": item.provider_model,

@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -90,11 +91,19 @@ class Runtime:
         self.question = question
 
     def estimate(self, call: Call) -> Reservation:
+        # Reserve the advanced-search ceiling before any Tavily I/O.
+        multiplier = 2 if os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily" else 1
         return Reservation(
-            0, self.search_cost if call.name == "web_search" else Decimal(0)
+            0,
+            self.search_cost * multiplier if call.name == "web_search" else Decimal(0),
         )
 
     async def search(self, request: Search, timeout: float) -> Message:
+        provider = os.environ.get("ATLAS_SEARCH_PROVIDER", "serpapi")
+        if provider not in {"serpapi", "tavily"}:
+            raise ValueError("invalid_search_provider")
+        if provider == "tavily":
+            return await self.tavily(request, timeout)
         key = self.cache.key(["search", 4096, request.model_dump()])
         cached = self.cache.get(key)
         if cached is not None:
@@ -153,8 +162,106 @@ class Runtime:
         self.cache.put(key, output, 3600)
         return output
 
+    async def tavily(self, request: Search, timeout: float) -> Message:
+        key = self.cache.key(["tavily-bounded-domain-content", request.model_dump()])
+        cached = self.cache.get(key)
+        if cached is not None:
+            return cached
+        credential = os.environ.get("TAVILY_API_KEY", "")
+        if not credential:
+            raise ValueError("search_unavailable")
+        # Tavily has a structured domain filter; site: text alone can return
+        # unrelated pages. Preserve explicit user/model source restrictions.
+        domains = re.findall(r"(?<!\S)site:([a-zA-Z0-9.-]+)(?=\s|$)", request.query)
+        query = re.sub(r"(?<!\S)site:[a-zA-Z0-9.-]+(?=\s|$)", "", request.query).strip()
+        for domain in domains:
+            validate_url("https://" + domain)
+        if not query:
+            raise ValueError("invalid_search_query")
+        self.cache.reserve_search("tavily", credits=2 if domains else 1)
+        async with aiohttp.ClientSession(
+            timeout=http_timeout(timeout, SEARCH_TIMEOUT), trust_env=False
+        ) as session:
+            async with session.post(
+                "https://api.tavily.com/search",
+                json={
+                    "api_key": credential,
+                    "query": query,
+                    "max_results": request.n,
+                    "search_depth": "advanced" if domains else "basic",
+                    "include_raw_content": True,
+                    **({"include_domains": domains} if domains else {}),
+                },
+                allow_redirects=False,
+            ) as response:
+                if response.status in (429, 432):
+                    raise ValueError("quota_exceeded")
+                if response.status != 200:
+                    raise ValueError("search_unavailable")
+                body = bytearray()
+                async for piece in response.content.iter_chunked(16384):
+                    body.extend(piece)
+                    if len(body) > MAX_BYTES:
+                        raise ValueError("response_too_large")
+                data = json.loads(body)
+        if not isinstance(data, dict) or data.get("error"):
+            raise ValueError("search_unavailable")
+        results = data.get("results")
+        if not isinstance(results, list):
+            raise ValueError("invalid_search_response")
+        consulted = datetime.now(timezone.utc).isoformat()
+        items: list[Message] = []
+        # Bound the combined history, not only each page: later shell/publication
+        # turns must still fit the unchanged cumulative loop token allowance.
+        page_limit = min(16000, 32000 // max(1, min(len(results), request.n)))
+        for result in results[: request.n]:
+            if not isinstance(result, dict) or not all(
+                isinstance(result.get(field), str)
+                for field in ("url", "content", "title")
+            ):
+                raise ValueError("invalid_search_response")
+            validate_url(result["url"])
+            raw = result.get("raw_content")
+            if raw is not None and not isinstance(raw, str):
+                raise ValueError("invalid_search_response")
+            source = raw or result["content"]
+            text = source[:page_limit]
+            items.append(
+                {
+                    "title": result["title"][:300],
+                    "link": result["url"],
+                    "snippet": text[:300],
+                    "content": text,
+                    "date": str(result.get("published_date", ""))[:100],
+                }
+            )
+            # Reuse provider content if a model requests a discovered URL.
+            # This path never performs a separate page fetch.
+            self.cache.put(
+                self.cache.key(["tavily-page", result["url"]]),
+                {
+                    "url": result["url"],
+                    "text": text,
+                    "consulted_at": consulted,
+                    "provider": "tavily",
+                    "truncated": len(source) > len(text),
+                },
+                3600,
+            )
+        output: Message = {
+            "provider": "tavily",
+            "results": items,
+            "consulted_at": consulted,
+        }
+        self.cache.put(key, output, 3600)
+        return output
+
     async def fetch(self, request: Fetch, timeout: float) -> Message:
         validate_url(request.url)
+        if os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily":
+            supplied = self.cache.get(self.cache.key(["tavily-page", request.url]))
+            if supplied is not None:
+                return supplied
         key = self.cache.key(["fetch-full", request.url])
         cached = self.cache.get(key)
         if cached is None:
