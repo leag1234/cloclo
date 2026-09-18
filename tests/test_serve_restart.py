@@ -4,6 +4,13 @@ import unittest
 
 
 class ContainerRestartTests(unittest.TestCase):
+    def test_readiness_waits_after_connection_reset(self) -> None:
+        from serve_idempotent import ready
+        from unittest.mock import patch
+
+        with patch("serve_idempotent.urlopen", side_effect=ConnectionResetError):
+            self.assertFalse(ready())
+
     def test_replace_only_matching_container_image(self) -> None:
         from unittest.mock import patch, call
         from services.orchestrator.serving import docker_run

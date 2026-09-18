@@ -1,10 +1,13 @@
 """Real HTTP/CPU/index/UI integration; provider replay exists only in tests."""
 
 from collections.abc import AsyncIterator
+from contextlib import ExitStack
 
 import gzip
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
@@ -14,7 +17,8 @@ from agent_provider import AgentProvider, AgentRequest
 from serverless_support import environment
 from stream_transport import StreamRequest
 from services.orchestrator.interactions import Interaction
-from services.orchestrator.serving import docker, stack, wait_http, webui
+from services.orchestrator.serving import stack
+from native_ui import native_ui
 
 RECORDING = Path("tests/cassettes/chat.json.gz")
 
@@ -60,7 +64,7 @@ def main() -> None:
         yield {"result": result}
 
     provider_env = {} if record else environment()
-    started = False
+    ui = ExitStack()
     try:
         with (
             patch.dict(os.environ, {**provider_env, "GPU_LOCAL": "0"}),
@@ -75,9 +79,8 @@ def main() -> None:
             ),
             stack("atlas-m7-test", False),
         ):
-            webui("atlas-m7-test-ui", False)
-            started = True
-            wait_http("http://127.0.0.1:3000")
+            if os.environ.get("ATLAS_UI_GATE") != "1":
+                ui.enter_context(native_ui("atlas-m7-test-ui"))
             payload = {
                 "model": "atlas-qwen",
                 "messages": [
@@ -139,9 +142,15 @@ def main() -> None:
                 RECORDING.write_bytes(gzip.compress(encoded, mtime=0))
             print("Source: UI gate", mode, result["id"], row["cout_eur"])
     finally:
-        if started and os.environ.get("ATLAS_UI_GATE") != "1":
-            docker("stop", "atlas-m7-test-ui")
+        ui.close()
 
 
 if __name__ == "__main__":
-    main()
+    if sys.argv[1:] == ["--verify"]:
+        with (
+            patch.dict(os.environ, {"ATLAS_UI_GATE": "1"}),
+            native_ui("atlas-m7-test-ui"),
+        ):
+            subprocess.run(["bash", "scripts/verify-m7.sh"], check=True)
+    else:
+        main()
