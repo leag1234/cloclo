@@ -33,6 +33,7 @@ class Limits:
     tool_calls: int = 10
     wall_clock: float = 120
     cost: Decimal = Decimal("0.05")
+    has_attachments: bool = False
 
     def __post_init__(self) -> None:
         if self.profile is not None and self.profile not in PROFILES:
@@ -44,7 +45,13 @@ class Limits:
             and (
                 0
                 <= self.cost
-                <= Decimal("0.10" if self.profile is not None else "0.05")
+                <= Decimal(
+                    "0.30"
+                    if self.has_attachments and self.profile is not None
+                    else "0.10"
+                    if self.profile is not None
+                    else "0.05"
+                )
             )
         ):
             raise ValueError("invalid_limits")
@@ -100,6 +107,10 @@ class Tools(Protocol):
 
 class Stop(Exception):
     pass
+
+
+class PublicFailure(RuntimeError):
+    """A typed boundary failure whose user-facing detail must survive the loop."""
 
 
 async def run(
@@ -332,6 +343,8 @@ async def run(
                 )
     except Stop as exc:
         result.reason = str(exc)
+    except PublicFailure:
+        raise
     except (ValueError, RuntimeError, OSError):
         result.reason = "provider_error"
     result.state = "stopped"

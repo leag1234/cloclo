@@ -1,7 +1,7 @@
 # MISSION — ATLAS-0
 
-Build [docs/13](docs/13-poc-spec.md); read AGENTS.md, docs/11 and docs/14 first.
-M0–M23 delivered; M24 current; no later milestone. History: docs/decisions-log.md.
+Build docs/13-poc-spec.md; first read AGENTS.md, docs/11 and docs/14.
+M0–M23 delivered; M24 current and last. History: docs/decisions-log.md.
 
 Done = make verify-mN + green GitHub ci. Protect workflows/CODEOWNERS/verify-*;
 never weaken assertions. Branch/PR only, no main push. Current human mandate
@@ -64,10 +64,8 @@ is preserved in docs/decisions-log.md. Do not print secrets into shared tool out
 
 ## M24 — Documents and files: read, produce, transform
 
-Full original owner requirements and verbatim journeys J42–J49:
-[contracts/m24-owner.md](contracts/m24-owner.md). Implementation contract:
-[contracts/m24.md](contracts/m24.md). Both remain binding; this summary does not
-relax their acceptance criteria. REQ-ENG-004/005/009/011, REQ-FIN-002, POC-F1/F3/F5.
+Binding requirements/J42–J49: contracts/m24-owner.md and contracts/m24.md.
+No criteria relaxed. REQ-ENG-004/005/009/011, REQ-FIN-002, POC-F1/F3/F5.
 
 D1–D2: make serve starts authenticated Open Terminal, loopback port8000, dedicated
 user-files volume, shared Docker network URL in TERMINAL_SERVER_CONNECTIONS and

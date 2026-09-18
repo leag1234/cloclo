@@ -14,7 +14,7 @@ from services.orchestrator.cache import Cache
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.loop import Call, Limits, Message, Query, run
-from services.orchestrator.model import GatewayModel
+from services.orchestrator.model import GatewayError, GatewayModel
 from services.orchestrator.tools import Rag, Runtime
 from services.orchestrator.stream_client import sink_context
 from services.orchestrator.vision import process_vision
@@ -164,6 +164,29 @@ class ChatTools(Runtime):
                     await sink(
                         {"phase": "source_truncated", "tool": call.name, "urls": urls}
                     )
+            if (
+                call.name == "web_search"
+                and os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily"
+                and (
+                    "error" in output
+                    or not isinstance(data, dict)
+                    or not data.get("results")
+                )
+            ):
+                # Stop before another inference can silently replace failed research
+                # with remembered facts, including during streamed responses.
+                reason = (
+                    "quota exhausted"
+                    if output.get("error") == "quota_exceeded"
+                    else "provider failed or returned no results"
+                )
+                raise GatewayError(
+                    "search_unavailable",
+                    503,
+                    f"Web search unavailable: {reason}. No verified result was obtained "
+                    "(required: at least 1). I cannot verify this answer from current sources. "
+                    "Search limits: 3 calls per request and 900 local reservations per month.",
+                )
             return output
         started = time.monotonic()
         succeeded = False
