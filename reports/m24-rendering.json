@@ -1,0 +1,18 @@
+{
+  "font": "Georgia, \"Iowan Old Style\", \"Times New Roman\", serif",
+  "paragraph_width": "700px",
+  "gutters": "none",
+  "copy": "0",
+  "save": "none",
+  "wrap": "pre",
+  "css_sha256": "1b291f463550d77c8905abcd7009037f2f412eec4b471bf881c26b5ba85550eb",
+  "dark_font": "Georgia, \"Iowan Old Style\", \"Times New Roman\", serif",
+  "dark_color": "rgb(227, 227, 223)",
+  "copy_on_hover": true,
+  "mode": "live",
+  "screenshots": {
+    "m24-rendering-before.png": "a56bfdc7ee033d2c1aa4eebdc75bfcfa0060b13fb744c2e96c71fb90d1a16f23",
+    "m24-rendering-after.png": "809fdf5051b5be7e627c0772a401553d2e3634c1ad519f7161ea32ca342cfd5d",
+    "m24-rendering-dark.png": "ed74d44819e6b1cd87640f9dbe5ec58e7a3f761231e0dc7dd42b89348089e5e4"
+  }
+}
