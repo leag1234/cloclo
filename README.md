@@ -18,7 +18,8 @@ scope, quality targets, and budget limits.
   backed by PostgreSQL with pgvector.
 - **Model gateway:** centralizes provider configuration, inference, and cost limits.
   The default chat stack uses Scaleway serverless inference and CPU retrieval.
-- **Tools:** SerpApi search, guarded page fetching, retrieval, and calculation;
+- **Tools:** Tavily search with supplied page content, explicit SerpApi fallback,
+  guarded page fetching, retrieval, calculation and contained document tools;
   MCP integrations require confirmation for writes.
 - **Evaluation harness:** multilingual golden sets, replayable checks, reports,
   and local interaction telemetry.
@@ -41,8 +42,10 @@ python3 -m pip install -r requirements-dev.txt
 ```
 
 Provide the configured Scaleway endpoint, API key, model roles and pricing, plus
-SerpApi credentials for web search, through environment variables. The serving
-script also reads an optional, ignored `.env` file. Configuration details live in
+`TAVILY_API_KEY` for search and `OPEN_TERMINAL_API_KEY` for the user-file service,
+through environment variables. The serving script loads external `../secrets.env`
+and then an optional, ignored `.env` file. Select SerpApi explicitly with
+`ATLAS_SEARCH_PROVIDER=serpapi` and its credential when needed. Configuration details live in
 [the gateway documentation](services/model-gateway/README.md) and the
 [chat runbook](runbooks/chat.md). Keep credentials out of Git.
 
@@ -58,7 +61,8 @@ ssh -N -L 3000:127.0.0.1:3000 -L 8020:127.0.0.1:8020 user@your-vm
 
 Open [the chat UI](http://localhost:3000) and select `atlas-qwen`, `atlas-glm`, or
 `atlas-deepseek` to compare the configured models. Each uses explicit non-reasoning
-generation with a €0.10,120-second and3000-output-token limit. See
+generation with a €0.10 limit (€0.30 with attachments),120-second deadline and
+3000-output-token limit. See
 [the M21 report](reports/M21.md) for measured quality limitations. The adapter on port
 8020 serves document citations. Stop the stack with Ctrl-C; persistent database
 and UI volumes remain. This is a local PoC deployment accessed through SSH.

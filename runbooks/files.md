@@ -1,13 +1,13 @@
 # User documents and Open Terminal
 
-M24 rollout target; the following behavior becomes active with the implementation increments.
-
 `make serve` starts the pinned Open Terminal container, authenticates using
 OPEN_TERMINAL_API_KEY from the environment, and exposes it on 127.0.0.1:8000.
 The launcher loads `../secrets.env` (or `ATLAS_SECRETS_FILE`), then optional `.env`
 overrides. Keep both files outside Git. The default search provider is Tavily;
 set `ATLAS_SEARCH_PROVIDER=serpapi` explicitly to select the fallback. Startup
 checks the selected provider's credential before creating the terminal.
+The Linux host needs Docker, nsenter, iptables and ip6tables; firewall setup
+requires root or passwordless sudo and fails closed if unavailable.
 The UI uses http://open-terminal:8000 on the shared internal atlas-files network.
 Its runtime TERMINAL_SERVER_CONNECTIONS enables filesystem uploads.
 
