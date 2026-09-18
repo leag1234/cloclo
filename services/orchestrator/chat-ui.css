@@ -40,7 +40,7 @@
   --atlas-code-border: #454944;
 }
 /* Theme font fallback honors Open WebUI's user-selected --app-font-family. */
-:where(.markdown:not(.user-message), .dark .markdown:not(.user-message)) {
+:where(:is(.markdown, .markdown-prose):not(.user-message), .dark :is(.markdown, .markdown-prose):not(.user-message)) {
   --font-sans: var(--app-font-family, var(--atlas-body-font));
   --font-primary: var(--font-sans);
   --tw-prose-body: var(--atlas-text);
@@ -61,18 +61,18 @@
   max-width: none;
 }
 /* Semantic prose has a readable measure; code wrappers retain available width. */
-.markdown :is(p, ul, ol, h1, h2, h3, blockquote),
-.dark .markdown :is(p, ul, ol, h1, h2, h3, blockquote) {
+:is(.markdown, .markdown-prose) :is(p, ul, ol, h1, h2, h3, blockquote),
+.dark :is(.markdown, .markdown-prose) :is(p, ul, ol, h1, h2, h3, blockquote) {
   max-width: var(--atlas-column);
 }
 /* Section separation is identical in both themes. */
-.markdown h2, .dark .markdown h2 { margin-top: var(--atlas-section-space); margin-bottom: 0.7em; }
+:is(.markdown, .markdown-prose) h2, .dark :is(.markdown, .markdown-prose) h2 { margin-top: var(--atlas-section-space); margin-bottom: 0.7em; }
 /* Subsections retain hierarchy with slightly less space than major sections. */
-.markdown h3, .dark .markdown h3 { margin-top: 1.4em; margin-bottom: 0.6em; }
+:is(.markdown, .markdown-prose) h3, .dark :is(.markdown, .markdown-prose) h3 { margin-top: 1.4em; margin-bottom: 0.6em; }
 /* Separate list items without widening the prose column in either theme. */
-.markdown li + li, .dark .markdown li + li { margin-top: 0.55em; }
+:is(.markdown, .markdown-prose) li + li, .dark :is(.markdown, .markdown-prose) li + li { margin-top: 0.55em; }
 /* Plain blocks and CodeMirror use the same theme palette and thin border. */
-.markdown :is(pre, .cm-editor), .dark .markdown :is(pre, .cm-editor) {
+:is(.markdown, .markdown-prose) :is(pre, .cm-editor, .nb-code-content, .nb-code-source, .file-code-editor), .dark :is(.markdown, .markdown-prose) :is(pre, .cm-editor, .nb-code-content, .nb-code-source, .file-code-editor) {
   background: var(--atlas-code-bg) !important;
   color: var(--atlas-text);
   border: 1px solid var(--atlas-code-border);
@@ -83,15 +83,15 @@
   overflow-x: auto;
 }
 /* Code always scrolls horizontally; neither theme may wrap long source lines. */
-.markdown :is(pre, pre code, .cm-content, .cm-line),
-.dark .markdown :is(pre, pre code, .cm-content, .cm-line) {
+:is(.markdown, .markdown-prose) :is(pre, pre code, .cm-content, .cm-line),
+.dark :is(.markdown, .markdown-prose) :is(pre, pre code, .cm-content, .cm-line) {
   white-space: pre !important;
   overflow-wrap: normal !important;
   word-break: normal;
   font-family: var(--font-mono, monospace);
 }
 /* Inline identifiers are subtle capsules; exclude block code in both themes. */
-.markdown :not(pre) > code, .dark .markdown :not(pre) > code {
+:is(.markdown, .markdown-prose) :not(pre) > code, .dark :is(.markdown, .markdown-prose) :not(pre) > code {
   background: var(--atlas-code-bg);
   color: var(--atlas-text);
   border: 0;
@@ -101,48 +101,66 @@
   font-size: 0.88em;
 }
 /* Tailwind prose decoration would add distracting backticks to capsules. */
-.markdown :not(pre) > code::before, .markdown :not(pre) > code::after,
-.dark .markdown :not(pre) > code::before, .dark .markdown :not(pre) > code::after { content: none; }
+:is(.markdown, .markdown-prose) :not(pre) > code::before, :is(.markdown, .markdown-prose) :not(pre) > code::after,
+.dark :is(.markdown, .markdown-prose) :not(pre) > code::before, .dark :is(.markdown, .markdown-prose) :not(pre) > code::after { content: none; }
 /* CodeMirror semantic classes hide line numbers, gutters and active-line tint. */
-.markdown .cm-gutters, .markdown .cm-lineNumbers,
-.dark .markdown .cm-gutters, .dark .markdown .cm-lineNumbers { display: none; }
+:is(.markdown, .markdown-prose) .cm-gutters, :is(.markdown, .markdown-prose) .cm-lineNumbers,
+.dark :is(.markdown, .markdown-prose) .cm-gutters, .dark :is(.markdown, .markdown-prose) .cm-lineNumbers { display: none; }
 /* Preserve text selection but remove the idle active-line highlight. */
-.markdown .cm-activeLine, .dark .markdown .cm-activeLine { background: transparent !important; }
+:is(.markdown, .markdown-prose) .cm-activeLine, .dark :is(.markdown, .markdown-prose) .cm-activeLine { background: transparent !important; }
 /* v0.11.3 toolbar wrapper: use its copy control, not generated utility hashes. */
-.markdown div:has(> .copy-code-button), .dark .markdown div:has(> .copy-code-button) {
+:is(.markdown, .markdown-prose) div:has(> .copy-code-button), .dark :is(.markdown, .markdown-prose) div:has(> .copy-code-button) {
   position: absolute;
   right: 0.5rem;
   top: 0.5rem;
   z-index: 20;
 }
 /* Collapse/save/run furniture is hidden; leave the keyboard-focusable copy action. */
-.markdown div:has(> .copy-code-button) > :not(.copy-code-button),
-.dark .markdown div:has(> .copy-code-button) > :not(.copy-code-button) { display: none; }
+:is(.markdown, .markdown-prose) div:has(> .copy-code-button) > :not(.copy-code-button),
+.dark :is(.markdown, .markdown-prose) div:has(> .copy-code-button) > :not(.copy-code-button) { display: none; }
 /* Remove toolbar title and its reserved height using structural selectors. */
-.markdown div:has(> div > .copy-code-button),
-.dark .markdown div:has(> div > .copy-code-button) {
+:is(.markdown, .markdown-prose) div:has(> div > .copy-code-button),
+.dark :is(.markdown, .markdown-prose) div:has(> div > .copy-code-button) {
   position: relative;
   height: 0;
   padding: 0;
   background: transparent !important;
 }
 /* The toolbar's language title is furniture too. */
-.markdown div:has(> div > .copy-code-button) > :not(:has(.copy-code-button)),
-.dark .markdown div:has(> div > .copy-code-button) > :not(:has(.copy-code-button)) { display: none; }
+:is(.markdown, .markdown-prose) div:has(> div > .copy-code-button) > :not(:has(.copy-code-button)),
+.dark :is(.markdown, .markdown-prose) div:has(> div > .copy-code-button) > :not(:has(.copy-code-button)) { display: none; }
 /* Undo the v0.11.3 toolbar overlap spacer; scope to its language wrapper. */
-.markdown div[class*="language-"]:has(pre, .cm-editor),
-.dark .markdown div[class*="language-"]:has(pre, .cm-editor) { margin-top: 0; }
+:is(.markdown, .markdown-prose) div[class*="language-"]:has(pre, .cm-editor),
+.dark :is(.markdown, .markdown-prose) div[class*="language-"]:has(pre, .cm-editor) { margin-top: 0; }
 /* Empty toolbar offset div must not leave blank space above the code. */
-.markdown div[class*="language-"] > div:empty,
-.dark .markdown div[class*="language-"] > div:empty { display: none; }
+:is(.markdown, .markdown-prose) div[class*="language-"] > div:empty,
+.dark :is(.markdown, .markdown-prose) div[class*="language-"] > div:empty { display: none; }
 /* Copy appears on hover or keyboard focus; opacity keeps it reachable with Tab. */
-.markdown .copy-code-button, .dark .markdown .copy-code-button {
+:is(.markdown, .markdown-prose) .copy-code-button, .dark :is(.markdown, .markdown-prose) .copy-code-button {
   opacity: 0;
   background: var(--atlas-code-bg) !important;
   color: var(--atlas-text);
 }
 /* The existing dir=ltr code wrapper supplies hover and focus visibility. */
-.markdown [dir="ltr"]:hover .copy-code-button,
-.markdown [dir="ltr"]:focus-within .copy-code-button,
-.dark .markdown [dir="ltr"]:hover .copy-code-button,
-.dark .markdown [dir="ltr"]:focus-within .copy-code-button { opacity: 1; }
+:is(.markdown, .markdown-prose) [dir="ltr"]:hover .copy-code-button,
+:is(.markdown, .markdown-prose) [dir="ltr"]:focus-within .copy-code-button,
+.dark :is(.markdown, .markdown-prose) [dir="ltr"]:hover .copy-code-button,
+.dark :is(.markdown, .markdown-prose) [dir="ltr"]:focus-within .copy-code-button { opacity: 1; }
+
+/* Rendered v0.11.3 code wrapper has no dir attribute; locate its stable copy control. */
+.markdown-prose div:has(> div > div > .copy-code-button):hover .copy-code-button,
+.markdown-prose div:has(> div > div > .copy-code-button):focus-within .copy-code-button {
+  opacity: 1;
+}
+/* Notebook source follows ordinary code geometry without generated Svelte classes. */
+.markdown-prose :is(.nb-code-source-raw, .nb-code-content) {
+  white-space: pre;
+  overflow-x: auto;
+  font-family: var(--font-mono, monospace);
+}
+
+/* The rendered theme declares prose color directly; match its specificity in both themes. */
+.chat-assistant .markdown-prose,
+.dark .chat-assistant .markdown-prose {
+  color: var(--atlas-text);
+}
