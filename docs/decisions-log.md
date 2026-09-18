@@ -1160,3 +1160,84 @@ the following are NORMAL and must never trigger a stop:
 If a genuine exposure occurs, record WHAT left, WHERE it went, and WHEN, so the owner can
 judge. A stop with no such evidence is not actionable and wastes sessions: three were lost
 to this one. Do not re-raise the 2026-09-18T06:30 record.
+
+
+## M23 owner findings preserved for M24 (2026-09-18)
+
+## M23 — readable rendering, English code, activity and complete attachments
+
+Full owner acceptance: [contracts/m23.md](contracts/m23.md), D1–D8 and J39–J41.
+Original dated owner wording is preserved in tests/journeys/m23-cases.json.
+REQ-ENG-004/005/009/011, REQ-FIN-002, POC-F1/F2. No model change for rendering.
+
+D1–D5: inspect the running Open WebUI theme and record exposed variables in
+reports/M23.md before CSS edits. In chat-ui.css use theme variables, semantic tags,
+attribute patterns, then generated classes only as a last resort; comment every
+rule. Default Georgia/Iowan/Times serif through --atlas-body-font; define/use
+--atlas-body-size and --atlas-line-height. User font preferences remain overridable,
+no font-family !important. Accessible dark-grey text, 680–720px prose column,
+more heading/list spacing, full-width horizontally scrolling unwrapped code.
+Code blocks: light background, thin border, padding, no heavy shadow, line numbers,
+active-line highlight or default toolbar; copy on hover. Inline code: subtle capsule,
+smaller monospace, no border. Preserve M21 green user messages. Dark parity for all.
+Document fragile selectors and upgrade repairs; owner judges the original debugging
+answer on screen after make serve.
+
+D6: every profile and M15 developer API emits English identifiers, filenames,
+comments, docstrings, developer logs/errors and commit messages. Prose follows
+user language; end-user labels follow the intended audience. Both chat prompts
+state the rule. J39: French request produces English code/docstring with French prose.
+
+D7: activity within2s for every request, including no-tool generation; named phase
+and elapsed time updated until first visible answer token. Never leave a blank gap.
+J40 includes a long document request with no tool call.
+
+D8: receive original PDF/DOCX/TXT/MD/CSV, bypass Open WebUI fragment retrieval
+(setting in runbooks/chat.md). Extract full text and place it in model context;
+a60-page/~40000-token document fits262144. Explicit errors for scanned/no-text or
+password-protected PDFs. Only above the context window use M10 hierarchy, never
+random sampling or corpus RAG. Attached documents never route to corpus retrieval.
+Log filename, bytes, pages, extracted characters and hierarchical synthesis flag.
+J41: multipage PDF synthesis covers beginning/middle/end, logs characters, no RAG.
+
+Done: make verify-m23 locally, branch/PR, exact-head green ci. Current owner mandate
+authorizes API squash only after green ci and continuation only if another milestone
+is listed. No protected edits. Owner visual acceptance remains separate and must
+not be claimed without their confirmation.
+
+## Permanent credential ruling — owner, 2026-09-18
+
+The06:30 remote-URL incident is a CLOSED FALSE POSITIVE; no revocation is required.
+Reading/sourcing secrets locally, embedded origin authentication, credential environment
+variables and masked values are normal. Never re-raise this incident. Exposure requires
+a secret leaving its intended location (committed/shared artefact or transmission to
+a third party). Report what left, where and when for a genuine incident. Full ruling
+is preserved in docs/decisions-log.md. Do not print secrets into shared tool output.
+
+### Attachment cost ceiling raised to 0.30 EUR (owner decision, 2026-09-18)
+Measured: a real PDF attachment reached 181 657 tokens — well inside the 262 144-token
+window, but above the 0.10 EUR per-request ceiling (~0.11 EUR at 0.60 EUR/M input), so the
+request was refused after 3.6 s. The extraction itself worked correctly and no corpus
+retrieval was used, so this is purely a budget limit, not a capability failure.
+AUTHORIZED: requests carrying an attachment may cost up to **0.30 EUR**. Requests without
+an attachment keep 0.10 EUR. A 200-page document stays under the new ceiling. Above it,
+apply the M10 hierarchical synthesis rather than refusing.
+Also: the refusal message was exemplary (measured values against the limit, statement that
+the full attachment was extracted). Keep that style for every rejection.
+
+### M23 rendering: the CSS targets the wrong selectors (owner finding, 2026-09-18)
+The stylesheet is correctly mounted and served (6 510 bytes reach the browser), and it is
+well written — it even honours the user's `--app-font-family`. But it targets `.markdown`,
+and Open WebUI 0.11.3 uses different classes. The real ones, read from the running build:
+`copy-code-button`, `run-code-button`, `nb-code-content`, `nb-code-source`,
+`nb-code-source-raw`, `file-code-editor`, plus generated Svelte suffixes (`svelte-1wcdx53`)
+that MUST NOT be hardcoded — they change at every build.
+Required: inspect the rendered DOM of a real answer (not the source bundle), identify the
+stable class prefixes, rewrite the selectors against them, and VERIFY IN THE BROWSER that
+the rendering changed before declaring the work done. A stylesheet whose rules match
+nothing passes a static gate and changes nothing on screen — that is what happened here.
+Add to `reports/M23.md` a before/after screenshot pair of a code block and of body text.
+Also unresolved: the activity indicator still shows only a static cursor on a request with
+no tool call (M23/D7, J40). Same cause to investigate: the state may be emitted but not
+rendered.
+
