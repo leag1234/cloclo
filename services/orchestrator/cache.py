@@ -49,8 +49,12 @@ class Cache:
                 (key, time.time() + ttl, json.dumps(value)),
             )
 
-    def reserve_search(self) -> None:
+    def reserve_search(self, provider: str = "serpapi") -> None:
         month = time.strftime("%Y-%m", time.gmtime())
+        if provider not in {"serpapi", "tavily"}:
+            raise ValueError("invalid_search_provider")
+        if provider != "serpapi":
+            month = provider + ":" + month
         with self.connection() as db:
             db.execute("INSERT OR IGNORE INTO quota VALUES (?,0)", (month,))
             if (
