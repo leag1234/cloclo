@@ -70,7 +70,15 @@ def main() -> None:
         else:
             row = rows[position]
             position += 1
-            assert row["request"] == value, "unrecorded_m23_exchange"
+            assert row["request"] == value, (
+                "unrecorded_m23_exchange",
+                position,
+                [
+                    key
+                    for key in row["request"].keys() | value.keys()
+                    if row["request"].get(key) != value.get(key)
+                ],
+            )
             source = replay_stream(row["response"])
         async with aclosing(source):
             async for event in source:
@@ -79,6 +87,7 @@ def main() -> None:
     evidence: dict[str, Any] = {}
 
     def ask(name: str, content: Any, profile: str = PROFILES[0]) -> str:
+        print("M23", name, "live/refresh" if live else "replay", flush=True)
         started = time.monotonic()
         events = []
         with urlopen(

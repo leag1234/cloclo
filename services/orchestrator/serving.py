@@ -186,6 +186,12 @@ def stack(name: str = "atlas-chat", persistent: bool = True) -> Iterator[None]:
 
 def run() -> None:
     require_env(CHAT_REQUIRED_ENV)
+    os.environ.setdefault("ATLAS_SEARCH_PROVIDER", "tavily")
+    require_env(
+        ("TAVILY_API_KEY",)
+        if os.environ["ATLAS_SEARCH_PROVIDER"] == "tavily"
+        else ("SERPAPI_API_KEY",)
+    )
     os.environ["ATLAS_IMAGE_ON_DEMAND"] = "1"
     stopping = False
 
