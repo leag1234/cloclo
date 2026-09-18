@@ -13,7 +13,7 @@ from typing import Literal
 import aiohttp
 from pydantic import BaseModel, ConfigDict, Field
 
-from services.orchestrator.loop import Call, Message, Reservation, Turn
+from services.orchestrator.loop import Call, Message, Reservation, Turn, PublicFailure
 from services.orchestrator.tools import declarations
 from services.orchestrator.stream_client import Sink, receive
 from services.orchestrator.narration import NarrationFilter, clean_answer
@@ -53,7 +53,7 @@ class WireTurn(BaseModel):
     usage: WireUsage
     model_config = ConfigDict(extra="forbid", strict=True)
     cost_eur: Decimal | None = Field(
-        default=None, ge=0, le=Decimal("0.20"), allow_inf_nan=False, strict=False
+        default=None, ge=0, le=Decimal("0.30"), allow_inf_nan=False, strict=False
     )
     reasoning: str = Field(default="", max_length=256000)
     trace_tokens: int = Field(default=0, ge=0)
@@ -64,7 +64,7 @@ class WireTurn(BaseModel):
     calls: list[WireCall] = Field(max_length=10)
 
 
-class GatewayError(RuntimeError):
+class GatewayError(PublicFailure):
     def __init__(self, code: str, status: int, detail: str = "") -> None:
         self.code, self.status, self.detail = code, status, detail
         super().__init__(code)
@@ -89,23 +89,34 @@ class GatewayModel:
         self.max_tokens = configuration.max_tokens
         self.provider_model = ""
         self.spent = Decimal(0)
+        self.has_attachments = False
         self.reasoning = ""
         self.trace_tokens = 0
         self.answer_tokens = 0
         self.token_split_estimated = False
         self.reasoning_retried = False
 
-    def configure_quality(self, profile: str, max_tokens: int) -> None:
+    def configure_quality(
+        self, profile: str, max_tokens: int, *, has_attachments: bool = False
+    ) -> None:
         if profile not in PROFILES:
             raise ValueError("invalid_profile")
         self.profile, self.max_tokens = profile, max_tokens
+        self.has_attachments = has_attachments
         self.reasoning_effort = "none"
 
     @property
     def allowance(self) -> Decimal:
         return max(
             Decimal(0),
-            Decimal("0.10" if self.profile is not None else "0.05") - self.spent,
+            Decimal(
+                "0.30"
+                if self.has_attachments and self.profile is not None
+                else "0.10"
+                if self.profile is not None
+                else "0.05"
+            )
+            - self.spent,
         )
 
     @staticmethod
@@ -298,6 +309,8 @@ class GatewayModel:
                 reasoning_effort=self.reasoning_effort,
                 budget_eur=str(self.allowance),
             )
+        if self.has_attachments:
+            payload["has_attachments"] = True
         if self.observing:
             payload.update(local_enabled=self.local_enabled, observe=True)
         reserved = self.estimate(messages)
