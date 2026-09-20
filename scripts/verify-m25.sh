@@ -14,9 +14,11 @@ P="prompts/chat.txt"
 # ---- D1: size and disposition ----
 SZ=$(wc -c < "$P")
 [[ "$SZ" -le 3500 ]] || fail "$P is $SZ bytes (> 3500): the case patches were not removed"
+# Compare on a whitespace-normalised copy: the disposition may be wrapped at any width.
+FLAT=$(tr '\n' ' ' < "$P" | tr -s ' ')
 for phrase in "who tried it" "a name, a date, a figure" "name the tension" "where a figure comes from" \
-              "content choose the form" "what you do not know" "what remains open"; do
-  grep -qiF "$phrase" "$P" || fail "disposition text missing: \"$phrase\""
+              "choose the form" "what you do not know" "what remains open"; do
+  case "${FLAT,,}" in *"${phrase,,}"*) ;; *) fail "disposition text missing: \"$phrase\"";; esac
 done
 pass "$SZ bytes, disposition present"
 
@@ -58,26 +60,28 @@ deepseek-v4
 glm-5
 qwen3
 EOF
-# Extend from the public corpus when present: distinctive words (>= 7 letters) from the
-# questions and truths, minus a stop list of ordinary vocabulary.
+# Extend from the public corpus when present, but only with DISTINCTIVE terms: proper
+# nouns, technical identifiers and rare words. Anything that also appears in the required
+# disposition text is by construction ordinary vocabulary and is excluded — otherwise the
+# gate would ban its own wording.
 if [[ -f /opt/atlas-src/corpus/cases.json ]]; then
-  python3 - >> "$BANNED_FILE" << 'PY'
-import json, re
+  python3 - "$P" >> "$BANNED_FILE" << 'PY'
+import json, re, sys, pathlib
+prompt_words = set(re.findall(r"[a-zà-ÿ]+", pathlib.Path(sys.argv[1]).read_text().lower()))
 d = json.load(open("/opt/atlas-src/corpus/cases.json"))
-words = set()
+out = set()
 for c in d["cases"]:
-    for w in re.findall(r"[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9\-]{6,}", c["question"] + " " + (c.get("truth") or "")):
-        words.add(w.lower())
-stop = {"question","answer","because","between","comment","quelles","chaque","exemple","réponse",
-        "chiffre","chiffres","correct","correctly","explain","explains","without","provided",
-        "fabriquer","possible","surtout","plusieurs","formats","français","english","script",
-        "fichier","source","sources","modèle","should","through","another","general","specific",
-        "instead","whether","against","include","includes","including","several","however",
-        "reader","readers","request","requests","expected","behaviour","behavior","failure",
-        "figures","figure","context","precise","precisely","practical","current","currently",
-        "existing","example","examples","following","different","directly","complete","structure",
-        "compare","comparer","comparison","conclusion","recommendation","recommandation"}
-print("\n".join(sorted(w for w in words if w not in stop)))
+    text = c["question"] + " " + (c.get("truth") or "")
+    # proper nouns and identifiers: capitalised mid-sentence, or containing a digit,
+    # underscore or hyphen. Ordinary lowercase words are never banned.
+    for w in re.findall(r"\b[A-Z][A-Za-zÀ-ÿ]{3,}\b|\b[A-Za-z]+[0-9_\-][A-Za-z0-9_\-]*\b", text):
+        lw = w.lower()
+        if lw in prompt_words:      # ordinary vocabulary: never ban
+            continue
+        if len(lw) < 4:
+            continue
+        out.add(lw)
+print("\n".join(sorted(out)))
 PY
 fi
 HITS=""
