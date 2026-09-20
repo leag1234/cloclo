@@ -68,7 +68,7 @@ class ImageURL(Strict):
 
 class TextPart(Strict):
     type: Literal["text"]
-    text: str = Field(min_length=1, max_length=32000, pattern=r"\S")
+    text: str = Field(min_length=1, max_length=200000, pattern=r"\S")
     _safe_text = field_validator("text")(validate_input)
 
 
@@ -99,7 +99,7 @@ class VisionMessage(BaseModel):
     @model_validator(mode="after")
     def valid_content(self) -> Self:
         if isinstance(self.content, str):
-            if not self.content.strip() or len(self.content) > 32000:
+            if not self.content.strip() or len(self.content) > 200000:
                 raise ValueError("invalid_text")
             validate_input(self.content)
         elif not 1 <= len(self.content) <= 16 or self.role != "user":
@@ -131,7 +131,7 @@ class VisionInput(BaseModel):
     def valid_history(self) -> Self:
         if self.messages[-1].role != "user" or not self.messages[-1].text.strip():
             raise ValueError("last_message_must_have_user_text")
-        if sum(len(m.text) for m in self.messages) > 32000:
+        if sum(len(m.text) for m in self.messages) > 600000:
             raise ValueError("context_exceeded")
         images = [im for m in self.messages for im in m.images]
         if len(images) > 4 or sum(int(im["bytes"]) for im in images) > 4 * 1024 * 1024:
