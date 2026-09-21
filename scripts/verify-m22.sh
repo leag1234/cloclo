@@ -75,8 +75,9 @@ new = {
 }
 try: d=json.loads(open(sys.argv[1]).read())
 except Exception as e: print(f"::error::verify-m22: report invalid JSON ({e})"); sys.exit(1)
+ACCEPTED_REGRESSIONS = {"J34_spacex_search_first"}  # M25 owner ruling 2026-09-21
 prev=[k for k in d if k.startswith("J") and k[1:3].isdigit() and int(k[1:3])<34]
-bad=[k for k in prev if d.get(k) is not True]
+bad=[k for k in prev if d.get(k) is not True and k not in ACCEPTED_REGRESSIONS]
 if bad: print("::error::verify-m22: regression on earlier journeys:", bad); sys.exit(1)
 miss=[k for k in new if k not in d]
 if miss: print(f"::error::verify-m22: report does not cover: {miss}"); sys.exit(1)
