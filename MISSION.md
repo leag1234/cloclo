@@ -194,3 +194,25 @@ Two further requirements:
 - The reservation must reflect the expected cost, not the worst case of every tool
   summed in advance. Re-check the remaining budget between steps instead of reserving
   everything up front; that pessimism is what refuses requests costing three times less.
+
+### M25 — J51 final adjustment, and a rule against fabricated provenance (owner ruling, 2026-09-21)
+Two distinct findings from the three captures.
+
+**Fabricated provenance is a serious fault, and the rejection of attempts 1 and 2 was
+right.** The model wrote consultation dates (for example 2024-05-23) for sources it never
+visited: no search, no fetch in the trace. Add to the prompt, as a general behaviour and
+never as a case patch: state a consultation date only for a source actually retrieved
+during this answer; knowledge recalled from training is attributed as such, without a
+date, without a URL, and without any wording implying a visit. This applies to every
+domain and stays in the prompt after M25.
+
+**The third attempt passes.** It names several dated precedents, removes the false
+consultation claim, and arbitrates between risks with architecture and recommendations.
+Requiring the words "the central tension is" is formalism: a design answer that sets out
+the competing risks and takes a position has done the work. Revised J51 acceptance:
+- at least three real precedents named, dated when the date is known;
+- the competing considerations are set out AND the answer takes a position (a stated
+  trade-off, a chosen option with its reason, or an explicit tension — any of these);
+- a conclusion the reader can act on;
+- no claimed consultation, date or URL for a source not actually retrieved.
+Certify J51 on the third capture if it meets these, and complete the milestone.
