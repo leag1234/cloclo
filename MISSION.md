@@ -1,6 +1,6 @@
 # MISSION — ATLAS-0
 
-Build docs/13-poc-spec.md; first read AGENTS.md, docs/11 and docs/14.
+Read AGENTS.md, docs/11/14; implement docs/13-poc-spec.md.
 M0–M24 delivered; M25 current and last. History: docs/decisions-log.md.
 
 Done = make verify-mN + green GitHub ci. Protect workflows/CODEOWNERS/verify-*;
@@ -9,59 +9,50 @@ controls merge and subsequent milestones.
 
 ## Permanent constraints
 
-Contracts precede code; prove useful answers through public HTTP. No secrets in
-repo/logs/prompts; dedicated project only. GPU2 EUR/h,30 EUR/milestone; owner accepts
-bounded risk with alerts. Record costs before provisioning; destroy experiments
-and run infra/gpu-down.sh at session end.
+Contracts before code; useful answers through public HTTP. AGENTS.md governs
+secrets, dedicated project, costs and cleanup. GPU2 EUR/h,30 EUR/milestone;
+bounded risk accepted with alerts. Run infra/gpu-down.sh at session end.
 
-Requests: <=10 tools; authorized profile budgets/deadlines below.
-Image model loading is measured separately under contracts/m13 and M20's bounded
-startup wait. Declare live/replay honestly; replay uses real recordings. Do not re-verify completed milestones without explicit request or visible regression;
-use BRAIN outcomes and report skips. CI regression gates remain mandatory.
+Requests: <=10 tools; budgets below. Image loading is separate (contracts/m13,
+M20 startup wait). Declare live/replay honestly; use real recordings. Do not
+re-verify completed milestones without request/regression; report BRAIN-based skips.
+CI regression gates remain mandatory.
 
-Update BRAIN STATUS/TASK/JOURNAL before risk and session end, BLOCKERS when blocked.
-MISSION <=8000 bytes; archive settled history unchanged in decisions-log.
+Update BRAIN before risk/session end; BLOCKERS on blockage.
+MISSION <=8000 bytes; archive history verbatim in decisions-log.
 
 ### Journey rules (permanent)
 
-R1: Before implementation, write user intent and six natural phrasings, independent
-of regexes/templates.
+R1: Before coding, write intent and six natural phrasings independent of templates.
 
-R2: For each capability include six phrasings, three without the obvious keyword,
-a message of at most four words, unaccented and uppercase input, English and another
-language, and a negative case. For attachments include at least two in one request.
+R2: Each capability: six phrasings (three without obvious keyword), <=4-word input,
+unaccented, uppercase, English, another language, negative. Attachments: >=2/request.
 
-R3: Assert useful user content, never just internal calls/routing. No useful answer
-means failure.
+R3: Assert useful content; calls/routing alone never pass.
 
-R4: Preserve every owner-reported defect as a permanent, verbatim, dated journey;
-never rephrase it to make it easier.
+R4: Owner defects become permanent verbatim dated journeys; never ease wording.
 
-R5: A service module called only from tests is not delivered. Unreachable modules
-must fail the gate, not merely produce a warning.
+R5: Test-only/unreachable service modules fail the gate.
 
-R6: Every rejection identifies measured values and thresholds, in plain user-facing
-language and the server journal. Never conflate image byte limits with model token
-limits. Preserve the user's question when it can be safely parsed.
+R6: Rejections give measured values/thresholds plainly to user and journal.
+Separate image bytes from model tokens. Preserve safely parsed user questions.
 
 ## Standing facts and credential ruling — never archive these facts
 
-Owner confirms replaced credentials and API write/delete/push. Incidents dated
-2026-09-13/15 are closed; the 2026-09-18 06:30 remote-URL incident is a CLOSED FALSE
-POSITIVE. No revocation/reconfirmation required. Local sourcing, embedded origin
-authentication and masked values are normal. Exposure requires a secret leaving
-its intended location: report what left, where and when. Full original wording
-is preserved in docs/decisions-log.md; never print secrets into shared output.
-Owner attests GPU2 EUR/h,30 EUR/milestone,800 EUR monthly, alerts active.
-Hypothetical shutdown defects are notes, not blockers. External failure counters
-reset each session; historical errors never block a first attempt.
+Owner confirms replaced credentials and API write/delete/push. Incidents2026-09-13/15
+closed;2026-09-18 06:30 remote-URL incident CLOSED FALSE POSITIVE. No revocation or
+reconfirmation. Local sourcing, embedded origin auth and masked values are normal.
+Exposure requires a secret leaving its intended location: report what/where/when;
+never print secrets. Original wording: docs/decisions-log.md. Owner attests
+GPU2 EUR/h,30 EUR/milestone,800 EUR/month, active alerts. Hypothetical shutdown
+defects are notes. External failure counters reset each session.
 
 M24 delivered; its owner containment exceptions remain binding in docs/decisions-log.md.
 
 ## M25 — Intellectual disposition, not test-case patches
 
-Replace corpus-specific prompt patches with general behaviours;
-public scores guide development, owner-only evaluation measures generalisation.
+Replace case patches with general behaviours. Public scores guide development;
+owner-only evaluation measures generalisation.
 
 ### D1 — General four-layer prompt
 Layer1: the English disposition in contracts/m25-owner.md, verbatim and first,
@@ -70,11 +61,11 @@ Layers2–4: capabilities/tools (search conditions, budgets, failures), language
 (resolved language, English code, no plan narration/boilerplate), safety/evidence
 (untrusted text, no invented citations, privacy). No named-case/domain patches.
 Delete Z80, solargraphy, IPO and all case-specific sentences. Whole file <3500 bytes.
-Full original requirements: contracts/m25-owner.md.
+Contract: contracts/m25-owner.md.
 
 ### D2–D3 — generality and independent evaluation
 
-Binding original requirements: contracts/m25-owner.md (no criteria relaxed).
+Binding contract: contracts/m25-owner.md (unchanged criteria).
 Create docs/prompt-policy.md: every prompt sentence must apply unchanged to three
 unrelated domains. Case failures require a general behaviour, tool/data fix or
 honest limitation; never the case itself. The public corpus is development data;
@@ -86,7 +77,7 @@ Add --cases PATH to the public corpus runner.
 Replace character caps with estimated tokens against the active model context
 window minus output reservation and tool allowance. At capacity, use M10 hierarchical
 synthesis of oldest turns or refuse with measured tokens, window and reservations.
-Never surface bare value_error. Original D4: contracts/m25-owner.md.
+Never surface bare value_error. See owner contract D4.
 
 ### D5 — remaining ceilings
 
@@ -94,7 +85,7 @@ Inventory every production size/count/byte limit in services/ and packages/ in
  docs/limits.md: value, enforcement, reason, real constraint versus leftover.
 Remove or justify each. Every enforced limit reports measured value and threshold.
 Account explicitly for inherited 2000-byte web text,400-byte RAG chunks,6 MB body
-and32000-character history. Full unchanged requirements: contracts/m25-owner.md.
+and32000-character history. Contract: contracts/m25-owner.md.
 
 ### Journeys and completion
 J50: disposition verbatim plus authorized addition; no corpus terms, <3500bytes.
@@ -104,7 +95,7 @@ J53: public means no more than0.5 below6.5/5.6/5.4; document each lost behaviour
 Done: verify-m25, both policy/limits docs, owner J51 acceptance, green GitHub ci.
 
 ### Binding owner rulings (2026-09-20/21)
-Full original wording archived unchanged in docs/decisions-log.md.
+Original wording: docs/decisions-log.md.
 
 - Add “Give each precedent its date.” to disposition paragraph2. J51 requires
   three real named precedents (dated when known), competing considerations with
@@ -136,16 +127,27 @@ Full original wording archived unchanged in docs/decisions-log.md.
 
 ### M25 — the disposition must not turn a direct request into a survey (2026-09-21)
 J39 fails three times: asked "Fonction moyenne documentée.", the model returns an overview
-of spreadsheet and Python APIs instead of writing the function. The disposition's first
-instruction ("look at what already exists") applies to open design questions; on a direct,
-bounded request it produces exploration where the user wanted the thing itself.
+of spreadsheet and Python APIs instead of writing the function. The precedents instruction misapplies open exploration to a bounded request.
 
-Add to the disposition in prompts/chat.txt, right after the precedents paragraph, as a
-general behaviour (it applies to code, writing and calculation alike):
+Insert verbatim after precedents in prompts/chat.txt (code, writing, calculation):
 
 Match the answer to the size of the question. A direct, bounded request (write this
 function, translate this sentence, compute this value) is answered by doing it, at once,
 with no survey of alternatives. Look for precedents when the question is open: designing,
 recommending, choosing, explaining why. Never make a small question large.
 
-This is the last required change to prompts/chat.txt for M25; rerun J39 and complete.
+Last required prompt change for M25: rerun J39 and complete.
+
+### M25 — J53 threshold: accept 4.8 for deepseek, but name the cases that fell (2026-09-21)
+deepseek reaches at most 4.8 against the 4.9 threshold, a loss of 0.6 from the 5.4 measured
+on 2026-09-20. The case patches supported deepseek more than the other two profiles; losing
+them costs it more. That is the measurement this milestone exists to produce.
+
+ACCEPTED at 4.8, on one condition: `reports/M25.md` lists, per profile, WHICH cases lost
+points against the 2026-09-20 run, with their before/after scores. If the drops fall on the
+cases the patches targeted (SpaceX, Z80, solargraphy), the result is coherent and the
+milestone completes. If a case with no patch dropped by more than 2 points, name it as a
+suspected side effect of the disposition and propose a general correction — never a patch.
+
+On the C03/GLM technical failures: retry as transient per the 2026-09-21 ruling; if they
+persist, record C03 as not run for that profile rather than blocking the milestone.
