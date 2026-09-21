@@ -166,3 +166,13 @@ Revised J51: at least three real precedents named (dated when the date is known)
 central tension stated with a position taken, a conclusion. No claim of having searched
 without a tool call. Rerun J51 once with the corrected prompt and criteria. If it passes,
 proceed to J53 and completion. Do not add any case-specific sentence to the prompt.
+
+### Transient provider failures are not technical failures (owner ruling, 2026-09-21)
+HTTP 502/503/504 and empty completions from the provider are TRANSIENT. On 2026-09-21 a
+plain curl to the same model returned 200 three times in under half a second while the
+agent's long tool-using requests were failing with 502. Such a failure does not count
+towards the three-attempt stop rule until it has been retried.
+Rule: on 502/503/504, an empty completion, or invalid JSON from the provider, retry the
+same call up to three times with increasing delay (2 s, 5 s, 15 s) before counting the
+attempt as failed. Log each retry. Only a failure that survives those retries counts as
+one of the three attempts. This applies to journeys, gates and the runtime alike.
