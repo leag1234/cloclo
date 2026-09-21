@@ -18,7 +18,11 @@ def capture(name: str, input_path: Path, response_path: Path) -> None:
     response = json.loads(response_path.read_text())
     identifier = response["id"]
     source = json.loads(
-        gzip.decompress(Path("/tmp/m24-session-streams.json.gz").read_bytes())
+        gzip.decompress(
+            Path(
+                os.environ.get("M24_STREAM_ARCHIVE", "/tmp/m24-session-streams.json.gz")
+            ).read_bytes()
+        )
     )
     exchanges = [row for row in source if identifier in json.dumps(row["request"])]
     assert exchanges and any(row["request"].get("kind") == "tool" for row in exchanges)

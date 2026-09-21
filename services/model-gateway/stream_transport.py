@@ -12,8 +12,12 @@ from typing import Literal
 import aiohttp
 from pydantic import ValidationError
 
-from agent_provider import AgentProvider, AgentRequest, classify
+from agent_provider import AgentProvider, AgentRequest, Usage, classify
 from streaming import StreamDecoder
+from provider_retry import TransientProviderError, RetryLedger, retry_stream
+from decimal import Decimal
+from packages.limits import LimitError
+from packages.validation import numeric_limit
 from packages.tool_history import final_messages
 from serverless import ServerlessPolicy
 
@@ -36,16 +40,28 @@ async def stream(
     policy = ServerlessPolicy()
     plan = policy.reserve(request.messages, request.tools)
     started = monotonic()
+    unknown = Decimal(0)
     for index, model in enumerate((plan.primary, plan.fallback)):
         sent = False
         remaining = request.timeout - (monotonic() - started)
         if remaining <= 0:
             raise TimeoutError("timeout")
         allotted = remaining * 0.7 if index == 0 else remaining
+        ledger = RetryLedger()
         try:
             async with (
                 asyncio.timeout(allotted),
-                aclosing(attempt(request, model, allotted)) as events,
+                aclosing(
+                    retry_stream(
+                        attempt,
+                        request,
+                        model,
+                        allotted,
+                        plan.reserved_eur - unknown,
+                        plan.incoming,
+                        ledger,
+                    )
+                ) as events,
             ):
                 async for event in events:
                     result = event.get("result")
@@ -60,6 +76,15 @@ async def stream(
                                 "fallback": bool(index),
                             }
                         usage = result["usage"]
+                        result["cost_eur"] = str(
+                            unknown
+                            + ledger.spent
+                            + policy.cost(
+                                model,
+                                usage["prompt_tokens"],
+                                usage["completion_tokens"],
+                            )
+                        )
                         logging.getLogger(__name__).info(
                             json.dumps(
                                 {
@@ -84,7 +109,12 @@ async def stream(
                         return
                     sent = True
                     yield event
+        except LimitError:
+            raise
         except (RuntimeError, TimeoutError):
+            unknown += ledger.spent + (
+                plan.fallback_bound if index else plan.primary_bound
+            )
             logging.getLogger(__name__).info(
                 json.dumps(
                     {
@@ -158,6 +188,8 @@ async def attempt(
             ) as response:
                 if response.status != 200:
                     diagnostic("http", status=response.status)
+                    if response.status in (502, 503, 504):
+                        raise TransientProviderError("provider_error")
                     raise RuntimeError("provider_error")
                 async for piece in response.content.iter_chunked(16384):
                     for event in decoder.feed(piece):
@@ -165,6 +197,15 @@ async def attempt(
         decoder.finish()
         assert decoder.result is not None
         result = decoder.result
+        if (
+            not str(result.get("text", "")).strip()
+            and not result.get("calls")
+            and result.get("finish_reason") != "length"
+        ):
+            diagnostic("empty_completion")
+            raise TransientProviderError(
+                "empty_completion", usage=Usage.model_validate(result["usage"])
+            )
         yield {"result": result}
     except TimeoutError:
         diagnostic("timeout")
@@ -172,6 +213,8 @@ async def attempt(
     except aiohttp.ClientError:
         diagnostic("transport")
         raise RuntimeError("provider_error") from None
+    except LimitError:
+        raise
     except ValueError as exc:
         known = {
             "stream_limit_or_trailing_data",
@@ -189,6 +232,9 @@ async def attempt(
         }
         details: dict[str, object] = {}
         if isinstance(exc, ValidationError):
+            measured = numeric_limit(exc)
+            if measured is not None:
+                raise measured from None
             details["validation_types"] = [
                 error["type"]
                 for error in exc.errors(
@@ -198,4 +244,6 @@ async def attempt(
         elif str(exc) in known:
             details["validation_code"] = str(exc)
         diagnostic("validation", **details)
+        if isinstance(exc, json.JSONDecodeError) or str(exc) == "empty_stream":
+            raise TransientProviderError("provider_error") from None
         raise RuntimeError("provider_error") from None

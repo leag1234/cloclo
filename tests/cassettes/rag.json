@@ -1,6 +1,6 @@
 {
-  "recorded_at": "2026-09-17T14:28:16.847458+00:00",
-  "prompt_sha256": "0825c8f4e717954ac8689abe9e2815bd86a28e5d49ee11978d5d561bd4bf9fd4",
+  "recorded_at": "2026-09-21T09:06:09Z",
+  "prompt_sha256": "406c7b7d44fa5b45d840a77b54fda59bf507b63d07a8e84b0a7d82f71c619d39",
   "records": [
     {
       "request": {
@@ -46,7 +46,7 @@
             "index": 0,
             "message": {
               "role": "assistant",
-              "content": "Le nombre maximum de jours de télétravail autorisés par semaine est de **trois jours** [1].\n\nLa politique de télétravail de la société NORDIA stipule explicitement que « le télétravail est limité à trois jours par semaine au maximum » [1]. Cette limitation s'accompagne d'une obligation de présence sur site d'au moins deux jours par semaine afin de préserver la cohésion d'équipe [1]. De plus, les managers conservent le droit d'exiger la présence d'un salarié sur site lors d'un jour de télétravail prévu, à condition de prévenir au moins vingt-quatre heures à l'avance pour des raisons de service [1].",
+              "content": "Le nombre maximum de jours de télétravail autorisés par semaine est de **trois jours** [1].\n\nLa politique de télétravail de la société NORDIA stipule explicitement que « Le télétravail est limité à trois jours par semaine au maximum » [1]. Cette limitation s'accompagne d'une obligation de présence sur site d'au moins deux jours par semaine afin de préserver la cohésion d'équipe [1]. De plus, les managers conservent le droit d'exiger la présence d'un salarié sur site lors d'un jour de télétravail prévu, à condition de prévenir au moins vingt-quatre heures à l'avance pour des raisons de service [1].",
               "refusal": null,
               "annotations": null,
               "audio": null,
@@ -60,22 +60,22 @@
             "routed_experts": null
           }
         ],
-        "created": 1789655289,
-        "id": "chatcmpl-386f7bb1-26fd-4a91-986a-a4941b7dc4fd",
+        "created": 1789981560,
+        "id": "chatcmpl-4725394a-8864-49a9-b05a-7ec039d201f3",
         "metrics": null,
         "model": "qwen3.5-397b-a17b",
         "object": "chat.completion",
         "service_tier": null,
         "system_fingerprint": null,
         "usage": {
-          "prompt_tokens": 4177,
-          "total_tokens": 4322,
+          "prompt_tokens": 4172,
+          "total_tokens": 4317,
           "completion_tokens": 145,
           "prompt_tokens_details": null
         }
       },
       "response": {
-        "text": "Le nombre maximum de jours de télétravail autorisés par semaine est de **trois jours** [c168ba4bbcc2298815035132a4e3938560216e95e4eba23c4b80bb646e969ffc].\n\nLa politique de télétravail de la société NORDIA stipule explicitement que « le télétravail est limité à trois jours par semaine au maximum » [c168ba4bbcc2298815035132a4e3938560216e95e4eba23c4b80bb646e969ffc]. Cette limitation s'accompagne d'une obligation de présence sur site d'au moins deux jours par semaine afin de préserver la cohésion d'équipe [c168ba4bbcc2298815035132a4e3938560216e95e4eba23c4b80bb646e969ffc]. De plus, les managers conservent le droit d'exiger la présence d'un salarié sur site lors d'un jour de télétravail prévu, à condition de prévenir au moins vingt-quatre heures à l'avance pour des raisons de service [c168ba4bbcc2298815035132a4e3938560216e95e4eba23c4b80bb646e969ffc].",
+        "text": "Le nombre maximum de jours de télétravail autorisés par semaine est de **trois jours** [c168ba4bbcc2298815035132a4e3938560216e95e4eba23c4b80bb646e969ffc].\n\nLa politique de télétravail de la société NORDIA stipule explicitement que « Le télétravail est limité à trois jours par semaine au maximum » [c168ba4bbcc2298815035132a4e3938560216e95e4eba23c4b80bb646e969ffc]. Cette limitation s'accompagne d'une obligation de présence sur site d'au moins deux jours par semaine afin de préserver la cohésion d'équipe [c168ba4bbcc2298815035132a4e3938560216e95e4eba23c4b80bb646e969ffc]. De plus, les managers conservent le droit d'exiger la présence d'un salarié sur site lors d'un jour de télétravail prévu, à condition de prévenir au moins vingt-quatre heures à l'avance pour des raisons de service [c168ba4bbcc2298815035132a4e3938560216e95e4eba23c4b80bb646e969ffc].",
         "citations": [
           "c168ba4bbcc2298815035132a4e3938560216e95e4eba23c4b80bb646e969ffc"
         ],
@@ -126,7 +126,7 @@
             "index": 0,
             "message": {
               "role": "assistant",
-              "content": "In the third quarter of 2026, HELIOS Ltd reported a total revenue of **48.3 million euros** [1].\n\nThis figure represents a 12 percent increase compared to the same quarter in the previous year [1]. The revenue was generated across three segments:\n*   **Hardware:** 29.1 million euros [1].\n*   **Software:** 14.2 million euros [1].\n*   **Services:** 5.0 million euros [1].\n\nThe sum of the segment revenues (29.1 + 14.2 + 5.0) equals 48.3 million euros, confirming the total reported figure [1].",
+              "content": "In the third quarter of 2026, HELIOS Ltd reported a total revenue of **48.3 million euros** [1].\n\nThis figure represents a 12 percent increase compared to the same quarter in the previous year [1]. The revenue was generated across three segments:\n*   **Hardware:** 29.1 million euros [1].\n*   **Software:** 14.2 million euros [1].\n*   **Services:** 5.0 million euros [1].\n\nThe sum of the segment revenues ($29.1 + 14.2 + 5.0 = 48.3$) confirms the total reported revenue [1].",
               "refusal": null,
               "annotations": null,
               "audio": null,
@@ -140,22 +140,22 @@
             "routed_experts": null
           }
         ],
-        "created": 1789655292,
-        "id": "chatcmpl-f10e6884-aa03-47fd-9ee9-7b9adf6bcc98",
+        "created": 1789981563,
+        "id": "chatcmpl-fd615957-674d-4d5c-afee-7d08d503714b",
         "metrics": null,
         "model": "qwen3.5-397b-a17b",
         "object": "chat.completion",
         "service_tier": null,
         "system_fingerprint": null,
         "usage": {
-          "prompt_tokens": 4034,
-          "total_tokens": 4183,
-          "completion_tokens": 149,
+          "prompt_tokens": 4029,
+          "total_tokens": 4176,
+          "completion_tokens": 147,
           "prompt_tokens_details": null
         }
       },
       "response": {
-        "text": "In the third quarter of 2026, HELIOS Ltd reported a total revenue of **48.3 million euros** [453a693a259d1f8e331df10d018ba3b8f1e7eb0702b90a1babcd4d367e228216].\n\nThis figure represents a 12 percent increase compared to the same quarter in the previous year [453a693a259d1f8e331df10d018ba3b8f1e7eb0702b90a1babcd4d367e228216]. The revenue was generated across three segments:\n*   **Hardware:** 29.1 million euros [453a693a259d1f8e331df10d018ba3b8f1e7eb0702b90a1babcd4d367e228216].\n*   **Software:** 14.2 million euros [453a693a259d1f8e331df10d018ba3b8f1e7eb0702b90a1babcd4d367e228216].\n*   **Services:** 5.0 million euros [453a693a259d1f8e331df10d018ba3b8f1e7eb0702b90a1babcd4d367e228216].\n\nThe sum of the segment revenues (29.1 + 14.2 + 5.0) equals 48.3 million euros, confirming the total reported figure [453a693a259d1f8e331df10d018ba3b8f1e7eb0702b90a1babcd4d367e228216].",
+        "text": "In the third quarter of 2026, HELIOS Ltd reported a total revenue of **48.3 million euros** [453a693a259d1f8e331df10d018ba3b8f1e7eb0702b90a1babcd4d367e228216].\n\nThis figure represents a 12 percent increase compared to the same quarter in the previous year [453a693a259d1f8e331df10d018ba3b8f1e7eb0702b90a1babcd4d367e228216]. The revenue was generated across three segments:\n*   **Hardware:** 29.1 million euros [453a693a259d1f8e331df10d018ba3b8f1e7eb0702b90a1babcd4d367e228216].\n*   **Software:** 14.2 million euros [453a693a259d1f8e331df10d018ba3b8f1e7eb0702b90a1babcd4d367e228216].\n*   **Services:** 5.0 million euros [453a693a259d1f8e331df10d018ba3b8f1e7eb0702b90a1babcd4d367e228216].\n\nThe sum of the segment revenues ($29.1 + 14.2 + 5.0 = 48.3$) confirms the total reported revenue [453a693a259d1f8e331df10d018ba3b8f1e7eb0702b90a1babcd4d367e228216].",
         "citations": [
           "453a693a259d1f8e331df10d018ba3b8f1e7eb0702b90a1babcd4d367e228216"
         ],
@@ -206,7 +206,7 @@
             "index": 0,
             "message": {
               "role": "assistant",
-              "content": "Die Kündigungsfrist des Vertrags beträgt **drei Monate** zum Monatsende [2]. Die Kündigung bedarf der Schriftform [2]. Bei einem schwerwiegenden Verstoß gegen die Vertragspflichten kann der Vertrag außerordentlich und fristlos gekündigt werden [2].\n\nDiese Regelung findet sich im Dienstleistungsvertrag zwischen der MÜLLER GmbH und dem Auftragnehmer unter § 3 [2].",
+              "content": "Die Kündigungsfrist des Vertrags beträgt **drei Monate** zum Monatsende [2]. Die Kündigung bedarf der Schriftform [2]. Bei einem schwerwiegenden Verstoß gegen die Vertragspflichten kann der Vertrag außerordentlich und fristlos gekündigt werden [2].",
               "refusal": null,
               "annotations": null,
               "audio": null,
@@ -220,22 +220,22 @@
             "routed_experts": null
           }
         ],
-        "created": 1789655295,
-        "id": "chatcmpl-6386e3df-672d-4105-b70b-587b46e86ee0",
+        "created": 1789981566,
+        "id": "chatcmpl-3bb20f1a-b33d-44f4-8dcc-48f43e4eef71",
         "metrics": null,
         "model": "qwen3.5-397b-a17b",
         "object": "chat.completion",
         "service_tier": null,
         "system_fingerprint": null,
         "usage": {
-          "prompt_tokens": 3875,
-          "total_tokens": 3966,
-          "completion_tokens": 91,
+          "prompt_tokens": 3870,
+          "total_tokens": 3930,
+          "completion_tokens": 60,
           "prompt_tokens_details": null
         }
       },
       "response": {
-        "text": "Die Kündigungsfrist des Vertrags beträgt **drei Monate** zum Monatsende [adfa8d1028156ba2013ed167da9bd1f9576b160494ba57e1a424b2b4214fc44b]. Die Kündigung bedarf der Schriftform [adfa8d1028156ba2013ed167da9bd1f9576b160494ba57e1a424b2b4214fc44b]. Bei einem schwerwiegenden Verstoß gegen die Vertragspflichten kann der Vertrag außerordentlich und fristlos gekündigt werden [adfa8d1028156ba2013ed167da9bd1f9576b160494ba57e1a424b2b4214fc44b].\n\nDiese Regelung findet sich im Dienstleistungsvertrag zwischen der MÜLLER GmbH und dem Auftragnehmer unter § 3 [adfa8d1028156ba2013ed167da9bd1f9576b160494ba57e1a424b2b4214fc44b].",
+        "text": "Die Kündigungsfrist des Vertrags beträgt **drei Monate** zum Monatsende [adfa8d1028156ba2013ed167da9bd1f9576b160494ba57e1a424b2b4214fc44b]. Die Kündigung bedarf der Schriftform [adfa8d1028156ba2013ed167da9bd1f9576b160494ba57e1a424b2b4214fc44b]. Bei einem schwerwiegenden Verstoß gegen die Vertragspflichten kann der Vertrag außerordentlich und fristlos gekündigt werden [adfa8d1028156ba2013ed167da9bd1f9576b160494ba57e1a424b2b4214fc44b].",
         "citations": [
           "adfa8d1028156ba2013ed167da9bd1f9576b160494ba57e1a424b2b4214fc44b"
         ],
@@ -300,16 +300,16 @@
             "routed_experts": null
           }
         ],
-        "created": 1789655296,
-        "id": "chatcmpl-e4e26d0f-f6e1-4ee6-848b-e5c96d7176b5",
+        "created": 1789981569,
+        "id": "chatcmpl-b592bca9-1d5c-4dee-ad13-00c9f587b709",
         "metrics": null,
         "model": "qwen3.5-397b-a17b",
         "object": "chat.completion",
         "service_tier": null,
         "system_fingerprint": null,
         "usage": {
-          "prompt_tokens": 4211,
-          "total_tokens": 4215,
+          "prompt_tokens": 4206,
+          "total_tokens": 4210,
           "completion_tokens": 4,
           "prompt_tokens_details": null
         }

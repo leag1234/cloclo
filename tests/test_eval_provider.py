@@ -1,6 +1,7 @@
 """POC-F8/R2: real streaming shape, missing usage and truncated streams."""
 
 import json
+from email.message import Message
 import unittest
 from typing import Any
 
@@ -256,3 +257,96 @@ class ProviderTests(unittest.TestCase):
                     "production", [{"role": "user", "content": "Grade this answer"}]
                 )
         self.assertNotIn("response_format", json.loads(send.call_args.args[0].data))
+
+
+class EvalRetryTests(unittest.TestCase):
+    def test_transient_retries_preserve_budget_and_account_unknown_usage(self) -> None:
+        import io
+        from urllib.error import HTTPError
+        from unittest.mock import patch
+        from eval_provider import EvalProvider
+        from serverless_support import environment
+
+        with patch.dict("os.environ", environment()):
+            provider = EvalProvider()
+            model = provider.roles["system"]
+            provider.prices[model] = {"input_eur_per_mtok": 1, "output_eur_per_mtok": 1}
+            messages = [{"role": "user", "content": "bonjour"}]
+            size = len(json.dumps(messages, ensure_ascii=False).encode()) + 32
+            reservation = (size + 2048) / 1e6
+            failures = [
+                HTTPError("https://example.invalid", code, "transient", Message(), None)
+                for code in (502, 503, 504)
+            ]
+            response = io.BytesIO(b"".join(line for _, line in StreamTests().stream()))
+            with (
+                patch(
+                    "eval_provider.urlopen", side_effect=[*failures, response]
+                ) as send,
+                patch("eval_provider.sleep") as wait,
+            ):
+                result = provider.complete("system", messages)
+            self.assertEqual(send.call_count, 4)
+            self.assertEqual([c.args[0] for c in wait.call_args_list], [2, 5, 15])
+            self.assertAlmostEqual(
+                result["telemetry"]["cost"], 3 * reservation + 110 / 1e6
+            )
+            self.assertEqual(result["telemetry"]["retry_reservations"], 3)
+
+    def test_empty_and_malformed_streams_retry_without_disclosing_payload(self) -> None:
+        import io
+        from unittest.mock import patch
+        from eval_provider import EvalProvider
+        from serverless_support import environment
+
+        with patch.dict("os.environ", environment()):
+            provider = EvalProvider()
+            provider.prices[provider.roles["system"]] = {
+                "input_eur_per_mtok": 1,
+                "output_eur_per_mtok": 1,
+            }
+            success = io.BytesIO(b"".join(line for _, line in StreamTests().stream()))
+            with (
+                patch(
+                    "eval_provider.urlopen",
+                    side_effect=[
+                        io.BytesIO(b""),
+                        io.BytesIO(b"data: invalid-json\n"),
+                        success,
+                    ],
+                ) as send,
+                patch("eval_provider.sleep") as wait,
+            ):
+                result = provider.complete(
+                    "system", [{"role": "user", "content": "bonjour"}]
+                )
+            self.assertEqual(send.call_count, 3)
+            self.assertEqual([c.args[0] for c in wait.call_args_list], [2, 5])
+            self.assertEqual(result["telemetry"]["retry_reservations"], 2)
+            self.assertEqual(result["telemetry"]["retry_reserved_output_tokens"], 4096)
+
+    def test_retry_cannot_exceed_request_money(self) -> None:
+        from urllib.error import HTTPError
+        from unittest.mock import patch
+        from eval_provider import EvalProvider
+        from serverless_support import environment
+        from packages.limits import LimitError
+
+        with patch.dict("os.environ", environment()):
+            provider = EvalProvider()
+            provider.prices[provider.roles["system"]] = {
+                "input_eur_per_mtok": 1,
+                "output_eur_per_mtok": 20,
+            }
+            with (
+                patch(
+                    "eval_provider.urlopen",
+                    side_effect=HTTPError(
+                        "https://example.invalid", 503, "transient", Message(), None
+                    ),
+                ) as send,
+                patch("eval_provider.sleep"),
+                self.assertRaises(LimitError),
+            ):
+                provider.complete("system", [{"role": "user", "content": "bonjour"}])
+            self.assertEqual(send.call_count, 1)

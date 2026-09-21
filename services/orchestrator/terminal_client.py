@@ -1,5 +1,7 @@
 """Authenticated calls to the contained user-file service, never to arbitrary URLs."""
 
+from packages.limits import LimitError
+
 import asyncio
 import base64
 import json
@@ -97,7 +99,9 @@ class TerminalClient:
                 async for part in response.content.iter_chunked(16384):
                     raw.extend(part)
                     if len(raw) > 8 * 1024 * 1024:
-                        raise ValueError("terminal_response_exceeds_8388608_bytes")
+                        raise LimitError(
+                            "terminal_response_limit", len(raw), 8388608, "bytes"
+                        )
         value = json.loads(raw)
         if not isinstance(value, dict):
             raise ValueError("invalid_terminal_response")

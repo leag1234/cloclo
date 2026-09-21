@@ -1,5 +1,7 @@
 """Bounded SSE decoder; deltas precede the validated terminal result (M11)."""
 
+from packages.limits import LimitError
+
 import json
 from typing import Literal
 
@@ -53,9 +55,12 @@ class StreamDecoder:
 
     def feed(self, piece: bytes) -> list[dict[str, object]]:
         self.total += len(piece)
-        if self.total > (8000000 if self.allow_length else 800000) or (
-            self.result is not None and piece.strip()
-        ):
+        maximum = 8000000 if self.allow_length else 800000
+        if self.total > maximum:
+            raise LimitError(
+                "stream_limit_or_trailing_data", self.total, maximum, "bytes"
+            )
+        if self.result is not None and piece.strip():
             raise ValueError("stream_limit_or_trailing_data")
         self.buffer.extend(piece)
         events: list[dict[str, object]] = []
@@ -99,11 +104,18 @@ class StreamDecoder:
                     target["id"] += call.id
                     target["name"] += call.function.name
                     target["arguments"] += call.function.arguments
-                    if any(
-                        len(target[k]) > n
-                        for k, n in (("id", 200), ("name", 80), ("arguments", 16000))
+                    for key, maximum in (
+                        ("id", 200),
+                        ("name", 80),
+                        ("arguments", 16000),
                     ):
-                        raise ValueError("tool_limit")
+                        if len(target[key]) > maximum:
+                            raise LimitError(
+                                "tool_limit",
+                                len(target[key]),
+                                maximum,
+                                key + " characters",
+                            )
                 self.reason = choice.finish_reason
         return events
 
@@ -134,7 +146,9 @@ class StreamDecoder:
             }
         )
         if not self.allow_length and completion.usage.completion_tokens > 2048:
-            raise ValueError("output_budget")
+            raise LimitError(
+                "output_budget", completion.usage.completion_tokens, 2048, "tokens"
+            )
         if self.reason == "length" and not self.allow_length:
             raise ValueError("incomplete_stream")
         if not self.text and not calls and not self.allow_length:

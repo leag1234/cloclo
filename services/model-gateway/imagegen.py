@@ -1,5 +1,7 @@
 """M13 bounded transport to the configured GPU address only."""
 
+from packages.limits import LimitError, ProviderLimitError
+
 import ipaddress
 import json
 import os
@@ -38,13 +40,22 @@ async def generate(request: object) -> dict[str, object]:
     )
     address = str(ipaddress.IPv4Address(configured_ip))
     rate = Decimal(configured_rate)
-    if not rate.is_finite() or not 0 < rate <= 2:
-        raise RuntimeError("cost_budget")
+    if not rate.is_finite():
+        raise RuntimeError("cost_budget: expected a finite hourly rate")
+    if not 0 < rate <= 2:
+        raise ProviderLimitError(
+            "cost_budget", int(rate * 1000000), 2000000, "microEUR/hour"
+        )
     started = monotonic()
     reserved = reservation(prompt.prompt, prompt.lang)
     available = prompt.max_cost_eur - reserved
     if available <= 0:
-        raise RuntimeError("cost_budget")
+        raise ProviderLimitError(
+            "cost_budget",
+            int(reserved * 1000000),
+            int(prompt.max_cost_eur * 1000000),
+            "microEUR",
+        )
     rewritten = await rewrite(
         prompt.prompt,
         min(30, prompt.timeout, float(available * 3600 / rate)),
@@ -54,7 +65,12 @@ async def generate(request: object) -> dict[str, object]:
         prompt.timeout - (monotonic() - started), float(available * 3600 / rate)
     )
     if timeout <= 0:
-        raise RuntimeError("cost_budget")
+        raise ProviderLimitError(
+            "image_deadline",
+            int((monotonic() - started) * 1000),
+            int(prompt.timeout * 1000),
+            "milliseconds",
+        )
     gpu_started = monotonic()
     async with aiohttp.ClientSession(
         timeout=aiohttp.ClientTimeout(total=timeout), trust_env=False
@@ -64,13 +80,31 @@ async def generate(request: object) -> dict[str, object]:
             json={"prompt": rewritten, "seed": prompt.seed},
             allow_redirects=False,
         ) as response:
+            if response.status == 413:
+                limits = json.loads(await response.content.read(512))
+                if (
+                    isinstance(limits, dict)
+                    and all(
+                        type(limits.get(k)) is int and limits[k] >= 0
+                        for k in ("measured", "limit")
+                    )
+                    and limits.get("unit") in {"bytes", "characters", "tokens"}
+                ):
+                    raise LimitError(
+                        "image_input_limit",
+                        limits["measured"],
+                        limits["limit"],
+                        limits["unit"],
+                    )
             if response.status != 200:
                 raise RuntimeError("image_provider_error")
             body = bytearray()
             async for chunk in response.content.iter_chunked(65536):
                 body.extend(chunk)
                 if len(body) > 2800000:
-                    raise RuntimeError("image_response_limit")
+                    raise ProviderLimitError(
+                        "image_response_limit", len(body), 2800000, "bytes"
+                    )
     data = json.loads(body)
     if not isinstance(data, dict) or not isinstance(data.get("image"), str):
         raise ValueError("invalid_provider_image")

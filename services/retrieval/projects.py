@@ -1,5 +1,7 @@
 """Private project state owned by retrieval; corrections invalidate stale writes."""
 
+from packages.limits import LimitError
+
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -11,6 +13,8 @@ from services.retrieval.search import tokens
 
 
 def bounded(value: str, limit: int, empty: bool = False) -> str:
+    if isinstance(value, str) and len(value) > limit:
+        raise LimitError("invalid_text", len(value), limit, "characters")
     if (
         not isinstance(value, str)
         or len(value) > limit
@@ -194,6 +198,8 @@ class Projects:
     ) -> None:
         bounded(question, 32000)
         bounded(answer, 32000)
+        if len(facts) > 8:
+            raise LimitError("invalid_facts", len(facts), 8, "facts")
         if len(facts) > 8 or type(revision) is not int or revision < 0:
             raise ValueError("invalid_facts")
         for fact in facts:

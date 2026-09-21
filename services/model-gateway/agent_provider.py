@@ -1,5 +1,7 @@
 """Validated tool-calling transport and human-confirmed pricing, POC-P6."""
 
+from packages.limits import LimitError, ProviderLimitError
+
 from packages.profiles import PROFILES
 
 import asyncio
@@ -15,7 +17,8 @@ from collections.abc import AsyncGenerator
 
 import aiohttp
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, ValidationError
+from packages.validation import numeric_limit
 
 
 def classify(messages: list[dict[str, object]]) -> str:
@@ -89,6 +92,7 @@ class AgentRequest(BaseModel):
     has_attachments: bool = Field(
         default=False, exclude_if=lambda value: value is False
     )
+    produces_files: bool = Field(default=False, exclude_if=lambda value: value is False)
     budget_eur: str | None = Field(
         default=None, max_length=40, exclude_if=lambda value: value is None
     )
@@ -98,10 +102,11 @@ class AgentRequest(BaseModel):
         if self.profile is not None and self.profile not in PROFILES:
             raise ValueError("invalid_profile")
         if self.timeout > 120:
-            raise ValueError("timeout_budget")
+            raise LimitError("timeout_budget", int(self.timeout * 1000), 120000, "ms")
         if self.profile is None:
             if (
                 self.has_attachments
+                or self.produces_files
                 or self.max_tokens != 2048
                 or self.budget_eur is not None
                 or self.reasoning_effort == "high"
@@ -109,19 +114,25 @@ class AgentRequest(BaseModel):
                 raise ValueError("invalid_legacy_profile")
             self.reasoning_effort = "none"
             return self
-        ceiling = 3000
+        ceiling = 6000
         if "max_tokens" not in self.model_fields_set:
             self.max_tokens = ceiling
         if self.max_tokens > ceiling:
-            raise ValueError("output_budget")
+            raise LimitError("output_budget", self.max_tokens, ceiling, "tokens")
         self.reasoning_effort = "none"
-        cap = Decimal("0.30" if self.has_attachments else "0.10")
+        cap = Decimal(
+            "0.30" if (self.has_attachments or self.produces_files) else "0.10"
+        )
         try:
             budget = Decimal(self.budget_eur) if self.budget_eur is not None else cap
         except InvalidOperation:
             raise ValueError("cost_budget") from None
-        if not budget.is_finite() or not 0 <= budget <= cap:
-            raise ValueError("cost_budget")
+        if not budget.is_finite():
+            raise ValueError("cost_budget: expected a finite monetary amount")
+        if not 0 <= budget <= cap:
+            raise LimitError(
+                "cost_budget", int(budget * 1000000), int(cap * 1000000), "microEUR"
+            )
         return self
 
 
@@ -239,6 +250,8 @@ class AgentProvider:
 
     async def serverless_complete(self, request: AgentRequest) -> dict[str, object]:
         from serverless import ServerlessPolicy
+        from provider_retry import RetryLedger, retry_stream
+        from contextlib import aclosing
 
         policy = ServerlessPolicy()
         plan = policy.reserve(request.messages, request.tools)
@@ -253,18 +266,45 @@ class AgentProvider:
                 raise TimeoutError("timeout")
             # Leave time for one fallback while keeping the original total deadline.
             allotted = remaining * 0.7 if index == 0 else remaining
-            try:
-                async with asyncio.timeout(allotted):
-                    answer = await self._complete(
-                        request,
+            ledger = RetryLedger()
+
+            async def completion_events(
+                current: AgentRequest, selected: str, seconds: float
+            ) -> AsyncGenerator[dict[str, object], None]:
+                yield {
+                    "result": await self._complete(
+                        current,
                         endpoint,
-                        model,
+                        selected,
                         os.environ["SCW_GENERATIVE_API_KEY"],
-                        allotted,
+                        seconds,
                     )
+                }
+
+            try:
+                async with (
+                    asyncio.timeout(allotted),
+                    aclosing(
+                        retry_stream(
+                            completion_events,
+                            request,
+                            model,
+                            allotted,
+                            plan.reserved_eur - unknown,
+                            plan.incoming,
+                            ledger,
+                        )
+                    ) as events,
+                ):
+                    async for event in events:
+                        value = event["result"]
+                        assert isinstance(value, dict)
+                        answer = value
+            except ProviderLimitError:
+                raise
             except (RuntimeError, TimeoutError):
-                unknown = plan.primary_bound + (
-                    plan.fallback_bound if index else Decimal(0)
+                unknown += ledger.spent + (
+                    plan.fallback_bound if index else plan.primary_bound
                 )
                 logging.getLogger(__name__).info(
                     json.dumps(
@@ -279,6 +319,7 @@ class AgentProvider:
                 if index:
                     raise
                 continue
+            unknown += ledger.spent
             usage = answer.get("usage")
             if not isinstance(usage, dict):
                 raise RuntimeError("provider_response_invalid")
@@ -297,6 +338,7 @@ class AgentProvider:
                     }
                 )
             )
+            answer["cost_eur"] = str(unknown + actual)
             if request.observe:
                 answer["observation"] = {
                     "provider": "escalade",
@@ -312,6 +354,8 @@ class AgentProvider:
     async def _complete(
         self, request: AgentRequest, endpoint: str, model: str, key: str, timeout: float
     ) -> dict[str, object]:
+        from provider_retry import TransientProviderError
+
         body = {
             "model": model,
             "messages": request.messages,
@@ -331,23 +375,32 @@ class AgentProvider:
                     headers={"Authorization": "Bearer " + key} if key else {},
                     allow_redirects=False,
                 ) as response:
+                    if response.status in (502, 503, 504):
+                        raise TransientProviderError("provider_error")
                     if response.status != 200:
                         raise RuntimeError("provider_error")
                     data = bytearray()
                     async for piece in response.content.iter_chunked(16384):
                         data.extend(piece)
                         if len(data) > 800000:
-                            raise RuntimeError("provider_response_limit")
+                            raise ProviderLimitError(
+                                "provider_response_limit", len(data), 800000, "bytes"
+                            )
             completion = Completion.model_validate(json.loads(data))
-            if (
-                completion.usage.completion_tokens > 2048
-                or completion.choices[0].finish_reason == "length"
-                or len(completion.choices[0].message.content or "") > 32000
-            ):
+            if completion.usage.completion_tokens > 2048:
+                raise ProviderLimitError(
+                    "output_budget", completion.usage.completion_tokens, 2048, "tokens"
+                )
+            content_size = len(completion.choices[0].message.content or "")
+            if content_size > 32000:
+                raise ProviderLimitError(
+                    "provider_response_limit", content_size, 32000, "characters"
+                )
+            if completion.choices[0].finish_reason == "length":
                 raise ValueError("provider_response_invalid")
             reply = completion.choices[0].message
             if not (reply.content or "").strip() and not reply.tool_calls:
-                raise RuntimeError("provider_response_invalid")
+                raise TransientProviderError("provider_response_invalid")
             ids = [call.id for call in reply.tool_calls]
             if len(ids) != len(set(ids)):
                 raise RuntimeError("provider_response_invalid")
@@ -363,5 +416,14 @@ class AgentProvider:
                     for call in reply.tool_calls
                 ],
             }
+        except LimitError:
+            raise
+        except json.JSONDecodeError:
+            raise TransientProviderError("provider_error") from None
+        except ValidationError as exc:
+            limit = numeric_limit(exc)
+            if limit is not None:
+                raise limit from None
+            raise RuntimeError("provider_error") from None
         except (aiohttp.ClientError, ValueError):
             raise RuntimeError("provider_error") from None

@@ -11,7 +11,7 @@ def run(execute: Callable[[int], None]) -> None:
     # M6 consumes those outputs and changes reports, so it must run last.
     with ThreadPoolExecutor(max_workers=1) as pool:
         evaluation = pool.submit(execute, 5)
-        for milestone in range(7, 25):
+        for milestone in range(7, 26):
             execute(milestone)
         evaluation.result()
     execute(6)

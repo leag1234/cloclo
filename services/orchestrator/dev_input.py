@@ -1,5 +1,7 @@
 """Text/function input translations; unsupported extensions fail before inference."""
 
+from packages.limits import LimitError
+
 import json
 from typing import Any
 from services.orchestrator.dev_chat import ChatInput
@@ -22,6 +24,12 @@ def responses(value: dict[str, Any]) -> ChatInput:
         raise ValueError("unsupported_storage_or_include")
     for key in ("metadata", "client_metadata"):
         meta = value.get(key, {})
+        if isinstance(meta, dict):
+            if len(meta) > 32:
+                raise LimitError("invalid_metadata", len(meta), 32, "entries")
+            for entry in meta.values():
+                if isinstance(entry, str) and len(entry) > 1024:
+                    raise LimitError("invalid_metadata", len(entry), 1024, "characters")
         if (
             not isinstance(meta, dict)
             or len(meta) > 32
@@ -78,6 +86,10 @@ def responses(value: dict[str, Any]) -> ChatInput:
                 messages.append({"role": "assistant", "tool_calls": [call]})
         elif kind == "function_call_output":
             fields(item, "type call_id output id")
+            if isinstance(item.get("id"), str) and len(item["id"]) > 1048576:
+                raise LimitError(
+                    "invalid_item_id", len(item["id"]), 1048576, "characters"
+                )
             if "id" in item and (
                 not isinstance(item["id"], str) or len(item["id"]) > 1048576
             ):

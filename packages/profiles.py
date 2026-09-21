@@ -18,3 +18,19 @@ def load_profiles() -> tuple[str, ...]:
 
 
 PROFILES = load_profiles()
+
+
+def context_window(profile: str, *, vision: bool = False) -> int:
+    """Resolve the active gateway model's declared capacity, including overrides."""
+    import os
+    import yaml
+
+    path = Path(__file__).resolve().parents[1] / "services/model-gateway/routing.yaml"
+    routing = yaml.safe_load(path.read_text())
+    role = "vision" if vision else routing["public_profiles"][profile]
+    entry = routing["serverless"][role]
+    model = os.environ.get(entry["env"], entry["model"])
+    window = entry["capabilities"][model]["context"]
+    if type(window) is not int or window <= 0:
+        raise ValueError("invalid_context_window")
+    return window

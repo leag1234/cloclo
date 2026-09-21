@@ -1,5 +1,7 @@
 """Same-origin local project UI and bounded proxy to retrieval-owned APIs."""
 
+from packages.limits import LimitError
+
 import asyncio
 from pathlib import Path
 
@@ -41,7 +43,7 @@ async def proxy(request: Request, path: str = "") -> Response:
             async for chunk in request.stream():
                 data.extend(chunk)
                 if len(data) > 160000:
-                    return JSONResponse({"error": "body_limit"}, status_code=413)
+                    raise LimitError("body_limit", len(data), 160000, "bytes")
             async with aiohttp.ClientSession(trust_env=False) as client:
                 async with client.request(
                     request.method,
@@ -54,11 +56,15 @@ async def proxy(request: Request, path: str = "") -> Response:
                     async for chunk in reply.content.iter_chunked(16384):
                         result.extend(chunk)
                         if len(result) > 800000:
-                            raise ValueError("response_limit")
+                            raise LimitError(
+                                "response_limit", len(result), 800000, "bytes"
+                            )
                     return Response(
                         bytes(result),
                         status_code=reply.status,
                         media_type="application/json",
                     )
+    except LimitError as exc:
+        return JSONResponse({"error": exc.code, "message": exc.detail}, status_code=413)
     except (aiohttp.ClientError, TimeoutError, ValueError):
         return JSONResponse({"error": "project_unavailable"}, status_code=503)

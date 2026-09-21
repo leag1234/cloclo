@@ -1,5 +1,7 @@
 """Local human confirmation, bound to immutable arguments and configuration."""
 
+from packages.limits import LimitError
+
 import asyncio
 from dataclasses import dataclass
 import hashlib
@@ -44,7 +46,9 @@ def prepare(call: mcp.MCPCall) -> dict[str, object]:
             if pending[key].expires <= time.time():
                 del pending[key]
         if len(pending) >= 100:
-            raise ValueError("mcp_pending_limit")
+            raise LimitError(
+                "mcp_pending_limit", len(pending) + 1, 100, "pending confirmations"
+            )
         key = secrets.token_hex(24)
         pending[key] = Pending(
             call.model_dump_json(), digest, secrets.token_hex(24), time.time() + 600
@@ -114,7 +118,7 @@ async def confirm(request: Request, key: str) -> Response:
             async for chunk in request.stream():
                 body.extend(chunk)
                 if len(body) > 1024:
-                    raise ValueError("mcp_form_limit")
+                    raise LimitError("mcp_form_limit", len(body), 1024, "bytes")
         form = parse_qs(body.decode(), strict_parsing=True, max_num_fields=1)
         with lock:
             action = lookup(key)
@@ -135,6 +139,8 @@ async def confirm(request: Request, key: str) -> Response:
         )
         state = "write_ok"
         return JSONResponse({"trust": "untrusted", "data": result})
+    except LimitError as exc:
+        return JSONResponse({"error": exc.code, "message": exc.detail}, status_code=400)
     except Exception:
         return JSONResponse(
             {"error": "confirmation_refused_or_write_uncertain"}, status_code=400

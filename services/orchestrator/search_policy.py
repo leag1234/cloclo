@@ -3,7 +3,6 @@
 import json
 import re
 import unicodedata
-from pathlib import Path
 from urllib.parse import urlsplit
 
 from services.orchestrator.loop import Call
@@ -74,27 +73,18 @@ def required_research(
         normalized,
     )
     technical = device_timings and (
-        re.search(r"\b(outi|otir)\b", normalized)
+        re.search(
+            r"\b(timing\w*|microsecond\w*|mikrosekund\w*|cycle\w*|zykl\w*|duree\w*|duration\w*|zeit\w*|throughput|debit|specification\w*)\b|\b(how long|combien de temps|wie lange)\b",
+            normalized,
+        )
+        # An explicit technical identifier deserves discovery even in a short
+        # question; preserve the user's wording, never insert a benchmark answer.
         or (
-            re.search(
-                r"\b(cpc|amstrad|z80|processor|prozessor|instructions?)\b", normalized
-            )
-            and re.search(
-                r"\b(timing\w*|microsecond\w*|mikrosekund\w*|cycle\w*|zykl\w*|duree\w*|duration\w*|zeit\w*)\b",
-                normalized,
-            )
+            len(question.split()) <= 4
+            and re.search(r"\b[A-Z][A-Z0-9_]{2,}\b", question)
         )
     )
     if temporal or explicit or technical:
-        if (
-            technical
-            and re.search(r"\b(cpc|amstrad)\b", normalized)
-            and re.search(r"\b(outi|otir)\b", normalized)
-        ):
-            sources = json.loads(Path("prompts/device-research.json").read_text())
-            question = sources["cpc_instruction_timings"]
-        if re.search(r"\bipo\b", normalized):
-            question += " offer price opening price"
         return (
             Call(
                 "required-current",
@@ -103,3 +93,15 @@ def required_research(
             ),
         )
     return ()
+
+
+def requested_page_read(question: str) -> bool:
+    """An explicit source-reading request must survive snippet-only discovery."""
+    text = question.casefold()
+    return bool(
+        re.search(
+            r"\b(read|lis|lire|lisez|lese\w*|lies|lee|leer|leggi|leggere)\b"
+            r".{0,50}\b(source|sources|page|article|quelle|seite|fuente|pagina|fonte)\b",
+            text,
+        )
+    )

@@ -1,22 +1,29 @@
 """Bounded decimal arithmetic; Python syntax is parsed but never executed."""
 
+from packages.limits import LimitError
+
 import ast
 import re
 from decimal import Decimal, DecimalException, localcontext
 
 
 def calculate(expr: str) -> str:
-    if not expr.strip() or len(expr) > 512 or re.search(r"[^0-9.()+*/\s-]", expr):
+    if len(expr) > 512:
+        raise LimitError("expression_limit", len(expr), 512, "characters")
+    if not expr.strip() or re.search(r"[^0-9.()+*/\s-]", expr):
         raise ValueError("invalid_expression")
     try:
         tree = ast.parse(expr.strip(), mode="eval")
-        if sum(1 for _ in ast.walk(tree)) > 128:
-            raise ValueError("expression_limit")
+        nodes = sum(1 for _ in ast.walk(tree))
+        if nodes > 128:
+            raise LimitError("expression_limit", nodes, 128, "syntax nodes")
         with localcontext() as context:
             context.prec = 64
             result = _number(tree.body, expr.strip())
         if not result.is_finite() or abs(result) > Decimal("1e50"):
-            raise ValueError("expression_limit")
+            raise LimitError(
+                "expression_limit", int(abs(result)), 10**50, "absolute value"
+            )
         return format(result, "f")
     except (SyntaxError, DecimalException, RecursionError):
         raise ValueError("invalid_expression") from None

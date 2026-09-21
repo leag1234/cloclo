@@ -51,48 +51,15 @@ M24 delivered; its owner containment exceptions remain binding in docs/decisions
 
 ## M25 — Intellectual disposition, not test-case patches
 
-Replace case patches with general behaviours. Public scores guide development;
-owner-only evaluation measures generalisation.
-
-### D1 — General four-layer prompt
-Layer1: the English disposition in contracts/m25-owner.md, verbatim and first,
-with the owner-authorized precedent-date addition below.
-Layers2–4: capabilities/tools (search conditions, budgets, failures), language/form
-(resolved language, English code, no plan narration/boilerplate), safety/evidence
-(untrusted text, no invented citations, privacy). No named-case/domain patches.
-Delete Z80, solargraphy, IPO and all case-specific sentences. Whole file <3500 bytes.
-Contract: contracts/m25-owner.md.
-
-### D2–D3 — generality and independent evaluation
-
-Binding contract: contracts/m25-owner.md (unchanged criteria).
-Create docs/prompt-policy.md: every prompt sentence must apply unchanged to three
-unrelated domains. Case failures require a general behaviour, tool/data fix or
-honest limitation; never the case itself. The public corpus is development data;
-cases belong in journeys/reports, never prompts. Owner alone runs independent
-private evaluation. Never inspect/list its directory. Keep private/ ignored.
-Add --cases PATH to the public corpus runner.
-
-### D4 — Conversation length: count tokens against the model window
-Replace character caps with estimated tokens against the active model context
-window minus output reservation and tool allowance. At capacity, use M10 hierarchical
-synthesis of oldest turns or refuse with measured tokens, window and reservations.
-Never surface bare value_error. See owner contract D4.
-
-### D5 — remaining ceilings
-
-Inventory every production size/count/byte limit in services/ and packages/ in
- docs/limits.md: value, enforcement, reason, real constraint versus leftover.
-Remove or justify each. Every enforced limit reports measured value and threshold.
-Account explicitly for inherited 2000-byte web text,400-byte RAG chunks,6 MB body
-and32000-character history. Contract: contracts/m25-owner.md.
-
-### Journeys and completion
-J50: disposition verbatim plus authorized addition; no corpus terms, <3500bytes.
-J51: owner-accepted third capture under the binding criteria below.
-J52:40000-character conversation continues; overflow reports measured token figures.
-J53: public means no more than0.5 below6.5/5.6/5.4; document each lost behaviour.
-Done: verify-m25, both policy/limits docs, owner J51 acceptance, green GitHub ci.
+D1–D5 and J50–J53: contracts/m25-owner.md, binding with owner rulings below.
+Four-layer general prompt, verbatim disposition/additions first, <3500bytes;
+no named-case/domain patches. Generality policy and exhaustive production-limits
+inventory required. Token-window conversation admission replaces character caps.
+Public corpus is development data; add --cases PATH to its runner. Owner alone
+runs private evaluation: never inspect/list its directory; keep private/ ignored.
+J51 uses the accepted third capture; J52 covers40000characters and measured
+overflow; J53 follows the latest certification ruling below and reports all losses.
+Done: verify-m25, policy/limits docs, owner J51 acceptance, green GitHub ci.
 
 ### Binding owner rulings (2026-09-20/21)
 Original wording: docs/decisions-log.md.
@@ -138,19 +105,12 @@ recommending, choosing, explaining why. Never make a small question large.
 
 Last required prompt change for M25: rerun J39 and complete.
 
-### M25 — J53 threshold: accept 4.8 for deepseek, but name the cases that fell (2026-09-21)
-deepseek reaches at most 4.8 against the 4.9 threshold, a loss of 0.6 from the 5.4 measured
-on 2026-09-20. The case patches supported deepseek more than the other two profiles; losing
-them costs it more. That is the measurement this milestone exists to produce.
-
-ACCEPTED at 4.8, on one condition: `reports/M25.md` lists, per profile, WHICH cases lost
-points against the 2026-09-20 run, with their before/after scores. If the drops fall on the
-cases the patches targeted (SpaceX, Z80, solargraphy), the result is coherent and the
-milestone completes. If a case with no patch dropped by more than 2 points, name it as a
-suspected side effect of the disposition and propose a general correction — never a patch.
-
-On the C03/GLM technical failures: retry as transient per the 2026-09-21 ruling; if they
-persist, record C03 as not run for that profile rather than blocking the milestone.
+### J53 reporting and transient exception (2026-09-21)
+The earlier4.8 DeepSeek floor is superseded below. Preserve per-profile before/after
+case tables against2026-09-20; name unpatched losses>2 as suspected disposition
+side effects and propose general corrections, never patches. Retry C03/GLM
+technical failures as transient; if persistent, record not run rather than blocking.
+Original owner wording is archived verbatim in docs/decisions-log.md.
 
 ### M25 — certified on qwen and glm; deepseek degraded by the disposition (owner ruling, 2026-09-21)
 Measured per-case, 2026-09-20 baseline → current:

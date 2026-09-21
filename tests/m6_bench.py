@@ -14,7 +14,8 @@ from eval_provider import EvalProvider
 
 def probe(_: int) -> dict[str, Any]:
     return EvalProvider().complete(
-        "system", [{"role": "user", "content": Path("prompts/bench.txt").read_text()}]
+        "system",
+        [{"role": "user", "content": Path("tests/journeys/bench.txt").read_text()}],
     )
 
 

@@ -130,6 +130,7 @@ def main() -> None:
                 **({} if live else environment()),
                 "GPU_LOCAL": "0",
                 "ATLAS_IMAGE_ON_DEMAND": "0",
+                "ATLAS_SEARCH_PROVIDER": "tavily",
                 "ATLAS_INTERACTION_DIR": root + "/logs",
                 "ATLAS_WEB_CACHE": root + "/web.sqlite",
             },
