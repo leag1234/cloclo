@@ -216,3 +216,23 @@ the competing risks and takes a position has done the work. Revised J51 acceptan
 - a conclusion the reader can act on;
 - no claimed consultation, date or URL for a source not actually retrieved.
 Certify J51 on the third capture if it meets these, and complete the milestone.
+
+### M25 — J34 assertion tests wording, not content (owner ruling, 2026-09-21)
+Capture 1 shows the model distinguishing the two measures correctly while saying
+"premier trade"; the assertion only accepts `ouverture|opening|premier.*cours`, so a
+correct answer failed on vocabulary. That is the same mistake as requiring the words "the
+central tension is" in J51: the test checks phrasing instead of substance.
+
+AUTHORIZED: widen the J34 assertion to accept any wording that conveys the distinction —
+`ouverture|opening|premier.*(cours|trade|échange)|début.*(cotation|séance)|first trade`
+— and, more importantly, assert on the SUBSTANCE: two distinct figures are given AND the
+answer states that they measure different things. The underlying fact (offer price versus
+first market price) is unchanged and no assertion is weakened in what it requires.
+
+General principle for every journey from now on: assert on what the answer establishes,
+not on the words it uses. A keyword list is acceptable only as a convenience, never as the
+sole criterion, and it must be widened whenever a correct answer fails it.
+
+Captures 2 and 3 are genuine failures (the distinction is absent): keep them as failures
+and fix them with the general evidence-reconciliation rule already added to
+`prompts/web-chat.txt`, not with a case patch.
