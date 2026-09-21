@@ -130,3 +130,14 @@ question for a later one.
 Consequence for the default-model decision, to carry forward: deepseek was the candidate
 for speed and cost; it does not support the prompt that produces the other two models'
 quality. glm is now the strongest on the public corpus, qwen the most balanced.
+
+### M25 — certified on qwen and glm (owner ruling, 2026-09-21)
+Measured: atlas-qwen 6.067 (threshold 6.0) passes, atlas-glm 6.467 (threshold 5.1) passes,
+atlas-deepseek 4.067 (threshold 4.8) fails. deepseek's losses fall on cases that never had
+a patch (C02 9→5, C03 9→3, C08 9→6, C11 9→6, C13 6→3) while glm gains on the same cases
+(C02 1→8, C07 0→8, C09 3→8): the same prompt helps two models and harms the small fast one.
+
+CERTIFY M25 on atlas-qwen and atlas-glm. Record deepseek's regression in reports/M25.md as
+a measured finding, not a milestone failure. Do not weaken the disposition, do not write a
+per-model prompt here. Complete the
+milestone: commit, PR, CI, merge.
