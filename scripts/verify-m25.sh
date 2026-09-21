@@ -124,9 +124,22 @@ new = {
 }
 try: d=json.loads(open(sys.argv[1]).read())
 except Exception as e: print(f"::error::verify-m25: report invalid JSON ({e})"); sys.exit(1)
+# J34 (SpaceX offer vs opening price) is an ACCEPTED regression: it passed only because a
+# sentence written for that case sat in the system prompt. Removing the patch is the point
+# of this milestone, and the loss is recorded in reports/M25.md. Any OTHER earlier journey
+# that regresses still fails the gate.
+ACCEPTED_REGRESSIONS = {"J34_spacex_search_first"}
 prev=[k for k in d if k.startswith("J") and k[1:3].isdigit() and int(k[1:3])<50]
-bad=[k for k in prev if d.get(k) is not True]
+bad=[k for k in prev if d.get(k) is not True and k not in ACCEPTED_REGRESSIONS]
 if bad: print("::error::verify-m25: regression on earlier journeys:", bad); sys.exit(1)
+for k in ACCEPTED_REGRESSIONS:
+    if d.get(k) is not True:
+        import pathlib
+        rep = pathlib.Path("reports/M25.md")
+        if not rep.exists() or "regression caused by removing a case patch" not in rep.read_text():
+            print(f"::error::verify-m25: {k} fails and reports/M25.md does not document it "
+                  "under 'regression caused by removing a case patch'")
+            sys.exit(1)
 miss=[k for k in new if k not in d]
 if miss: print(f"::error::verify-m25: report does not cover: {miss}"); sys.exit(1)
 fails=[f"{k}: {m}" for k,m in new.items() if d.get(k) is not True]
