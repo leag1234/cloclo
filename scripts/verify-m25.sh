@@ -60,30 +60,9 @@ deepseek-v4
 glm-5
 qwen3
 EOF
-# Extend from the public corpus when present, but only with DISTINCTIVE terms: proper
-# nouns, technical identifiers and rare words. Anything that also appears in the required
-# disposition text is by construction ordinary vocabulary and is excluded — otherwise the
-# gate would ban its own wording.
-if [[ -f /opt/atlas-src/corpus/cases.json ]]; then
-  python3 - "$P" >> "$BANNED_FILE" << 'PY'
-import json, re, sys, pathlib
-prompt_words = set(re.findall(r"[a-zà-ÿ]+", pathlib.Path(sys.argv[1]).read_text().lower()))
-d = json.load(open("/opt/atlas-src/corpus/cases.json"))
-out = set()
-for c in d["cases"]:
-    text = c["question"] + " " + (c.get("truth") or "")
-    # proper nouns and identifiers: capitalised mid-sentence, or containing a digit,
-    # underscore or hyphen. Ordinary lowercase words are never banned.
-    for w in re.findall(r"\b[A-Z][A-Za-zÀ-ÿ]{3,}\b|\b[A-Za-z]+[0-9_\-][A-Za-z0-9_\-]*\b", text):
-        lw = w.lower()
-        if lw in prompt_words:      # ordinary vocabulary: never ban
-            continue
-        if len(lw) < 4:
-            continue
-        out.add(lw)
-print("\n".join(sorted(out)))
-PY
-fi
+# No dynamic extraction: it kept promoting ordinary words (content, python, path, data)
+# to banned terms. The list above is fixed and reviewed by the owner; extend it when a new
+# corpus case introduces a distinctive proper noun or identifier.
 HITS=""
 for f in prompts/*.txt; do
   while IFS= read -r t; do
