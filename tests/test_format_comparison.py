@@ -31,9 +31,15 @@ class FormatComparisonTests(unittest.TestCase):
             row = next(
                 line
                 for line in message["content"].splitlines()
-                if line.startswith("|") and "inventaire.ods" in line
+                if line.startswith("|")
+                and "inventaire.ods" in line
+                and any(
+                    cell.strip().strip("`*").casefold() == "abricot"
+                    for cell in line.strip("|").split("|")
+                )
             )
             self.assertRegex(row, r"\b43\b")
+            original = message["content"]
             if corruption == "missing":
                 replacement = ""
             elif corruption == "quantity":
@@ -44,5 +50,6 @@ class FormatComparisonTests(unittest.TestCase):
                 message["content"] = message["content"].replace("Quantité", "Autre")
                 replacement = row
             message["content"] = message["content"].replace(row, replacement)
-            with self.assertRaises(AssertionError):
+            self.assertNotEqual(message["content"], original)
+            with self.subTest(corruption=corruption), self.assertRaises(AssertionError):
                 validate("formats_read", case, case["response"])
