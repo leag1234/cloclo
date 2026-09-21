@@ -236,3 +236,19 @@ sole criterion, and it must be widened whenever a correct answer fails it.
 Captures 2 and 3 are genuine failures (the distinction is absent): keep them as failures
 and fix them with the general evidence-reconciliation rule already added to
 `prompts/web-chat.txt`, not with a case patch.
+
+### M25 — J34 regression accepted as the measured price of generalisation (owner ruling, 2026-09-21)
+With the case patch removed, the SpaceX question returns the offer price (135 USD) and
+omits the first-market price (150 USD) in three fresh captures. This is a real quality
+loss on one public-corpus case, and it is exactly what this milestone set out to measure:
+the previous score depended on a sentence written for that case, not on a behaviour.
+
+ACCEPTED. J34 is recorded as FAILING in `reports/M25.md`, with the three captures, under
+the heading "regression caused by removing a case patch". It does not block the milestone.
+No case-specific sentence returns to any prompt. The general evidence-reconciliation rule
+added to `prompts/web-chat.txt` stays; if it later improves this case, so much the better.
+
+Certify M25 on: J50, J51 (third capture), J52, J53, and the corpus mean within the agreed
+0.5 tolerance. Record J34 as a known regression in the report and in
+`docs/prompt-policy.md` as the first documented instance of the trade-off between a
+patched score and a general behaviour.
