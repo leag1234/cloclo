@@ -40,8 +40,10 @@ async def finish(
 ) -> None:
     # Selection is model-owned; the original request is user-owned. A model
     # paraphrase must not silently discard constraints before the image rewriter.
-    if image_iteration(request.messages) is None:
-        prompt = request.messages[-1].text
+    iteration = image_iteration(request.messages)
+    prompt = (
+        " ".join(iteration.splitlines()) if iteration else request.messages[-1].text
+    )
     try:
         await process_image(
             prompt,
@@ -52,7 +54,7 @@ async def finish(
                 Decimal(0),
                 min(
                     Decimal("0.05"),
-                    Decimal("0.10") - result.cost,
+                    Decimal("0.30") - result.cost,
                 ),
             ),
             timeout=max(0, min(120, request.timeout_seconds - (monotonic() - started))),

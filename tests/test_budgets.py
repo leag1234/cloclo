@@ -74,6 +74,7 @@ class BudgetTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(tools.calls, count)
                 self.assertIn(reason, result.text)
                 self.assertLessEqual(result.cost, limits.cost)
+                assert limits.tokens is not None
                 self.assertLessEqual(result.tokens, limits.tokens)
 
     async def test_inflight_timeout(self) -> None:
@@ -153,3 +154,59 @@ class BudgetTests(unittest.IsolatedAsyncioTestCase):
 
         result = await run(Query(question="test", lang="fr"), Violation(), Tools(), "")
         self.assertEqual(result.reason, "provider_error")
+
+
+class AnswerContinuationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_tool_turn_retains_substantive_answer(self) -> None:
+        from unittest.mock import patch
+
+        model = Model()
+        with patch.object(
+            model,
+            "complete",
+            side_effect=[
+                Turn(
+                    "A workshop needs 12 tables at 25 euros each.\n\n",
+                    (Call("sum", "calculator", '{"expr":"12*25"}'),),
+                ),
+                Turn("The total is 300 euros. Reserve that amount before ordering."),
+            ],
+        ):
+            result = await run(
+                Query(question="Cost the workshop", lang="en"), model, Tools(), ""
+            )
+        self.assertEqual(result.state, "done")
+        self.assertEqual(
+            result.text,
+            "A workshop needs 12 tables at 25 euros each.\n\nThe total is 300 euros. Reserve that amount before ordering.",
+        )
+
+
+class PublicContextTests(unittest.IsolatedAsyncioTestCase):
+    async def test_repeated_context_is_not_a_cumulative_window(self) -> None:
+        from unittest.mock import patch
+
+        model = Model()
+        with (
+            patch.object(
+                model, "estimate", return_value=Reservation(150000, Decimal(0))
+            ),
+            patch.object(
+                model,
+                "complete",
+                side_effect=[
+                    Turn("", (Call("sum", "calculator", '{"expr":"1"}'),)),
+                    Turn("The answer is 1."),
+                ],
+            ),
+        ):
+            result = await run(
+                Query(question="Compute one", lang="en"),
+                model,
+                Tools(),
+                "",
+                Limits(profile="atlas-qwen", tokens=None),
+            )
+        self.assertEqual(result.state, "done")
+        self.assertEqual(result.text, "The answer is 1.")
+        self.assertEqual(result.tokens, 300000)

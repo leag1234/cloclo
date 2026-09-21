@@ -1,5 +1,7 @@
 """M15 single-attempt code transport with a frozen, conservatively priced request."""
 
+from packages.limits import LimitError
+
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_CEILING
@@ -54,7 +56,9 @@ def prepare(request: Request) -> Plan:
     incoming = len(json.dumps(body, ensure_ascii=False).encode()) + 512
     context = policy.config["code"]["capabilities"][model]["context"]
     if incoming + request.max_tokens > context:
-        raise ValueError("context_exceeded")
+        raise LimitError(
+            "context_exceeded", incoming + request.max_tokens, context, "tokens"
+        )
     price = policy.prices[model]
     endpoint = os.environ["SCW_GENERATIVE_BASE_URL"].rstrip("/")
     if not endpoint.startswith("https://"):
@@ -68,7 +72,7 @@ def prepare(request: Request) -> Plan:
     )
     reserved = plan.charge(incoming, request.max_tokens)
     if not 0 < reserved <= 50000:
-        raise ValueError("cost_budget")
+        raise LimitError("cost_budget", reserved, 50000, "microEUR")
     return Plan(plan.body, plan.endpoint, reserved, plan.input_rate, plan.output_rate)
 
 
@@ -119,7 +123,7 @@ async def events(plan: Plan) -> AsyncGenerator[dict[str, Any], None]:
         async for piece in chunks:
             total += len(piece)
             if total > 2_000_000:
-                raise ValueError("provider_stream_limit")
+                raise LimitError("provider_stream_limit", total, 2_000_000, "bytes")
             buffer += piece
             while b"\n" in buffer:
                 line, buffer = buffer.split(b"\n", 1)

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "C12-long-document",
+    "profile": "atlas-qwen",
+    "attempt": 1,
+    "result": {
+      "text": "## Synthèse du document MOBIFREE\n\nJ'ai analysé le PDF de 174 pages qu'il s'agit d'un **accord de subvention Horizon Europe** (n° 101135795) pour le projet **MOBIFREE** (Mobile Freedom).\n\n### Objet du document\nAccord de subvention entre la **Commission européenne** et un consortium de **13 bénéficiaires** coordonné par **E FOUNDATION**, pour un projet de 36 mois (décembre 2023 - novembre 2026) visant à développer un écosystème de logiciels mobiles open-source, éthiques et centrés sur l'humain.\n\n**Montant :** 4 421 800 EUR (budget total éligible : 5 072 425 EUR)\n\n---\n\n### Cinq points essentiels\n\n1. **Consortium international** : 13 partenaires de 7 pays (France, Pays-Bas, Allemagne, Roumanie, Serbie). E FOUNDATION est coordinateur (1,128 M€), NLNET (770 k€), Murena et QWANT (402,5 k€ chacun) sont les principaux bénéficiaires.\n\n2. **6 lots de travaux** : WP1 (cadre éthique, Waag Society), WP2 (développement logiciel, Murena, 256 personnes-mois), WP3 (appel ouvert, NLNET), WP4 (business, BIOSENSE), WP5 (dissémination, E FOUNDATION), WP6 (gestion).\n\n3. **Financement** : Préfinancement initial de 3,54 M€, contribution MIM de 5% (221 k€), deux périodes de reporting (mois 1-18 et 19-36), taux de financement 100% (non-lucratif) ou 70% (lucratif).\n\n4. **Livrables majeurs** : Cadre éthique (D1.1), versions finales des logiciels (D2.1), site web et appels ouverts (D3.x), étude commerciale et Business Kit (D4.x), plan de dissémination et Forum Fair Tech (D5.x).\n\n5. **Obligations clés** : Confidentialité des informations sensibles, conformité éthique (RGPD, Charte des droits fondamentaux), accès libre de redevances aux résultats pour les politiques UE, publication en open-access.\n\n---\n\n### Points demandant une décision de votre part\n\n- **Signature de l'Annexe 3** (formule d'adhésion) si vous êtes bénéficiaire\n- **Validation du budget individuel** dans l'Annexe 2\n- **Désignation des signataires autorisés** pour amendements et rapports\n- **Choix du système de coûts** : coûts réels ou coûts unitaires moyens\n- **Identification des tâches à sous-traiter** dans l'Annexe 1\n\n---\n\n### Ce qui manque ou reste ambigu\n\n- **Annexes incomplètes** : Budget détaillé par bénéficiaire et Description de l'action ne sont pas entièrement lisibles\n- **Nombre minimum de bénéficiaires** requis pour distribuer le préfinancement non spécifié\n- **Critères de sélection détaillés** pour l'appel ouvert WP3 (max 60 k€ par tiers) absents\n- **Exigences précises du Data Management Plan** (format, référentiels) non définies\n- **Seuils et modalités d'audit** (SPA) non explicités\n- **Coordination avec d'autres actions Horizon** pour éviter le double financement\n\n---\n\n📄 **Document complet :** [Télécharger la synthèse (Markdown)](/api/v1/terminals/atlas-files/files/serve/home/user/requests/chatcmpl-caaed3cccdba409b973965aa8c75805c/synthese_mobifree.md)\n\n**Source consultée :** Grant Agreement 101135795 — MOBIFREE, Ref. Ares(2023)7143257 du 20/10/2023, 174 pages.\n\n[synthese_mobifree.md](/api/v1/terminals/atlas-files/files/serve/home/user/requests/chatcmpl-caaed3cccdba409b973965aa8c75805c/synthese_mobifree.md) — Document créé.",
+      "seconds": 101.8,
+      "usage": {
+        "prompt_tokens": 157502,
+        "completion_tokens": 4490,
+        "total_tokens": 161992
+      },
+      "error": null,
+      "attachments": [
+        {
+          "filename": "bigpdf.pdf",
+          "bytes": 3369441,
+          "sha256": "017b69dd1f7210b17b09299c56e9bd202ec53dea8e2e6947de0e64b0b147ce2e"
+        }
+      ]
+    }
+  },
+  {
+    "id": "C12-long-document",
+    "profile": "atlas-glm",
+    "attempt": 1,
+    "result": {
+      "text": "",
+      "seconds": 87.0,
+      "usage": {},
+      "error": "HTTP Error 504: Gateway Timeout",
+      "attachments": [
+        {
+          "filename": "bigpdf.pdf",
+          "bytes": 3369441,
+          "sha256": "017b69dd1f7210b17b09299c56e9bd202ec53dea8e2e6947de0e64b0b147ce2e"
+        }
+      ]
+    }
+  },
+  {
+    "id": "C12-long-document",
+    "profile": "atlas-glm",
+    "attempt": 2,
+    "result": {
+      "text": "J'ai lu le PDF fourni (174 pages). Il s'agit d'un **contrat de subvention Horizon Europe** (Grant Agreement), pas d'un rapport ou d'une spec. Voici la synthèse demandée.\n\n---\n\n# Synthèse — Grant Agreement MOBIFREE (Projet 101135795)\n\n## Objet du document\nContrat de subvention entre la Commission européenne (DG CNECT) et un consortium de 13 bénéficiaires coordonné par la **E Foundation** (France). Il finance le projet **MOBIFREE — « Mobile Freedom »**, action HORIZON-IA (Innovation Action), appel HORIZON-CL4-2023-HUMAN-01-CNECT, topic HORIZON-CL4-2023-HUMAN-01-12. Le projet vise à développer un écosystème logiciel mobile européen **open-source, respectueux de la vie privée et éthique**, en alternative aux technologies américaines dominantes, via la co-création et le pilottage avec quatre secteurs d'utilisateurs finaux. Document de référence : Ares(2023)7143257 — 20/10/2023.\n\n## Cinq points essentiels\n\n1. **Cadre financier** — Coûts éligibles totaux : **5 072 425 €** ; subvention maximale : **4 421 800 €** (taux de financement 70 %, 100 % pour les entités à but non lucratif). Préfinancement initial : 3 537 440 €, dont retenue MIM de 5 % (221 090 €). Plafond de paiement intermédiaire : 90 % de la subvention.\n\n2. **Durée et gouvernance** — 36 mois, date de début fixée au **1er décembre 2023**. Coordination par E Foundation. 6 work packages (WP1 cadre éthique/Waag Society ; WP2 développement & pilotes/Murena ; WP3 Open Call/NLNET ; WP4 business/BIOSENSE ; WP5 dissémination/E Foundation ; WP6 management/E Foundation).\n\n3. **Open Call — Financial Support to Third Parties (WP3)** — NLNET gère un appel ouvert avec budget dédié (D.1) ; montants **min. 10 000 € / max. 50 000 €** par tiers, plafond de 60 000 € par bénéficiaire tiers. Entre **13 et 67 projets** tiers attendus, sélection par comité externe indépendant.\n\n4. **Pilotes utilisateurs (WP1/WP2)** — Tests dans 4 secteurs d'utilisateurs finaux, **120 utilisateurs au total** (30 par secteur), sur 2 mois (M15–M21), avec focus groups + enquêtes ; un secteur (urgences humanitaires) bénéficie d'une simulation supplémentaire.\n\n5. **Obligations transversales** — Règle de non-profit, open access obligatoire aux publications, Plan de Gestion des Données (D6.3/D6.4), conformité éthique (RGPD, AI Act, Charte des droits fondamentaux), propriété des résultats par le bénéficiaire qui les génère, accord sur le « background » à formaliser par écrit. Loi applicable : droit UE + droit belge ; tribunal compétent : Cour de justice de l'UE (bénéficiaires UE) / tribunaux de Bruxelles (non-UE).\n\n## Points nécessitant une décision de votre part\n\n- **Accord sur le background** : les bénéficiaires doivent identifier par écrit le background nécessaire à l'action et à l'exploitation des résultats. À formaliser entre partenaires (Art. IPR / Annexe 5).\n- **Accès et exploitation des résultats** : décider des conditions d'accès (royalty-free ou non) aux résultats détenus par d'autres bénéficiaires, dans un délai raisonnable après demande.\n- **Sous-traitance des tâches impliquant des informations classifiées UE** : soumise à approbation écrite préalable de l'autorité accordante — à arbitrer si applicable.\n- **Répartition du préfinancement** : ne peut être distribuée qu'aux bénéficiaires ayant accédé à l'accord ; décision de coordination sur la répartition interne.\n- **Tâches soulevant des questions éthiques** : approbations obligatoires (comités d'éthique, autorités de protection des données) à obtenir **avant** le démarrage des tâches concernées — à planifier.\n- **Plan de Gestion des Données** : version préliminaire (D6.3) puis révisée (D6.4) — choix des licences et des données à ouvrir.\n\n## Ce qui manque ou reste ambigu\n\n- **Annexe 1 Partie B (description détaillée de l'action)** : le sommaire la mentionne, mais le contenu détaillé des tâches au-delà de WP1–WP3 est partiellement extrait ; les WP4, WP5, WP6 et la liste complète des livrables/milestones/risques n'ont pas été lus intégralement dans cette synthèse.\n- **Annexe 2b** (table des coûts unitaires pour infrastructures de recherche) est référencée mais non visible dans les pages consultées.\n- **Détail du budget par catégorie** pour chaque bénéficiaire : la ligne Murena/QWANT affiche un taux « 70 » mais la colonne « Maximum grant amount » du tableau de la page 9 indique 402 500 € (cohérent avec 70 % de 575 000 €) ; en revanche la page 144 montre « 70 402 500.00 » qui semble être une **erreur d'extraction PDF** (fusion de cellules) — à vérifier sur le document source.\n- **Conditions exactes de l'Open Call** (critères d'éligibilité, calendrier des 6 tours minimum) : renvoyées à « l'annexe du proposal » non incluse dans ce contrat.\n- **Accord de consortium (Consortium Agreement)** : le contrat y fait référence pour la répartition interne des droits et obligations, mais il n'est pas annexé ici — document séparé à obtenir.\n\n---\n\n**Note de fiabilité** : synthèse fondée sur la lecture des pages clés (préambule, datasheet p. 8–12, Annexe 1 Partie A p. 72–80, Annexe 2 p. 144, Annexe 5 p. 161–164). Les 174 pages n'ont pas toutes été lues intégralement ; les zones identifiées comme « manquantes/ambiguës » reflètent cette limite et des possibles artefacts d'extraction PDF.",
+      "seconds": 56.1,
+      "usage": {
+        "prompt_tokens": 76202,
+        "completion_tokens": 2241,
+        "total_tokens": 78443
+      },
+      "error": null,
+      "attachments": [
+        {
+          "filename": "bigpdf.pdf",
+          "bytes": 3369441,
+          "sha256": "017b69dd1f7210b17b09299c56e9bd202ec53dea8e2e6947de0e64b0b147ce2e"
+        }
+      ]
+    }
+  },
+  {
+    "id": "C12-long-document",
+    "profile": "atlas-deepseek",
+    "attempt": 1,
+    "result": {
+      "text": "",
+      "seconds": 105.4,
+      "usage": {},
+      "error": "HTTP Error 502: Bad Gateway",
+      "attachments": [
+        {
+          "filename": "bigpdf.pdf",
+          "bytes": 3369441,
+          "sha256": "017b69dd1f7210b17b09299c56e9bd202ec53dea8e2e6947de0e64b0b147ce2e"
+        }
+      ]
+    }
+  },
+  {
+    "id": "C12-long-document",
+    "profile": "atlas-deepseek",
+    "attempt": 2,
+    "result": {
+      "text": "",
+      "seconds": 43.2,
+      "usage": {},
+      "error": "HTTP Error 502: Bad Gateway",
+      "attachments": [
+        {
+          "filename": "bigpdf.pdf",
+          "bytes": 3369441,
+          "sha256": "017b69dd1f7210b17b09299c56e9bd202ec53dea8e2e6947de0e64b0b147ce2e"
+        }
+      ]
+    }
+  },
+  {
+    "id": "C12-long-document",
+    "profile": "atlas-deepseek",
+    "attempt": 3,
+    "result": {
+      "text": "The PDF has 174 pages, not 20-60. Let me read it to understand its content.\n\nThis is a Horizon Europe grant agreement (MOBIFREE project). Let me read the datasheet and key sections to understand the budget, duration, and specific obligations.\n\nI have the datasheet. Let me read the coordinator's budget (E Foundation) and the specific rules (Annex 5), plus the action description (Annex 1) to understand the project's work packages. Let me look at the coordinator's row and the specific rules.\n\nThe coordinator row (E Foundation) is on the previous page. Let me get page 8's full text and the specific rules (Annex 5) and the action description.\n\nThe coordinator row (E Foundation) is missing from the extracted text on page 8/9 — it seems the table row for E Foundation was cut. Let me look at the specific rules and the action description sections.\n\nLet me read the specific rules (Annex 5) around pages 32-36 and the action description (Annex 1) around pages 13-21 to understand the work packages and specific obligations.\n\nLet me read the Annex 5 specific rules (pages 161-162) and the action description (Annex 1) work packages around pages 13-21 and 53, 71.\n\nNow let me read the action description (Annex 1) work packages around pages 13-21 to understand the project structure, and the coordinator's budget. Let me look at the work packages and deliverables.\n\nI have a good understanding of the grant agreement structure. Let me look at the action description (Annex 1) work packages to understand the project's technical content. Let me also check the duration (Article 4) and the coordinator's row in the budget table.\n\nThe coordinator's row (E Foundation) is missing from the extracted table on page 9 — it seems the table extraction cut off rows 1-2. Let me look at the duration in the datasheet (Point 1) and the work packages in Annex 1.\n\n\n\n",
+      "seconds": 59.0,
+      "usage": {
+        "prompt_tokens": 131080,
+        "completion_tokens": 2184,
+        "total_tokens": 133264
+      },
+      "error": null,
+      "attachments": [
+        {
+          "filename": "bigpdf.pdf",
+          "bytes": 3369441,
+          "sha256": "017b69dd1f7210b17b09299c56e9bd202ec53dea8e2e6947de0e64b0b147ce2e"
+        }
+      ]
+    }
+  }
+]

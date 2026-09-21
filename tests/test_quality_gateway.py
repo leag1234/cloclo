@@ -191,16 +191,16 @@ class ProfileTests(unittest.TestCase):
         )
 
     def test_profiles_and_hard_caps(self) -> None:
-        self.assertEqual(request().max_tokens, 3000)
+        self.assertEqual(request().max_tokens, 6000)
         self.assertEqual(request().reasoning_effort, "none")
-        self.assertEqual(request(profile="atlas-qwen").max_tokens, 3000)
+        self.assertEqual(request(profile="atlas-qwen").max_tokens, 6000)
         self.assertEqual(
             request(profile="atlas-qwen", reasoning_effort="high").reasoning_effort,
             "none",
         )
         for options in (
             {"max_tokens": 16001},
-            {"profile": "atlas-qwen", "max_tokens": 3001},
+            {"profile": "atlas-qwen", "max_tokens": 6001},
             {"profile": "atlas-qwen", "budget_eur": "0.100001"},
             {"budget_eur": "NaN"},
         ):
@@ -363,7 +363,7 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
             patch.dict(os.environ, environment()),
             patch("stream_transport.attempt", upstream),
         ):
-            original = request(timeout=120.0)
+            original = request(timeout=120.0, max_tokens=3000)
             policy = ServerlessPolicy()
             model = policy.models["text"]
             incoming = input_bound(original.messages, original.tools)
@@ -447,6 +447,55 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
                             ]
                 self.assertEqual(calls, 2)
 
+    async def test_initial_budget_finalization_preserves_work_request(self) -> None:
+        original = request(
+            tools=[{"type": "function", "function": {"name": "web_search"}}],
+            messages=[{"role": "user", "content": "Prepare a checklist."}],
+            budget_eur="0.047",
+        )
+        seen: list[AgentRequest] = []
+
+        async def transport(
+            current: AgentRequest, model: str, timeout: float
+        ) -> AsyncGenerator[dict[str, object], None]:
+            seen.append(current)
+            yield result("A usable checklist", 20)
+
+        with (
+            patch.dict(os.environ, environment()),
+            patch("stream_transport.attempt", transport),
+        ):
+            _ = [e async for e in stream_quality(AgentProvider(), original)]
+        self.assertEqual(seen[0].tool_choice, "none")
+        self.assertEqual(seen[0].messages, original.messages)
+
+    async def test_exhausted_tools_finalize_acquired_evidence(self) -> None:
+        original = request(
+            messages=[
+                {"role": "user", "content": "Calculate the total."},
+                {"role": "tool", "content": "Measured items: 12 and 30."},
+                {"role": "tool", "content": '{"error": "tool_quota_exhausted"}'},
+            ],
+            tools=[],
+        )
+        seen: list[AgentRequest] = []
+
+        async def transport(
+            current: AgentRequest, model: str, timeout: float
+        ) -> AsyncGenerator[dict[str, object], None]:
+            seen.append(current)
+            yield result("The total is 42.", 20)
+
+        with (
+            patch.dict(os.environ, environment()),
+            patch("stream_transport.attempt", transport),
+        ):
+            events = [e async for e in stream_quality(AgentProvider(), original)]
+        self.assertEqual(seen[0].tool_choice, "none")
+        self.assertEqual(seen[0].messages[:-1], original.messages)
+        self.assertIn("Deliver the final answer", str(seen[0].messages[-1]))
+        self.assertIn("The total is 42.", str(events[-1]))
+
     async def test_research_leaves_room_for_full_context_answer(self) -> None:
         from quality import input_bound
         from serverless import classify_task
@@ -455,7 +504,15 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
         for profile in ("atlas-qwen", "atlas-glm"):
             with patch.dict(os.environ, environment()):
                 policy = ServerlessPolicy()
-                req = request(profile=profile, tools=[tool], max_tokens=3000)
+                req = request(
+                    profile=profile,
+                    tools=[tool],
+                    max_tokens=3000,
+                    messages=[
+                        {"role": "user", "content": "Explain the measurement."},
+                        {"role": "tool", "content": "Measured duration: 12 seconds."},
+                    ],
+                )
                 incoming = input_bound(req.messages, req.tools)
                 model = policy.models[classify_task(req.messages)]
                 one_turn = policy.cost(model, incoming, 3000)
@@ -518,7 +575,7 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
         async def upstream(
             req: AgentRequest, model: str, timeout: float
         ) -> AsyncGenerator[dict[str, object], None]:
-            self.assertEqual(req.max_tokens, 3000)
+            self.assertEqual(req.max_tokens, 6000)
             yield result("A complete expert answer with its conclusion.", 20)
 
         with (
@@ -533,7 +590,7 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
             budget = policy.cost(
                 policy.models["code"],
                 input_bound(original.messages, original.tools),
-                3000,
+                6000,
             )
             original = request(
                 profile="atlas-qwen", messages=original.messages, budget_eur=str(budget)
@@ -1130,7 +1187,7 @@ class SelectorTests(unittest.IsolatedAsyncioTestCase):
                 ) -> AsyncGenerator[dict[str, object], None]:
                     called.append(model)
                     self.assertEqual(req.reasoning_effort, "none")
-                    self.assertLessEqual(req.max_tokens, 3000)
+                    self.assertLessEqual(req.max_tokens, 6000)
                     self.assertLessEqual(timeout, 120)
                     yield result("A useful answer to the same technical question.", 20)
 
@@ -1225,3 +1282,66 @@ class VisionDetailTests(unittest.IsolatedAsyncioTestCase):
                 {**payload(picture()), "profile": "atlas-qwen"}
             )
         self.assertIn("visible object", str(answer["text"]))
+
+
+class ReservationDiagnosticTests(unittest.IsolatedAsyncioTestCase):
+    async def test_unaffordable_input_reports_reservation_without_provider_io(
+        self,
+    ) -> None:
+        from packages.limits import LimitError
+        from unittest.mock import AsyncMock
+
+        upstream = AsyncMock(side_effect=AssertionError("paid I/O forbidden"))
+        with (
+            patch.dict(os.environ, environment()),
+            patch("stream_transport.attempt", upstream),
+            self.assertRaises(LimitError) as caught,
+        ):
+            _ = [
+                event
+                async for event in stream_quality(
+                    AgentProvider(), request(budget_eur="0.000001")
+                )
+            ]
+        self.assertEqual(caught.exception.code, "cost_budget")
+        self.assertEqual(caught.exception.limit, 1)
+        self.assertGreater(caught.exception.measured, 1)
+        self.assertEqual(caught.exception.unit, "microEUR")
+        upstream.assert_not_called()
+
+    async def test_alternate_can_deliver_with_less_than_full_output_allowance(
+        self,
+    ) -> None:
+        from quality import input_bound
+
+        seen = []
+        original = request(
+            profile="atlas-qwen",
+            messages=[{"role": "user", "content": "e" * 110000}],
+            budget_eur="0.047",
+        )
+
+        async def upstream(
+            req: AgentRequest, model: str, timeout: float
+        ) -> AsyncGenerator[dict[str, object], None]:
+            seen.append(model)
+            self.assertLess(req.max_tokens, original.max_tokens)
+            self.assertLessEqual(
+                policy.cost(
+                    model, input_bound(req.messages, req.tools), req.max_tokens
+                ),
+                Decimal("0.047"),
+            )
+            self.assertEqual(req.messages, original.messages)
+            yield result("Complete delivery within the remaining allowance.", 20)
+
+        with (
+            patch.dict(os.environ, environment()),
+            patch("stream_transport.attempt", upstream),
+        ):
+            policy = ServerlessPolicy()
+            events = [
+                event async for event in stream_quality(AgentProvider(), original)
+            ]
+        self.assertEqual(len(seen), 1)
+        self.assertIn("Complete delivery", str(events))

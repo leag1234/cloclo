@@ -78,7 +78,9 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
                         "GPU_MAX_EUR_H": "2",
                     },
                 ),
-                self.assertRaisesRegex(RuntimeError, "budget_exceeded"),
+                self.assertRaisesRegex(
+                    RuntimeError, "measured 32000000 microEUR; limit 30000000"
+                ),
             ):
                 image_lifecycle.start_worker()
             start.assert_not_called()

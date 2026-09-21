@@ -1,5 +1,7 @@
 """M12 sovereign vision with a conservative reservation before any paid call."""
 
+from packages.limits import LimitError, ProviderLimitError
+
 from packages.profiles import PROFILES
 
 import asyncio
@@ -37,7 +39,7 @@ class VisionRequest(VisionInput):
         if self.profile is not None and self.profile not in PROFILES:
             raise ValueError("invalid_profile")
         if self.timeout > 120:
-            raise ValueError("timeout_budget")
+            raise LimitError("timeout_budget", int(self.timeout * 1000), 120000, "ms")
         return self
 
 
@@ -73,7 +75,12 @@ class VisionProvider:
             )
         reservation = self.cost(tokens, self.config["max_tokens"])
         if reservation > request.budget:
-            raise RuntimeError("cost_budget")
+            raise ProviderLimitError(
+                "cost_budget",
+                int(reservation * 1000000),
+                int(request.budget * 1000000),
+                "microEUR",
+            )
         return tokens, reservation
 
     async def complete(self, payload: object) -> dict[str, object]:
@@ -108,7 +115,12 @@ class VisionProvider:
                 incoming + self.config["max_tokens"], self.config["context_tokens"]
             )
         if reserved > request.budget:
-            raise RuntimeError("cost_budget")
+            raise ProviderLimitError(
+                "cost_budget",
+                int(reserved * 1000000),
+                int(request.budget * 1000000),
+                "microEUR",
+            )
         messages = [{"role": "system", "content": prompt}]
         messages.extend(m.model_dump() for m in request.messages)
         if request.profile is not None:
@@ -196,7 +208,11 @@ class VisionProvider:
                     async for piece in response.content.iter_chunked(16384):
                         data.extend(piece)
                         if len(data) > 800000:
-                            raise RuntimeError("provider_response_limit")
+                            raise ProviderLimitError(
+                                "provider_response_limit", len(data), 800000, "bytes"
+                            )
             return json.loads(data)
+        except LimitError:
+            raise
         except (aiohttp.ClientError, ValueError):
             raise RuntimeError("provider_error") from None

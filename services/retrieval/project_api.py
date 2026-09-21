@@ -1,5 +1,8 @@
 """Bounded HTTP project boundary; all child operations carry a project scope."""
 
+from packages.limits import LimitError
+from packages.validation import describe_validation
+
 import logging
 import os
 import sqlite3
@@ -155,9 +158,20 @@ async def projects(request: Request, path: str = "") -> Response:
             async for piece in request.stream():
                 body.extend(piece)
                 if len(body) > 160000:
-                    return JSONResponse({"error": "body_limit"}, status_code=413)
+                    raise LimitError("body_limit", len(body), 160000, "bytes")
         result = await asyncio.to_thread(dispatch, request.method, path, bytes(body))
         return JSONResponse(result)
+    except LimitError as exc:
+        status = 413
+        return JSONResponse(
+            {"error": exc.code, "message": exc.detail}, status_code=status
+        )
+    except ValidationError as exc:
+        status = 422
+        return JSONResponse(
+            {"error": "invalid_request", "message": describe_validation(exc)},
+            status_code=status,
+        )
     except KeyError:
         status, code = 404, "not_found"
     except (ValidationError, ValueError, sqlite3.IntegrityError):

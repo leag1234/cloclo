@@ -1,6 +1,7 @@
 """Disk cache and conservative, atomic monthly search reservations."""
 
 from contextlib import contextmanager
+from packages.limits import LimitError
 from collections.abc import Iterator
 import hashlib
 import json
@@ -66,4 +67,9 @@ class Cache:
                 ).rowcount
                 != 1
             ):
-                raise ValueError("quota_exceeded")
+                used = db.execute(
+                    "SELECT used FROM quota WHERE month=?", (month,)
+                ).fetchone()[0]
+                raise LimitError(
+                    "quota_exceeded", used + credits, 900, "monthly search credits"
+                )

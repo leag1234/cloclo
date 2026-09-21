@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from services.retrieval.search import Gateway, rank
 from services.retrieval.store import Store
 from packages.evidence import whole_chunks
+from packages.limits import LimitError
 
 
 class Request(BaseModel):
@@ -16,7 +17,10 @@ class Request(BaseModel):
 
 
 def main() -> None:
-    request = Request.model_validate_json(sys.stdin.buffer.read(16001))
+    raw = sys.stdin.buffer.read(16001)
+    if len(raw) > 16000:
+        raise LimitError("retrieval_input_limit", len(raw), 16000, "bytes")
+    request = Request.model_validate_json(raw)
     store = Store(os.environ["ATLAS_RETRIEVAL_DSN"])
     chunks = rank(
         request.query,

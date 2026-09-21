@@ -1,5 +1,7 @@
 """CPU inference configured solely inside the model gateway (POC-A3)."""
 
+from packages.limits import LimitError
+
 import json
 import math
 import logging
@@ -18,11 +20,16 @@ RERANK_REVISION = "1427fd652930e4ba29e8149678df786c240d8825"
 
 def validate_texts(texts: list[str], maximum: int) -> None:
     if not 1 <= len(texts) <= maximum:
-        raise ValueError("invalid_cardinality")
-    if any(not t.strip() or len(t) > 32000 for t in texts):
+        raise LimitError(
+            "invalid_cardinality", len(texts), maximum, "items (minimum 1)"
+        )
+    for text in texts:
+        if len(text) > 32000:
+            raise LimitError("invalid_text", len(text), 32000, "characters")
+    if any(not t.strip() for t in texts):
         raise ValueError("invalid_text")
     if sum(map(len, texts)) > 128000:
-        raise ValueError("context_exceeded")
+        raise LimitError("context_exceeded", sum(map(len, texts)), 128000, "characters")
 
 
 class CPUModels:
@@ -77,7 +84,12 @@ class CPUModels:
         validate_texts([question], 1)
         validate_texts(texts, 64)
         if len(question) + sum(map(len, texts)) > 128000:
-            raise ValueError("context_exceeded")
+            raise LimitError(
+                "context_exceeded",
+                len(question) + sum(map(len, texts)),
+                128000,
+                "characters",
+            )
         values = self.ranker.predict(
             [(question, text) for text in texts],
             show_progress_bar=False,

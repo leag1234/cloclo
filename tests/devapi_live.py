@@ -53,7 +53,7 @@ def main() -> None:
                     "messages": [
                         {
                             "role": "user",
-                            "content": Path("prompts/dev-tool.txt").read_text(),
+                            "content": Path("tests/journeys/dev-tool.txt").read_text(),
                         }
                     ],
                     "tools": [

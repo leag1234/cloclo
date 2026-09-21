@@ -193,3 +193,7 @@ test-m23: ## exact recorded public HTTP journeys J39-J41
 .PHONY: verify-m24
 verify-m24: ## documents, contained file tools and actual rendering
 	@bash scripts/verify-m24.sh
+
+.PHONY: verify-m25
+verify-m25: ## general disposition and model-window conversation limits
+	@bash scripts/verify-m25.sh

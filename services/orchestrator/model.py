@@ -1,6 +1,7 @@
 """Model-independent client; provider selection and prices belong to the gateway."""
 
 from packages.profiles import PROFILES
+from packages.limits import LimitError
 
 import json
 from packages.tool_history import final_messages
@@ -36,7 +37,7 @@ class WireCall(BaseModel):
 
 class WireUsage(BaseModel):
     prompt_tokens: int = Field(ge=0, strict=True)
-    completion_tokens: int = Field(ge=0, le=19000, strict=True)
+    completion_tokens: int = Field(ge=0, le=48000, strict=True)
 
 
 class Observation(BaseModel):
@@ -56,6 +57,7 @@ class WireTurn(BaseModel):
         default=None, ge=0, le=Decimal("0.30"), allow_inf_nan=False, strict=False
     )
     reasoning: str = Field(default="", max_length=256000)
+    retry_completion_tokens: int = Field(default=0, ge=0, le=36000, strict=True)
     trace_tokens: int = Field(default=0, ge=0)
     answer_tokens: int = Field(default=0, ge=0)
     token_split_estimated: bool = False
@@ -90,6 +92,7 @@ class GatewayModel:
         self.provider_model = ""
         self.spent = Decimal(0)
         self.has_attachments = False
+        self.produces_files = False
         self.reasoning = ""
         self.trace_tokens = 0
         self.answer_tokens = 0
@@ -97,12 +100,18 @@ class GatewayModel:
         self.reasoning_retried = False
 
     def configure_quality(
-        self, profile: str, max_tokens: int, *, has_attachments: bool = False
+        self,
+        profile: str,
+        max_tokens: int,
+        *,
+        has_attachments: bool = False,
+        produces_files: bool = False,
     ) -> None:
         if profile not in PROFILES:
             raise ValueError("invalid_profile")
         self.profile, self.max_tokens = profile, max_tokens
         self.has_attachments = has_attachments
+        self.produces_files = produces_files
         self.reasoning_effort = "none"
 
     @property
@@ -111,7 +120,8 @@ class GatewayModel:
             Decimal(0),
             Decimal(
                 "0.30"
-                if self.has_attachments and self.profile is not None
+                if (self.has_attachments or self.produces_files)
+                and self.profile is not None
                 else "0.10"
                 if self.profile is not None
                 else "0.05"
@@ -128,6 +138,69 @@ class GatewayModel:
                 async with session.post(
                     url, json=payload, allow_redirects=False
                 ) as response:
+                    if response.status in (413, 429):
+                        error = json.loads(await response.content.read(512))
+                        if (
+                            isinstance(error, dict)
+                            and error.get("code") == "cost_budget"
+                            and error.get("unit") == "microEUR"
+                            and all(
+                                type(error.get(k)) is int and error[k] >= 0
+                                for k in ("measured", "limit")
+                            )
+                        ):
+                            raise GatewayError(
+                                "cost_budget",
+                                504,
+                                f"Cost reservation: {error['measured']} microEUR, remaining limit {error['limit']} microEUR; request ceiling "
+                                + (
+                                    "0.30"
+                                    if payload.get("has_attachments")
+                                    or payload.get("produces_files")
+                                    else "0.10"
+                                    if payload.get("profile")
+                                    else "0.05"
+                                )
+                                + " EUR",
+                            )
+                        if response.status == 429:
+                            if (
+                                isinstance(error, dict)
+                                and error.get("unit") in ("microEUR", "microEUR/hour")
+                                and all(
+                                    type(error.get(k)) is int and error[k] >= 0
+                                    for k in ("measured", "limit")
+                                )
+                            ):
+                                raise GatewayError(
+                                    "cost_budget",
+                                    429,
+                                    f"Reservation {error['measured']} {error['unit']}; limit {error['limit']} {error['unit']}",
+                                )
+                            raise GatewayError("provider_error", 429)
+                        if (
+                            isinstance(error, dict)
+                            and all(
+                                type(error.get(k)) is int and error[k] >= 0
+                                for k in ("measured", "limit")
+                            )
+                            and error.get("unit") == "bytes"
+                        ):
+                            raise GatewayError(
+                                "request_size_exceeded",
+                                413,
+                                f"Gateway limit: {error['measured']} {error.get('unit', 'bytes')}, limit {error['limit']} {error.get('unit', 'bytes')}",
+                            )
+                        if isinstance(error, dict) and all(
+                            type(error.get(k)) is int and error[k] >= 0
+                            for k in ("tokens", "limit")
+                        ):
+                            raise GatewayError(
+                                "context_exceeded",
+                                413,
+                                f"Conversation: {error['tokens']} tokens, limit {error['limit']} tokens",
+                            )
+                        raise GatewayError("request_size_exceeded", 413)
                     if response.status != 200:
                         if url.endswith(
                             ("/vision/complete", "/images/generate", "/images/start")
@@ -175,7 +248,9 @@ class GatewayModel:
                     async for piece in response.content.iter_chunked(16384):
                         data.extend(piece)
                         if len(data) > maximum:
-                            raise ValueError("gateway_response_limit")
+                            raise LimitError(
+                                "gateway_response_limit", len(data), maximum, "bytes"
+                            )
             value: object = json.loads(data)
             if not isinstance(value, dict):
                 raise ValueError("gateway_response_invalid")
@@ -309,6 +384,8 @@ class GatewayModel:
                 reasoning_effort=self.reasoning_effort,
                 budget_eur=str(self.allowance),
             )
+        if self.produces_files:
+            payload["produces_files"] = True
         if self.has_attachments:
             payload["has_attachments"] = True
         if self.observing:
@@ -361,9 +438,28 @@ class GatewayModel:
                 not self.profile
                 and result.usage.completion_tokens > self.configuration.max_tokens
             ):
-                raise ValueError("output_budget")
-            if self.profile and result.usage.completion_tokens > self.max_tokens + 3000:
-                raise ValueError("output_budget")
+                raise LimitError(
+                    "output_budget",
+                    result.usage.completion_tokens,
+                    self.configuration.max_tokens,
+                    "tokens",
+                )
+            retry_tokens = result.retry_completion_tokens
+            if retry_tokens > min(
+                result.usage.completion_tokens, 3 * (self.max_tokens + 3000)
+            ):
+                raise ValueError("invalid_retry_usage")
+            if (
+                self.profile
+                and result.usage.completion_tokens - retry_tokens
+                > self.max_tokens + 3000
+            ):
+                raise LimitError(
+                    "output_budget",
+                    result.usage.completion_tokens,
+                    self.max_tokens + 3000,
+                    "tokens including recovery",
+                )
             if self.sink is not None:
                 await self.sink(
                     {
@@ -402,8 +498,13 @@ class GatewayModel:
                 # without restarting the reasoning that already failed.
                 self.reasoning_effort = "none"
                 self.max_tokens = 3000
+        if not self.profile and result.cost_eur is not None:
+            if result.cost_eur > reserved.cost:
+                raise ValueError("invalid_provider_cost")
+            cost = result.cost_eur
         if (
             not self.profile
+            and result.cost_eur is None
             and result.observation is not None
             and result.observation.fallback
         ):

@@ -1,5 +1,7 @@
 """Normalize bounded chat uploads before the strict provider image schema."""
 
+import logging
+
 import base64
 import io
 from typing import Any
@@ -14,6 +16,7 @@ class UploadError(ValueError):
         self.limit = limit
         self.unit = unit
         super().__init__(f"{code}: {measured} {unit}, limit {limit} {unit}")
+        logging.getLogger(__name__).warning(str(self))
 
 
 def normalize_uploads(value: Any) -> tuple[Any, list[dict[str, int]]]:

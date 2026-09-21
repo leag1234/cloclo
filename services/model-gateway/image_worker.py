@@ -13,6 +13,12 @@ from time import monotonic
 from typing import Any
 
 
+class WorkerLimit(ValueError):
+    def __init__(self, measured: int, limit: int, unit: str) -> None:
+        self.data = {"measured": measured, "limit": limit, "unit": unit}
+        super().__init__(f"Image input: {measured} {unit}; limit {limit} {unit}")
+
+
 def place_pipeline(pipeline: Any, memory_bytes: int) -> None:
     # BF16 weights plus encoders exceed a single L4's usable VRAM.
     if memory_bytes < 40 * 1024**3:
@@ -48,10 +54,14 @@ def main() -> None:
             try:
                 self.connection.settimeout(5)
                 length = int(self.headers.get("Content-Length", "0"))
+                if length > 16000:
+                    raise WorkerLimit(length, 16000, "bytes")
                 if not 0 < length <= 16000:
                     raise ValueError("invalid_input")
                 data = json.loads(self.rfile.read(length))
                 prompt = data["prompt"]
+                if isinstance(prompt, str) and len(prompt.strip()) > 2000:
+                    raise WorkerLimit(len(prompt.strip()), 2000, "characters")
                 if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 2000:
                     raise ValueError("invalid_input")
                 seed = data.get("seed")
@@ -62,11 +72,11 @@ def main() -> None:
                 steps = data.get("steps", 4)
                 if steps not in (4, 8):
                     raise ValueError("invalid_steps")
-                if (
-                    len(pipeline.tokenizer_2(prompt, truncation=False)["input_ids"])
-                    > 512
-                ):
-                    raise ValueError("prompt_too_long")
+                tokens = len(
+                    pipeline.tokenizer_2(prompt, truncation=False)["input_ids"]
+                )
+                if tokens > 512:
+                    raise WorkerLimit(tokens, 512, "tokens")
                 started = monotonic()
                 timer.start()  # Kill CUDA work too, even if a client disconnects.
                 result = pipeline(
@@ -91,6 +101,13 @@ def main() -> None:
                     }
                 ).encode()
                 self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except WorkerLimit as exc:
+                body = json.dumps(exc.data).encode()
+                self.send_response(413)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()

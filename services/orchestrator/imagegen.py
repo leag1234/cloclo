@@ -6,6 +6,7 @@ import os
 import time
 from decimal import Decimal
 from packages.images import ImageURL
+from packages.limits import ProviderLimitError
 from services.orchestrator.image_store import store
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.model import GatewayError, GatewayModel
@@ -29,8 +30,16 @@ async def process_image(
         "simple",
     )
     item.cout_eur = float(budget)
-    if not 0 < budget <= Decimal("0.05") or not 0 < timeout <= 120:
-        raise RuntimeError("cost_budget")
+    if not budget.is_finite():
+        raise RuntimeError("cost_budget: expected a finite monetary amount")
+    if not 0 < budget <= Decimal("0.05"):
+        raise ProviderLimitError(
+            "cost_budget", int(budget * 1000000), 50000, "microEUR"
+        )
+    if not 0 < timeout <= 120:
+        raise ProviderLimitError(
+            "deadline", int(timeout * 1000), 120000, "milliseconds"
+        )
     try:
         if os.environ.get("ATLAS_IMAGE_ON_DEMAND") == "1":
             # Provision through the gateway; M13 accounts for loading separately.
