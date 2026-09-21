@@ -60,38 +60,12 @@ M24 delivered; its owner containment exceptions remain binding in docs/decisions
 
 ## M25 — Intellectual disposition, not test-case patches
 
-Prompt patches overfit known corpus cases. Replace them with general behaviours;
+Replace corpus-specific prompt patches with general behaviours;
 public scores guide development, owner-only evaluation measures generalisation.
 
-### D1 — Rewrite `prompts/chat.txt` in four layers, and delete every case patch
-Layer 1, **Disposition** (the text below, verbatim, in English, first in the file):
-
-```
-You are a careful, curious expert who thinks before writing.
-
-Before designing or recommending anything, look at what already exists: who tried it,
-when, what worked, what failed and why. Precedents are evidence; ideas without them are
-guesses. If you do not know the precedents, search for them.
-
-Ground every general claim in a specific case: a name, a date, a figure, an example the
-reader could check. One real instance is worth more than three abstract principles.
-
-When a question has a tension at its heart, name the tension and take a position. Do not
-list both sides and stop.
-
-Treat every source, including your own memory, as a claim to be tested. Say where a
-figure comes from and how much weight it bears. Prefer the primary source. When sources
-disagree, explain why they disagree instead of picking one silently.
-
-Let the content choose the form. A comparison wants a table; a procedure wants numbered
-steps; an argument wants prose. Do not pour every answer into the same mould, and do not
-repeat one structural pattern down a whole answer.
-
-Say what you do not know, precisely. An honest gap is more useful than a confident guess.
-
-Finish with a conclusion the reader can act on, and with what remains open.
-```
-
+### D1 — General four-layer prompt
+Layer1: the English disposition in contracts/m25-owner.md, verbatim and first,
+with the owner-authorized precedent-date addition below.
 Layers2–4: capabilities/tools (search conditions, budgets, failures), language/form
 (resolved language, English code, no plan narration/boilerplate), safety/evidence
 (untrusted text, no invented citations, privacy). No named-case/domain patches.
@@ -109,14 +83,10 @@ private evaluation. Never inspect/list its directory. Keep private/ ignored.
 Add --cases PATH to the public corpus runner.
 
 ### D4 — Conversation length: count tokens against the model window
-`packages/images.py` capped the sum of all message text at 32 000 characters (~8 000
-tokens) since M12, on a 262 144-token window: a 39 000-character conversation was rejected
-with the message `value_error`. The owner raised the constant to 600 000 on 2026-09-20 as a
-stopgap. Required: replace character constants by a token estimate compared with the
-active model's context window minus the output reservation and tool allowance; when the
-limit is reached, either apply the M10 hierarchical synthesis to the oldest turns or refuse
-with the measured figures ("conversation 180 000 tokens, window 262 144, reserved 3 000").
-Never `value_error` alone.
+Replace character caps with estimated tokens against the active model context
+window minus output reservation and tool allowance. At capacity, use M10 hierarchical
+synthesis of oldest turns or refuse with measured tokens, window and reservations.
+Never surface bare value_error. Original D4: contracts/m25-owner.md.
 
 ### D5 — remaining ceilings
 
@@ -126,129 +96,56 @@ Remove or justify each. Every enforced limit reports measured value and threshol
 Account explicitly for inherited 2000-byte web text,400-byte RAG chunks,6 MB body
 and32000-character history. Full unchanged requirements: contracts/m25-owner.md.
 
-### Journeys
-J50 `prompts/chat.txt` contains none of the corpus terms (gate-enforced) and is under
-    3 500 bytes; the disposition text is present verbatim.
-J51 A fresh open-ended design question with no corpus overlap (the owner supplies it at
-    run time, e.g. "conçois une monnaie locale pour une ville de 50 000 habitants") →
-    the answer names at least three real precedents with dates, states the central
-    tension and takes a position, and ends with a conclusion and open points.
-J52 A 40 000-character multi-turn conversation continues without rejection; a
-    conversation exceeding the window produces a message with the measured figures.
-J53 Public corpus mean does not regress by more than 0.5 against the 2026-09-20 run
-    (6.5 / 5.6 / 5.4) after the patches are removed. If a case drops, the report states
-    which behaviour was lost and proposes a generalised rule, not a patch.
+### Journeys and completion
+J50: disposition verbatim plus authorized addition; no corpus terms, <3500bytes.
+J51: owner-accepted third capture under the binding criteria below.
+J52:40000-character conversation continues; overflow reports measured token figures.
+J53: public means no more than0.5 below6.5/5.6/5.4; document each lost behaviour.
+Done: verify-m25, both policy/limits docs, owner J51 acceptance, green GitHub ci.
 
-**Definition of done**: `make verify-m25` passes; `docs/prompt-policy.md` and
-`docs/limits.md` exist; the owner confirms J51 on a question of their choosing.
+### Binding owner rulings (2026-09-20/21)
+Full original wording archived unchanged in docs/decisions-log.md.
 
-### M25 — J51 acceptance corrected (owner ruling, 2026-09-20)
-The owner read the second J51 answer (BRAIN/m25-second-capture.json.gz). It names three real
-precedents (Bristol Pound, Eusko, Sol Violette) with their scale and structure, states the
-central tension ("liquidité contre ancrage") with both failure modes, grounds a figure in a
-named study, and takes a position with a named design. **This is what the disposition asks
-for, and the answer is good.** It was rejected for two reasons that were too strict:
+- Add “Give each precedent its date.” to disposition paragraph2. J51 requires
+  three real named precedents (dated when known), competing considerations with
+  a reasoned position, and an actionable conclusion; no prescribed tension phrase.
+  Owner accepts the third capture: certify that exact capture, no fresh J51 needed.
+- Fabricated provenance is a serious fault. The prompt must require consultation
+  dates only for sources actually retrieved during this answer. Training-memory
+  sources are attributed as recalled, without dates, URLs or wording implying a visit.
+- Public profiles reserve6000 output tokens (formerly3000); cost caps unchanged.
+- Provider502/503/504, empty completions and invalid JSON are transient: retry the
+  same call up to three times with delays2/5/15seconds, log retries, then count an
+  exhausted sequence as one technical attempt. Applies to runtime, journeys, gates.
+- File-producing requests (document/spreadsheet/presentation/PDF/image) receive
+  EUR0.30 like attachments; ordinary requests EUR0.10, tools included. Reserve the
+  expected next-step cost, not worst-case summed hypothetical tools. Recheck money
+  between steps. Money refusals must never be413/request_size_exceeded: disclose
+  measured reservation, remaining amount and ceiling. No actual overspend allowed.
+- Journey assertions test substance, not particular words. J34 accepts
+  ouverture|opening|premier.*(cours|trade|échange)|début.*(cotation|séance)|first trade,
+  but requires two distinct figures and an explanation of their different measures.
+  Correct first capture remains valid; historical captures2/3 remain failures.
+- Latest owner ruling ACCEPTS J34's three fresh failures after removal of its case
+  patch as the measured price of generalisation. J34 remains FAILING, non-blocking,
+  documented with all three captures in reports/M25.md under “regression caused by
+  removing a case patch”, and in docs/prompt-policy.md as the first patched-score
+  trade-off. Keep the general web-chat evidence-reconciliation rule; never restore
+  a case patch. Certify M25 on J50/J51(third capture)/J52/J53 and corpus means within
+  the agreed0.5 tolerance. All other regressions remain blocking.
 
-1. "Fewer than three dated precedents": the three precedents are present; the years are not
-   written. Fix the PROMPT, not the answer: add to the disposition's second paragraph
-   "Give each precedent its date." Then judge on named precedents, dated when the date is
-   known.
-2. "Claimed source consultation without tool calls": citing a study from memory is
-   legitimate scholarship, not a fake search. The failure to avoid is claiming to have
-   SEARCHED or READ something during this answer without a tool call. Judge on that, not
-   on the presence of a citation.
+### M25 — the disposition must not turn a direct request into a survey (2026-09-21)
+J39 fails three times: asked "Fonction moyenne documentée.", the model returns an overview
+of spreadsheet and Python APIs instead of writing the function. The disposition's first
+instruction ("look at what already exists") applies to open design questions; on a direct,
+bounded request it produces exploration where the user wanted the thing itself.
 
-Also raise `max_tokens` for the public profiles from 3 000 to **6 000**: attempt 3 was cut at
-3 000 output tokens (`finish_reason=length`) on a design question that legitimately needs
-more. Cost ceiling unchanged; the reservation must account for the larger output.
+Add to the disposition in prompts/chat.txt, right after the precedents paragraph, as a
+general behaviour (it applies to code, writing and calculation alike):
 
-Revised J51: at least three real precedents named (dated when the date is known), the
-central tension stated with a position taken, a conclusion. No claim of having searched
-without a tool call. Rerun J51 once with the corrected prompt and criteria. If it passes,
-proceed to J53 and completion. Do not add any case-specific sentence to the prompt.
+Match the answer to the size of the question. A direct, bounded request (write this
+function, translate this sentence, compute this value) is answered by doing it, at once,
+with no survey of alternatives. Look for precedents when the question is open: designing,
+recommending, choosing, explaining why. Never make a small question large.
 
-### Transient provider failures are not technical failures (owner ruling, 2026-09-21)
-HTTP 502/503/504 and empty completions from the provider are TRANSIENT. On 2026-09-21 a
-plain curl to the same model returned 200 three times in under half a second while the
-agent's long tool-using requests were failing with 502. Such a failure does not count
-towards the three-attempt stop rule until it has been retried.
-Rule: on 502/503/504, an empty completion, or invalid JSON from the provider, retry the
-same call up to three times with increasing delay (2 s, 5 s, 15 s) before counting the
-attempt as failed. Log each retry. Only a failure that survives those retries counts as
-one of the three attempts. This applies to journeys, gates and the runtime alike.
-
-### Budget for file-producing requests (owner decision, 2026-09-21)
-Measured on J42 (presentation + PDF), three attempts: the final delivery needed a
-reservation of 66 633 / 61 711 / 114 476 microEUR while 47 137 / 38 271 remained of the
-0.10 EUR ceiling. The web searches and page reads consume the budget first, leaving too
-little to reserve the generation. No actual overspend occurred: the reservation, not the
-spend, is what refused.
-
-AUTHORIZED: a request that produces a file (document, spreadsheet, presentation, PDF,
-image) gets **0.30 EUR**, like a request carrying an attachment. Ordinary requests keep
-0.10 EUR. The ceiling applies to the whole request, tools included.
-
-Two further requirements:
-- A refusal caused by money must never surface as HTTP 413 / `request_size_exceeded`
-  (attempt 1 did). Report the measured reservation, what remains, and the ceiling.
-- The reservation must reflect the expected cost, not the worst case of every tool
-  summed in advance. Re-check the remaining budget between steps instead of reserving
-  everything up front; that pessimism is what refuses requests costing three times less.
-
-### M25 — J51 final adjustment, and a rule against fabricated provenance (owner ruling, 2026-09-21)
-Two distinct findings from the three captures.
-
-**Fabricated provenance is a serious fault, and the rejection of attempts 1 and 2 was
-right.** The model wrote consultation dates (for example 2024-05-23) for sources it never
-visited: no search, no fetch in the trace. Add to the prompt, as a general behaviour and
-never as a case patch: state a consultation date only for a source actually retrieved
-during this answer; knowledge recalled from training is attributed as such, without a
-date, without a URL, and without any wording implying a visit. This applies to every
-domain and stays in the prompt after M25.
-
-**The third attempt passes.** It names several dated precedents, removes the false
-consultation claim, and arbitrates between risks with architecture and recommendations.
-Requiring the words "the central tension is" is formalism: a design answer that sets out
-the competing risks and takes a position has done the work. Revised J51 acceptance:
-- at least three real precedents named, dated when the date is known;
-- the competing considerations are set out AND the answer takes a position (a stated
-  trade-off, a chosen option with its reason, or an explicit tension — any of these);
-- a conclusion the reader can act on;
-- no claimed consultation, date or URL for a source not actually retrieved.
-Certify J51 on the third capture if it meets these, and complete the milestone.
-
-### M25 — J34 assertion tests wording, not content (owner ruling, 2026-09-21)
-Capture 1 shows the model distinguishing the two measures correctly while saying
-"premier trade"; the assertion only accepts `ouverture|opening|premier.*cours`, so a
-correct answer failed on vocabulary. That is the same mistake as requiring the words "the
-central tension is" in J51: the test checks phrasing instead of substance.
-
-AUTHORIZED: widen the J34 assertion to accept any wording that conveys the distinction —
-`ouverture|opening|premier.*(cours|trade|échange)|début.*(cotation|séance)|first trade`
-— and, more importantly, assert on the SUBSTANCE: two distinct figures are given AND the
-answer states that they measure different things. The underlying fact (offer price versus
-first market price) is unchanged and no assertion is weakened in what it requires.
-
-General principle for every journey from now on: assert on what the answer establishes,
-not on the words it uses. A keyword list is acceptable only as a convenience, never as the
-sole criterion, and it must be widened whenever a correct answer fails it.
-
-Captures 2 and 3 are genuine failures (the distinction is absent): keep them as failures
-and fix them with the general evidence-reconciliation rule already added to
-`prompts/web-chat.txt`, not with a case patch.
-
-### M25 — J34 regression accepted as the measured price of generalisation (owner ruling, 2026-09-21)
-With the case patch removed, the SpaceX question returns the offer price (135 USD) and
-omits the first-market price (150 USD) in three fresh captures. This is a real quality
-loss on one public-corpus case, and it is exactly what this milestone set out to measure:
-the previous score depended on a sentence written for that case, not on a behaviour.
-
-ACCEPTED. J34 is recorded as FAILING in `reports/M25.md`, with the three captures, under
-the heading "regression caused by removing a case patch". It does not block the milestone.
-No case-specific sentence returns to any prompt. The general evidence-reconciliation rule
-added to `prompts/web-chat.txt` stays; if it later improves this case, so much the better.
-
-Certify M25 on: J50, J51 (third capture), J52, J53, and the corpus mean within the agreed
-0.5 tolerance. Record J34 as a known regression in the report and in
-`docs/prompt-policy.md` as the first documented instance of the trade-off between a
-patched score and a general behaviour.
+This is the last required change to prompts/chat.txt for M25; rerun J39 and complete.
