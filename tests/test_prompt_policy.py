@@ -7,7 +7,7 @@ import unittest
 
 class PromptPolicyTests(unittest.TestCase):
     def test_disposition_and_size(self) -> None:
-        owner = Path("contracts/m25-owner.md").read_text()
+        owner = Path("contracts/m25-owner.txt").read_text()
         disposition = owner.split("Layer 1, **Disposition**")[1].split("```")[1].strip()
         disposition = disposition.replace(
             "guesses. If you do not know the precedents, search for them.",

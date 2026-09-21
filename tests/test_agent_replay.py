@@ -1,17 +1,32 @@
 """Replay cannot silently accept changed prompts, calls or incomplete records."""
 
 import unittest
+import yaml
 import gzip
 import json
 import tempfile
 from pathlib import Path
 from decimal import Decimal
 from typing import Any
-from agent_gate_eval import ReplayModel, ReplayTools, select_cases, load_record
+from agent_gate_eval import ReplayModel, ReplayTools, select_cases, load_record, replay
 from services.orchestrator.loop import Call
 
 
 class ReplayTests(unittest.IsolatedAsyncioTestCase):
+    async def test_budget_stop_keeps_measured_diagnostic_and_exact_result(self) -> None:
+        cases = yaml.safe_load(Path("evals/golden/e4_tool_calling.yaml").read_text())
+        case = next(c for c in cases if c["id"] == "E4-020")
+        results = await replay(Path("tests/cassettes/agent"), [case])
+        self.assertIn("Tokens reserved: 8360; limit 16384", results[0].text)
+        self.assertIn("Elapsed: 0.000 seconds; limit 120.000 seconds", results[0].text)
+        record = load_record(Path("tests/cassettes/agent"), case["id"])
+        record["result"]["tokens"] = 1
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            (path / (case["id"] + ".json")).write_text(json.dumps(record))
+            with self.assertRaisesRegex(AssertionError, "recorded_result_changed"):
+                await replay(path, [case])
+
     def record(self) -> dict[str, Any]:
         return {
             "configuration": {

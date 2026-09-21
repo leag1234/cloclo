@@ -14,8 +14,7 @@ secrets, dedicated project, costs and cleanup. GPU2 EUR/h,30 EUR/milestone;
 bounded risk accepted with alerts. Run infra/gpu-down.sh at session end.
 
 Requests: <=10 tools; budgets below. Image loading is separate (contracts/m13,
-M20 startup wait). Declare live/replay honestly; use real recordings. Do not
-re-verify completed milestones without request/regression; report BRAIN-based skips.
+M20 startup wait). Declare live/replay honestly; use real recordings. Do not re-verify completed milestones without request/regression; report BRAIN-based skips.
 CI regression gates remain mandatory.
 
 Update BRAIN before risk/session end; BLOCKERS on blockage.
