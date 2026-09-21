@@ -5,6 +5,7 @@ import asyncio
 import hashlib
 import json
 import os
+import time
 from dataclasses import asdict
 from pathlib import Path
 from threading import Thread
@@ -67,8 +68,19 @@ async def record(case: dict[str, Any], url: str) -> str:
     model.records = []
     tools = RecordingTools(case)
     prompt = Path("prompts/agent.txt").read_text()
+    clock_samples: list[float] = []
+
+    def clock() -> float:
+        value = time.monotonic()
+        clock_samples.append(value)
+        return value
+
     result = await run(
-        Query(question=case["input"], lang=case["lang"]), model, tools, prompt
+        Query(question=case["input"], lang=case["lang"]),
+        model,
+        tools,
+        prompt,
+        clock=clock,
     )
     output = {
         "id": case["id"],
@@ -80,6 +92,7 @@ async def record(case: dict[str, Any], url: str) -> str:
         "model": model.records,
         "tools": tools.records,
         "result": asdict(result),
+        "clock_samples": clock_samples,
     }
     path = Path("BRAIN/agent-recordings") / (case["id"] + ".json")
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -95,9 +95,22 @@ async def replay(directory: Path, cases: list[dict[str, Any]]) -> list[Result]:
         ):
             raise AssertionError("stale_tool_recording")
         model, tools = ReplayModel(record), ReplayTools(record)
+        samples = iter(record["clock_samples"]) if "clock_samples" in record else None
+
+        def clock() -> float:
+            # Legacy recordings contain no timing evidence. Their replay clock
+            # is fixed; newer captures preserve every observed clock reading.
+            return float(next(samples)) if samples is not None else 0.0
+
         result = await run(
-            Query(question=case["input"], lang=case["lang"]), model, tools, prompt
+            Query(question=case["input"], lang=case["lang"]),
+            model,
+            tools,
+            prompt,
+            clock=clock,
         )
+        if samples is not None and next(samples, None) is not None:
+            raise AssertionError("unused_clock_recording")
         if model.count != len(record["model"]) or tools.count != len(record["tools"]):
             raise AssertionError("unused_recording")
         actual = json.loads(json.dumps(asdict(result), default=str))

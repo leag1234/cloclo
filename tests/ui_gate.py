@@ -67,7 +67,10 @@ def main() -> None:
     ui = ExitStack()
     try:
         with (
-            patch.dict(os.environ, {**provider_env, "GPU_LOCAL": "0"}),
+            patch.dict(
+                os.environ,
+                {**provider_env, "GPU_LOCAL": "0", "ATLAS_SEARCH_PROVIDER": "tavily"},
+            ),
             patch.object(
                 AgentProvider, "configuration", return_value=archive["configuration"]
             ),

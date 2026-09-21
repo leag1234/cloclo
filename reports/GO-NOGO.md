@@ -20,16 +20,16 @@ Sources : reports/bench.json.gz, reports/demo.json.gz ; évaluation et calibrati
 | Suite | Score normalisé |
 |---|---:|
 | E1 | 0.9750 |
-| E2 | 0.9600 |
+| E2 | 1.0000 |
 | E3 | 1.0000 |
 | E4 | 0.9000 |
-| E5 | 0.9429 |
+| E5 | 1.0000 |
 | E6 | 0.8800 |
 | E7 | 1.0000 |
 | E8 | 1.0000 |
 | E9 | 0.8400 |
 
-Calibration croisée : κ=0.5288. GO qualité M5 : False.
+Calibration croisée : κ=0.7872. GO qualité M5 : False.
 
 Le micro-bench mesure le serverless, pas le GPU local. Les parcours RAG/web sont des observations unitaires, pas une distribution de charge. Les durées de rejeu CI ne sont pas des temps d'inférence.
 
