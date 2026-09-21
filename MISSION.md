@@ -176,3 +176,21 @@ Rule: on 502/503/504, an empty completion, or invalid JSON from the provider, re
 same call up to three times with increasing delay (2 s, 5 s, 15 s) before counting the
 attempt as failed. Log each retry. Only a failure that survives those retries counts as
 one of the three attempts. This applies to journeys, gates and the runtime alike.
+
+### Budget for file-producing requests (owner decision, 2026-09-21)
+Measured on J42 (presentation + PDF), three attempts: the final delivery needed a
+reservation of 66 633 / 61 711 / 114 476 microEUR while 47 137 / 38 271 remained of the
+0.10 EUR ceiling. The web searches and page reads consume the budget first, leaving too
+little to reserve the generation. No actual overspend occurred: the reservation, not the
+spend, is what refused.
+
+AUTHORIZED: a request that produces a file (document, spreadsheet, presentation, PDF,
+image) gets **0.30 EUR**, like a request carrying an attachment. Ordinary requests keep
+0.10 EUR. The ceiling applies to the whole request, tools included.
+
+Two further requirements:
+- A refusal caused by money must never surface as HTTP 413 / `request_size_exceeded`
+  (attempt 1 did). Report the measured reservation, what remains, and the ceiling.
+- The reservation must reflect the expected cost, not the worst case of every tool
+  summed in advance. Re-check the remaining budget between steps instead of reserving
+  everything up front; that pessimism is what refuses requests costing three times less.
