@@ -81,7 +81,8 @@ bad=[k for k in prev if d.get(k) is not True and k not in ACCEPTED_REGRESSIONS]
 if bad: print("::error::verify-m22: regression on earlier journeys:", bad); sys.exit(1)
 miss=[k for k in new if k not in d]
 if miss: print(f"::error::verify-m22: report does not cover: {miss}"); sys.exit(1)
-fails=[f"{k}: {m}" for k,m in new.items() if d.get(k) is not True]
+# J34 is an owner-accepted, documented regression (M25 ruling 2026-09-21).
+fails=[f"{k}: {m}" for k,m in new.items() if d.get(k) is not True and k not in ACCEPTED_REGRESSIONS]
 if fails:
     print("::error::verify-m22: journeys failed:")
     for f in fails: print("  -", f)
