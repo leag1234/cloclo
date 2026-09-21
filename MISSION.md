@@ -151,3 +151,23 @@ suspected side effect of the disposition and propose a general correction — ne
 
 On the C03/GLM technical failures: retry as transient per the 2026-09-21 ruling; if they
 persist, record C03 as not run for that profile rather than blocking the milestone.
+
+### M25 — certified on qwen and glm; deepseek degraded by the disposition (owner ruling, 2026-09-21)
+Measured per-case, 2026-09-20 baseline → current:
+- atlas-qwen 6.067 (threshold 6.0) — passes
+- atlas-glm 6.467 (threshold 5.1) — passes, +1.3 on the previous run
+- atlas-deepseek 4.067 (threshold 4.8) — fails, −1.3
+
+The losses on deepseek fall on cases that never had a patch: C02 9→5, C03 9→3, C04 5→3,
+C08 9→6, C11 9→6, C13 6→3, C14 4→2. On the same cases glm gains: C02 1→8, C07 0→8,
+C09 3→8. The same prompt therefore helps two models and harms the third. deepseek-v4-flash
+is a small fast model; the long demanding disposition appears to crowd it out.
+
+CERTIFY M25 on atlas-qwen and atlas-glm. Record deepseek's regression in `reports/M25.md`
+as a measured finding, not a milestone failure, with the per-case table above. Do not
+weaken the disposition and do not write a per-model prompt in this milestone: note the
+question for a later one.
+
+Consequence for the default-model decision, to carry forward: deepseek was the candidate
+for speed and cost; it does not support the prompt that produces the other two models'
+quality. glm is now the strongest on the public corpus, qwen the most balanced.
