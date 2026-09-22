@@ -1,6 +1,7 @@
 """Loopback OpenAI-compatible adapter with one journal row on every outcome."""
 
 from packages.profiles import PROFILES
+from packages.limits import LimitError
 
 import asyncio
 import json
@@ -11,6 +12,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import ValidationError
+from packages.validation import describe_validation
 from packages.image_upload import UploadError
 from services.orchestrator.image_store import prepare_uploads
 import html
@@ -132,12 +134,7 @@ async def chat(request: Request) -> Response:
                 status, code, detail = 413, exc.code, str(exc)
             except ValidationError as exc:
                 status, code = 400, "invalid_request"
-                # Do not reflect Pydantic inputs/context: these can contain image
-                # data or credentials. Types and numeric bounds are safe.
-                failures = exc.errors(
-                    include_input=False, include_context=False, include_url=False
-                )
-                detail = "; ".join(str(e["type"]) for e in failures)
+                detail = describe_validation(exc)
             except json.JSONDecodeError:
                 status = 413 if len(body) > 160000 else 400
                 code = "invalid_request"
@@ -162,10 +159,17 @@ async def chat(request: Request) -> Response:
             if item.state != "done":
                 status = 502 if "provider_error" in item.erreurs else 504
                 code = "request_stopped"
+                detail = item.reponse
     except asyncio.CancelledError:
         status, code = 499, "cancelled"
     except GatewayError as exc:
         status, code, detail = exc.status, exc.code, exc.detail
+    except LimitError as exc:
+        status, code, detail = (
+            (429 if exc.unit in {"microEUR", "micro EUR"} else 502),
+            exc.code,
+            exc.detail,
+        )
     except TimeoutError:
         status, code = 504, "timeout"
         limit = (

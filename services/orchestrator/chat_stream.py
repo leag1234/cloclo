@@ -11,6 +11,8 @@ import re
 import time
 
 from fastapi.responses import StreamingResponse
+from packages.file_intent import produces_file
+from packages.limits import LimitError
 
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.deadline import request_deadline
@@ -25,6 +27,11 @@ def response(
     started: float,
     process: Callable[[ChatRequest, Interaction], Awaitable[None]],
 ) -> StreamingResponse:
+    ceiling = (
+        "0.30"
+        if payload.documents or produces_file(payload.messages[-1].text)
+        else "0.10"
+    )
     language = payload.ui_locale
     labels = json.loads(Path("prompts/progress.json").read_text())
     progress = str(labels.get(language, labels["en"])).split(":", 1)[0].strip()
@@ -298,6 +305,19 @@ def response(
                         }
                     }
                 )
+            except LimitError as exc:
+                item.state = "error"
+                item.erreurs.append(exc.code)
+                item.rejection = {"code": exc.code, "message": exc.detail}
+                await queue.put(
+                    {
+                        "error": {
+                            "code": exc.code,
+                            "type": exc.code,
+                            "message": exc.detail,
+                        }
+                    }
+                )
             except Exception:
                 item.state = "error"
                 item.erreurs.append("stream_error")
@@ -305,7 +325,7 @@ def response(
                     "The provider did not complete a valid answer. "
                     f"Elapsed {time.monotonic() - started:.3f}s "
                     f"(limit {payload.timeout_seconds:.0f}s); "
-                    f"reserved cost {item.cout_eur:.6f} EUR (limit 0.10 EUR)."
+                    f"reserved cost {item.cout_eur:.6f} EUR (limit {ceiling} EUR)."
                 )
                 item.rejection = {"code": "stream_error", "message": detail}
                 logging.getLogger(__name__).warning(json.dumps(item.rejection))
@@ -399,6 +419,8 @@ def response(
                 )
                 if first_content:
                     answer_started = True
+                    output["event"] = status_event(done=True)
+                elif event.get("finish"):
                     output["event"] = status_event(done=True)
                 elif not answer_started and (
                     "atlas" in event

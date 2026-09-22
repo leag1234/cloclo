@@ -51,7 +51,7 @@ class MeasurementTests(unittest.TestCase):
                 os.chdir(cwd)
 
     def test_live_recording_isolated_and_logger_restored(self) -> None:
-        cases = yaml.safe_load(Path("prompts/demo.yaml").read_text())
+        cases = yaml.safe_load(Path("tests/journeys/demo.yaml").read_text())
         records = {
             c["id"]: load_record(Path("tests/cassettes/demo"), c["id"]) for c in cases
         }
@@ -76,9 +76,9 @@ class MeasurementTests(unittest.TestCase):
             try:
                 os.chdir(tmp)
                 Path("BRAIN/agent-recordings").mkdir(parents=True)
-                Path("prompts").mkdir()
+                Path("tests/journeys").mkdir(parents=True)
                 Path("reports").mkdir()
-                Path("prompts/demo.yaml").write_text(yaml.safe_dump(cases))
+                Path("tests/journeys/demo.yaml").write_text(yaml.safe_dump(cases))
                 asyncio.run(m6_demo.live(cases, "http://unused.invalid"))
                 m6_demo.archive_measurements()
                 self.assertEqual(

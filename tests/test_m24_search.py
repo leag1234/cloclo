@@ -1,6 +1,7 @@
 """Device timing research and quota disclosure through the public HTTP boundary."""
 
 from decimal import Decimal
+import json
 import os
 import tempfile
 import unittest
@@ -14,6 +15,19 @@ from services.orchestrator.search_policy import required_research, corpus_allowe
 
 
 class SearchJourneyTests(unittest.TestCase):
+    def test_research_does_not_replace_user_question_with_a_case_template(self) -> None:
+        questions = (
+            "What is the IPO price of this company?",
+            "Sur un Amstrad CPC, quels sont les timings de OUTI et OTIR ?",
+            "Quel est le prix de ce traitement ?",
+            "Compare the current sensor specifications.",
+        )
+        for question in questions:
+            with self.subTest(question=question):
+                calls = required_research(question, "fr", device_timings=True)
+                self.assertEqual(len(calls), 1)
+                self.assertEqual(json.loads(calls[0].arguments)["query"], question)
+
     def test_explicit_corpus_exclusions_are_enforced_across_phrasings(self) -> None:
         for question in (
             "Tu ne fais pas appel à la mémoire présente dans notre environnement.",
@@ -92,3 +106,11 @@ class SearchJourneyTests(unittest.TestCase):
             self.assertEqual(reply.status_code, 503)
             self.assertIn("quota exhausted", reply.json()["error"]["message"])
             complete.assert_not_called()
+            self.assertIn(
+                "web_fetch",
+                [
+                    function.get("name")
+                    for tool in model.tools
+                    if isinstance(function := tool.get("function"), dict)
+                ],
+            )

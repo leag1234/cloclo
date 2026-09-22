@@ -2,7 +2,7 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import aclosing
-from decimal import Decimal, ROUND_FLOOR
+from decimal import Decimal, ROUND_FLOOR, ROUND_CEILING
 import json
 import asyncio
 import copy
@@ -11,6 +11,10 @@ from time import monotonic
 from pathlib import Path
 
 from agent_provider import AgentProvider, AgentRequest, Usage, classify
+from packages.context_limit import ContextExceeded
+from provider_retry import RetryLedger, TransientProviderError, retry_stream
+from packages.limits import LimitError, ProviderLimitError
+
 from packages.tool_history import (
     final_messages,
     is_history_answer,
@@ -44,8 +48,13 @@ def input_bound(
             byte_count += int(info["bytes"])
             pixels += width * height
             image["url"] = "[image]"
-    if count > 4 or byte_count > 4 * 1024 * 1024 or pixels > 16000000:
-        raise ValueError("image_size_exceeded")
+    for measured, maximum, unit in (
+        (count, 4, "images"),
+        (byte_count, 4 * 1024 * 1024, "bytes"),
+        (pixels, 16000000, "pixels"),
+    ):
+        if measured > maximum:
+            raise LimitError("image_size_exceeded", measured, maximum, unit)
     # Reserve the larger representation before I/O, including answer-only JSON
     # escaping. Tool schemas are retained in this bound even if not transmitted.
     return (
@@ -90,6 +99,7 @@ async def stream_quality(
     incoming = input_bound(request.messages, request.tools)
     spent = Decimal(0)
     prompt_tokens = completion_tokens = trace_tokens = answer_tokens = 0
+    retry_completion_tokens = 0
     reasoning = ""
     estimated = retried = fallback = False
     started = monotonic()
@@ -109,12 +119,11 @@ async def stream_quality(
             affordable_roles = [
                 candidate
                 for candidate in dict.fromkeys(policy.public_profiles.values())
-                if incoming + request.max_tokens
+                if incoming + 1
                 <= policy.config[candidate]["capabilities"][policy.models[candidate]][
                     "context"
                 ]
-                and policy.cost(policy.models[candidate], incoming, request.max_tokens)
-                <= budget
+                and policy.cost(policy.models[candidate], incoming, 1) <= budget
             ]
             if affordable_roles:
                 selected = min(
@@ -142,7 +151,10 @@ async def stream_quality(
         and function.get("name") in {"terminal_command", "publish_document"}
         for tool in request.tools
     )
-    if (
+    evidence_without_tools = not request.tools and any(
+        message.get("role") == "tool" for message in request.messages
+    )
+    if evidence_without_tools or (
         request.tools
         and not file_tools
         and (
@@ -154,12 +166,22 @@ async def stream_quality(
         request = request.model_copy(
             update={
                 "tool_choice": "none",
+                # Research finalization presupposes acquired evidence. Before
+                # any tool result, preserve the original task and disposition.
                 "messages": [
                     *request.messages,
-                    {
-                        "role": "system",
-                        "content": Path("prompts/budget-answer.txt").read_text(),
-                    },
+                    *(
+                        [
+                            {
+                                "role": "system",
+                                "content": Path(
+                                    "prompts/budget-answer.txt"
+                                ).read_text(),
+                            }
+                        ]
+                        if any(m.get("role") == "tool" for m in request.messages)
+                        else []
+                    ),
                 ],
             }
         )
@@ -172,11 +194,10 @@ async def stream_quality(
         remaining = request.timeout - (monotonic() - started)
         if remaining <= 0:
             raise TimeoutError("timeout")
-        # A reasoning timeout need not change the expert route: reserve its
-        # non-reasoning recovery when affordable, plus the transport fallback.
-        recovery_output = 1000
+        # Retain room for one bounded recovery, not all future tool turns.
+        # Actual cost is reserved immediately before each transport call.
         recovery = (
-            policy.cost(policy.models[fallback_role], incoming, recovery_output)
+            policy.cost(policy.models[fallback_role], incoming, 1000)
             if index == 0
             else Decimal(0)
         )
@@ -186,12 +207,7 @@ async def stream_quality(
             and recovery + policy.cost(model, incoming, current.max_tokens)
             > budget - spent
         ):
-            # Standard streams cannot replace an already visible partial answer.
-            # Prioritize its requested output over an optional unknown-error retry.
             recovery = Decimal(0)
-        # A late evidence turn may afford only one attempt. Its actual usage
-        # can still free enough funds for an empty-length retry; never refuse
-        # that affordable primary merely to promise an unknown-failure retry.
         if recovery + policy.cost(model, incoming, 1) > budget - spent:
             recovery = Decimal(0)
         if (
@@ -207,7 +223,20 @@ async def stream_quality(
                 else 3000
             )
             if affordable < 1:
-                raise RuntimeError("cost_budget")
+                raise ProviderLimitError(
+                    "cost_budget",
+                    int(
+                        (policy.cost(model, incoming, 1) * 1_000_000).to_integral_value(
+                            rounding=ROUND_CEILING
+                        )
+                    ),
+                    int(
+                        ((budget - spent) * 1_000_000).to_integral_value(
+                            rounding=ROUND_FLOOR
+                        )
+                    ),
+                    "microEUR",
+                )
             current = request.model_copy(
                 update={
                     "max_tokens": min(
@@ -218,10 +247,21 @@ async def stream_quality(
             )
         reserved = policy.cost(model, incoming, current.max_tokens)
         if spent + reserved > budget:
-            raise RuntimeError("cost_budget")
+            raise ProviderLimitError(
+                "cost_budget",
+                int(
+                    ((spent + reserved) * 1_000_000).to_integral_value(
+                        rounding=ROUND_CEILING
+                    )
+                ),
+                int((budget * 1_000_000).to_integral_value(rounding=ROUND_FLOOR)),
+                "microEUR",
+            )
         capabilities = policy.config[role]["capabilities"][model]
         if incoming + current.max_tokens > capabilities["context"]:
-            raise ValueError("context_exceeded")
+            raise ContextExceeded(
+                incoming + current.max_tokens, capabilities["context"]
+            )
         visible_content = False
         buffered: list[dict[str, object]] = []
         prefix = ""
@@ -230,10 +270,21 @@ async def stream_quality(
         result: dict[str, object] | None = None
         # Reserve time for recovery, still under the original request deadline.
         allotted = remaining * 0.8 if index == 0 else remaining
+        retry_ledger = RetryLedger()
         try:
             async with (
                 asyncio.timeout(allotted),
-                aclosing(attempt(current, model, allotted)) as events,
+                aclosing(
+                    retry_stream(
+                        attempt,
+                        current,
+                        model,
+                        allotted,
+                        budget - spent,
+                        incoming,
+                        retry_ledger,
+                    )
+                ) as events,
             ):
                 async for event in events:
                     terminal = event.get("result")
@@ -263,11 +314,34 @@ async def stream_quality(
                     yield event
             if result is None:
                 raise RuntimeError("provider_response_invalid")
+        except ProviderLimitError:
+            raise
         except (RuntimeError, TimeoutError) as exc:
-            spent += reserved
-            prompt_tokens += incoming
-            completion_tokens += current.max_tokens
-            estimated = True
+            spent += retry_ledger.spent
+            prompt_tokens += retry_ledger.prompt_tokens
+            completion_tokens += retry_ledger.completion_tokens
+            retry_completion_tokens += retry_ledger.completion_tokens
+            failed_usage = (
+                exc.usage if isinstance(exc, TransientProviderError) else None
+            )
+            if failed_usage is not None:
+                if (
+                    failed_usage.prompt_tokens > incoming
+                    or failed_usage.completion_tokens > current.max_tokens
+                ):
+                    raise RuntimeError("provider_usage_exceeds_reservation") from None
+                spent += policy.cost(
+                    model, failed_usage.prompt_tokens, failed_usage.completion_tokens
+                )
+                prompt_tokens += failed_usage.prompt_tokens
+                completion_tokens += failed_usage.completion_tokens
+                retry_completion_tokens += failed_usage.completion_tokens
+                estimated |= retry_ledger.estimated
+            else:
+                spent += reserved
+                prompt_tokens += incoming
+                completion_tokens += current.max_tokens
+                estimated = True
             # Keep the trace actually shown before an interrupted attempt.
             # Its token count is estimated; unknown billing stays fully reserved.
             reasoning += partial_reasoning
@@ -282,6 +356,7 @@ async def stream_quality(
                         "attempt": index + 1,
                         "elapsed_seconds": round(monotonic() - started, 3),
                         "reserved_unknown_eur": str(spent),
+                        "final_usage_measured": failed_usage is not None,
                         "visible_content": visible_content,
                     }
                 )
@@ -294,6 +369,11 @@ async def stream_quality(
             retried = False
             yield {"phase": "reasoning_fallback" if retried else "provider_fallback"}
             continue
+        spent += retry_ledger.spent
+        prompt_tokens += retry_ledger.prompt_tokens
+        completion_tokens += retry_ledger.completion_tokens
+        retry_completion_tokens += retry_ledger.completion_tokens
+        estimated |= retry_ledger.estimated
         usage = Usage.model_validate(result["usage"])
         if (
             usage.prompt_tokens > incoming
@@ -420,6 +500,8 @@ async def stream_quality(
             "token_split_estimated": estimated,
             "reasoning_retried": retried,
         }
+        if retry_completion_tokens:
+            answer["retry_completion_tokens"] = retry_completion_tokens
         if request.observe:
             answer["observation"] = {
                 "provider": "escalade",

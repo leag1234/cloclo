@@ -2,19 +2,21 @@
 
 import json
 import math
+import logging
 import os
 import signal
 from contextlib import contextmanager
 from collections.abc import Iterator
 from types import FrameType
 from pathlib import Path
-from time import monotonic
+from time import monotonic, sleep
 from typing import Any
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
+from packages.limits import LimitError
 
 
 @contextmanager
@@ -125,7 +127,9 @@ class EvalProvider:
             raise ValueError("non_independent_judges")
 
     def complete(self, role: str, messages: list[dict[str, str]]) -> dict[str, Any]:
-        if role not in self.roles or not messages or len(messages) > 100:
+        if len(messages) > 100:
+            raise LimitError("invalid_eval_request", len(messages), 100, "messages")
+        if role not in self.roles or not messages:
             raise ValueError("invalid_eval_request")
         if any(
             set(m) != {"role", "content"}
@@ -145,8 +149,12 @@ class EvalProvider:
             messages
         )
         reservation = (size * rates[0] + 2048 * rates[1]) / 1e6
-        if size > 32000 or reservation > 0.05:
-            raise ValueError("eval_request_budget")
+        if size > 32000:
+            raise LimitError("eval_request_budget", size, 32000, "input bytes")
+        if reservation > 0.05:
+            raise LimitError(
+                "eval_request_budget", math.ceil(reservation * 1e6), 50000, "micro EUR"
+            )
         endpoint = os.environ["SCW_GENERATIVE_BASE_URL"].rstrip("/")
         if not endpoint.startswith("https://"):
             raise ValueError("provider_configuration")
@@ -168,24 +176,89 @@ class EvalProvider:
             },
         )
         started = monotonic()
+        unknown = 0.0
+        for attempt in range(4):
+            if unknown + reservation > 0.05:
+                raise LimitError(
+                    "eval_request_budget",
+                    math.ceil((unknown + reservation) * 1e6),
+                    50000,
+                    "micro EUR",
+                )
+            remaining = 120 - (monotonic() - started)
+            if remaining <= 0:
+                raise TimeoutError("eval_deadline")
+            try:
+                result = self._read(request, remaining, rates)
+            except (HTTPError, json.JSONDecodeError, ValueError) as error:
+                transient = (
+                    isinstance(error, HTTPError)
+                    and error.code in (502, 503, 504)
+                    or isinstance(error, json.JSONDecodeError)
+                    or type(error) is ValueError
+                    and str(error) == "incomplete_stream"
+                )
+                if isinstance(error, HTTPError):
+                    error.close()
+                if not transient or attempt == 3:
+                    if isinstance(error, HTTPError):
+                        raise RuntimeError("eval_provider_error") from None
+                    raise
+                unknown += reservation
+                delay = (2, 5, 15)[attempt]
+                if 120 - (monotonic() - started) <= delay:
+                    raise TimeoutError("eval_deadline") from None
+                logging.getLogger(__name__).warning(
+                    json.dumps(
+                        {
+                            "event": "provider_transient_retry",
+                            "retry": attempt + 1,
+                            "delay_seconds": delay,
+                            "reserved_eur": unknown,
+                        }
+                    )
+                )
+                sleep(delay)
+                continue
+            except URLError:
+                raise RuntimeError("eval_provider_error") from None
+            if result["telemetry"]["cost"] > reservation:
+                raise ValueError("usage_exceeded_reservation")
+            result["telemetry"]["cost"] += unknown
+            result["telemetry"]["retry_reservations"] = attempt
+            result["telemetry"]["retry_reserved_input_tokens"] = attempt * size
+            result["telemetry"]["retry_reserved_output_tokens"] = attempt * 2048
+            if attempt:
+                result["telemetry"]["source"] += (
+                    "; failed attempts retain estimated maximum charges"
+                )
+            result["telemetry"]["latency"] = monotonic() - started
+            return result | {"role": role, "model": model}
+        raise RuntimeError("eval_provider_error")
+
+    def _read(
+        self, request: Request, timeout: float, rates: list[float]
+    ) -> dict[str, Any]:
+        started = monotonic()
         events = []
         received = 0
-        try:
-            with deadline(120), urlopen(request, timeout=120) as response:
-                while True:
-                    line = response.readline(800001)
-                    if not line:
-                        break
-                    seconds = monotonic() - started
-                    received += len(line)
-                    if seconds > 120 or received > 800000:
-                        raise ValueError("eval_response_budget")
-                    events.append((seconds, line))
-                    if line.strip() == b"data: [DONE]":
-                        break
-        except URLError:
-            raise RuntimeError("eval_provider_error") from None
-        result = summarize_stream(events, *rates)
-        if result["telemetry"]["cost"] > reservation:
-            raise ValueError("usage_exceeded_reservation")
-        return result | {"role": role, "model": model}
+        with deadline(timeout), urlopen(request, timeout=timeout) as response:
+            while True:
+                line = response.readline(800001)
+                if not line:
+                    break
+                seconds = monotonic() - started
+                received += len(line)
+                if received > 800000:
+                    raise LimitError("eval_response_budget", received, 800000, "bytes")
+                if seconds > timeout:
+                    raise LimitError(
+                        "eval_response_budget",
+                        math.ceil(seconds * 1000),
+                        math.ceil(timeout * 1000),
+                        "ms",
+                    )
+                events.append((seconds, line))
+                if line.strip() == b"data: [DONE]":
+                    break
+        return summarize_stream(events, *rates)

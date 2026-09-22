@@ -29,7 +29,7 @@ LIMITS = [
 
 
 def command(client: str) -> list[str]:
-    task = Path("prompts/dev-client.txt").read_text().strip()
+    task = Path("tests/journeys/dev-client.txt").read_text().strip()
     if client == "claude":
         return [
             "/opt/client",
@@ -41,7 +41,7 @@ def command(client: str) -> list[str]:
             "--allowedTools",
             "Bash",
             "--system-prompt",
-            Path("prompts/dev-client-system.txt").read_text(),
+            Path("tests/journeys/dev-client-system.txt").read_text(),
             "-p",
             task,
         ]
@@ -101,7 +101,7 @@ def run_client(client: str, root: Path, sockets: Path, store: Store) -> dict[str
     )
     work = root / (client + "-work")
     work.mkdir()
-    shutil.copyfile("prompts/dev-client-system.txt", work / "instructions.md")
+    shutil.copyfile("tests/journeys/dev-client-system.txt", work / "instructions.md")
     keyfile = root / (client + ".key")
     provision(store, client, keyfile, 4, 50000)
     key = keyfile.read_text().strip()

@@ -61,8 +61,8 @@ ssh -N -L 3000:127.0.0.1:3000 -L 8020:127.0.0.1:8020 user@your-vm
 
 Open [the chat UI](http://localhost:3000) and select `atlas-qwen`, `atlas-glm`, or
 `atlas-deepseek` to compare the configured models. Each uses explicit non-reasoning
-generation with a €0.10 limit (€0.30 with attachments),120-second deadline and
-3000-output-token limit. See
+generation with a €0.10 limit (€0.30 with attachments or file-producing requests),120-second deadline and
+6000-output-token limit. See
 [the M21 report](reports/M21.md) for measured quality limitations. The adapter on port
 8020 serves document citations. Stop the stack with Ctrl-C; persistent database
 and UI volumes remain. This is a local PoC deployment accessed through SSH.

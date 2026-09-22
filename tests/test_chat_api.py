@@ -17,6 +17,33 @@ from services.orchestrator.interactions import Interaction
 
 
 class ChatAPITests(unittest.TestCase):
+    def test_internal_size_limit_reaches_json_and_stream_with_measurements(
+        self,
+    ) -> None:
+        from packages.limits import LimitError
+
+        async def reject(request: ChatRequest, item: Interaction) -> None:
+            raise LimitError("source_response_limit", 800001, 800000, "bytes")
+
+        with (
+            tempfile.TemporaryDirectory() as root,
+            patch.dict(os.environ, {"ATLAS_INTERACTION_DIR": root}),
+            TestClient(app) as client,
+            patch("services.orchestrator.chat_api.process", side_effect=reject),
+        ):
+            for streaming in (False, True):
+                result = client.post(
+                    "/v1/chat/completions",
+                    json={
+                        "messages": [{"role": "user", "content": "Explain the source"}],
+                        "stream": streaming,
+                    },
+                )
+                self.assertEqual(result.status_code, 200 if streaming else 502)
+                for value in ("source_response_limit", "800001", "800000", "bytes"):
+                    self.assertIn(value, result.text)
+                self.assertNotIn('"finish_reason": "stop"', result.text)
+
     def test_http_deadlines_follow_model_for_json_and_stream(self) -> None:
         limits: list[float] = []
 
@@ -232,3 +259,30 @@ class ChatAPITests(unittest.TestCase):
                 for line in p.read_text().splitlines()
             ]
             self.assertEqual([r["erreurs"] for r in rows], [["timeout"], ["cancelled"]])
+
+
+class StopDiagnosticTests(unittest.TestCase):
+    def test_http_and_journal_keep_measured_stop(self) -> None:
+        async def stopped(request: ChatRequest, item: Interaction) -> None:
+            item.state = "stopped"
+            item.reponse = (
+                "Tools executed: 10; limit 10. Cost reserved: 0.09 EUR; limit 0.10 EUR."
+            )
+
+        with (
+            tempfile.TemporaryDirectory() as root,
+            patch.dict(os.environ, {"ATLAS_INTERACTION_DIR": root}),
+            patch("services.orchestrator.chat_api.process", stopped),
+            TestClient(app) as client,
+        ):
+            response = client.post(
+                "/v1/chat/completions",
+                json={
+                    "messages": [{"role": "user", "content": "Explain the evidence"}]
+                },
+            )
+            self.assertEqual(response.status_code, 504)
+            self.assertIn("10; limit 10", response.json()["error"]["message"])
+            row = json.loads(next(Path(root).glob("*.jsonl")).read_text())
+            self.assertIn("0.09 EUR; limit 0.10 EUR", row["reponse"])
+            self.assertEqual(row["question"], "Explain the evidence")

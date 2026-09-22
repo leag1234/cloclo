@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 from services.orchestrator import mcp_client as mcp
 from services.orchestrator.mcp_transport import invoke
+from packages.limits import LimitError
 
 SERVER = """import json,os,sys,time
 mode=os.environ.get('MODE','ok')
@@ -28,6 +29,15 @@ for line in sys.stdin:
 
 
 class MCPTests(unittest.IsolatedAsyncioTestCase):
+    async def test_oversized_line_reports_measured_bytes(self) -> None:
+        with self.assertRaises(LimitError) as caught:
+            await invoke(
+                sys.executable, ["-c", SERVER], {"MODE": "giant"}, [], "read", {}, 3
+            )
+        self.assertGreater(caught.exception.measured, 262144)
+        self.assertEqual(caught.exception.limit, 262144)
+        self.assertIn(str(caught.exception.measured), caught.exception.detail)
+
     async def test_transport_bounds_errors_and_secret_echo(self) -> None:
         for mode in ("ok", "timeout", "giant", "invalid", "version", "leak", "error"):
             with self.subTest(mode=mode):

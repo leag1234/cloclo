@@ -1,5 +1,7 @@
 """Bounded MCP stdio subset: initialization, ping and synchronous tools/call."""
 
+from packages.limits import LimitError
+
 import asyncio
 import json
 import os
@@ -43,10 +45,17 @@ async def invoke(
         nonlocal consumed
         await send({"id": number, "method": method, "params": params})
         for _ in range(32):
-            raw = await reader.readline()
+            try:
+                raw = await reader.readuntil(b"\n")
+            except asyncio.LimitOverrunError as exc:
+                raise LimitError(
+                    "mcp_response_limit", consumed + exc.consumed, LIMIT, "bytes"
+                ) from None
+            except asyncio.IncompleteReadError:
+                raise ValueError("mcp_unexpected_eof") from None
             consumed += len(raw)
-            if not raw or consumed > LIMIT:
-                raise ValueError("mcp_response_limit")
+            if consumed > LIMIT:
+                raise LimitError("mcp_response_limit", consumed, LIMIT, "bytes")
             message = json.loads(raw)
             if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
                 raise ValueError("mcp_protocol")
@@ -78,7 +87,7 @@ async def invoke(
             ):
                 raise ValueError("mcp_protocol")
             return result
-        raise ValueError("mcp_notification_limit")
+        raise LimitError("mcp_notification_limit", 32, 31, "notifications before reply")
 
     try:
         async with asyncio.timeout(min(timeout, 15)):

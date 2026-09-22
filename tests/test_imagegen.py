@@ -72,7 +72,7 @@ class ImageTests(unittest.IsolatedAsyncioTestCase):
                 self.wfile.write(json.dumps(payload).encode())
 
         # Real local HTTP exercises bounded reads and PNG decoding.
-        with ThreadingHTTPServer(("127.0.0.1", 8000), Handler) as server:
+        with ThreadingHTTPServer(("127.0.0.2", 8000), Handler) as server:
             thread = Thread(target=server.serve_forever, daemon=True)
             thread.start()
             try:
@@ -84,7 +84,7 @@ class ImageTests(unittest.IsolatedAsyncioTestCase):
                     patch.dict(
                         os.environ,
                         {
-                            "ATLAS_IMAGE_GPU_IP": "127.0.0.1",
+                            "ATLAS_IMAGE_GPU_IP": "127.0.0.2",
                             "ATLAS_IMAGE_GPU_EUR_H": "1.46988",
                         },
                     ),

@@ -1,5 +1,7 @@
 """Bounded Scaleway generation with validated source references."""
 
+from packages.limits import LimitError, ProviderLimitError
+
 import re
 from typing import Self
 from urllib.request import Request, urlopen
@@ -25,11 +27,18 @@ class AnswerRequest(BaseModel):
         if len({p.chunk_id for p in self.passages}) != len(self.passages):
             raise ValueError("invalid_input")
         if len(self.question) + sum(len(p.text) for p in self.passages) > 128000:
-            raise ValueError("context_exceeded")
+            raise LimitError(
+                "context_exceeded",
+                len(self.question) + sum(len(p.text) for p in self.passages),
+                128000,
+                "characters",
+            )
         return self
 
 
 def parse_answer(text: str, request: AnswerRequest) -> dict[str, object]:
+    if len(text) > 32000:
+        raise LimitError("invalid_citation", len(text), 32000, "answer characters")
     if text.strip() == "INSUFFICIENT":
         return {
             "text": "I cannot find the answer in the sources.",
@@ -39,7 +48,6 @@ def parse_answer(text: str, request: AnswerRequest) -> dict[str, object]:
     numbers = list(dict.fromkeys(int(n) for n in re.findall(r"\[(\d+)\]", text)))
     if (
         not text.strip()
-        or len(text) > 32000
         or not numbers
         or any(n < 1 or n > len(request.passages) for n in numbers)
     ):
@@ -65,12 +73,11 @@ class Generator:
         try:
             request = AnswerRequest.model_validate(payload)
         except ValidationError as exc:
-            if any(
-                str(e.get("ctx", {}).get("error")) == "context_exceeded"
-                for e in exc.errors()
-            ):
-                raise ValueError("context_exceeded") from None
-            raise ValueError("invalid_input") from None
+            for failure in exc.errors():
+                cause = failure.get("ctx", {}).get("error")
+                if isinstance(cause, LimitError):
+                    raise cause from None
+            raise
         prompt = Path(__file__).resolve().parents[2] / "prompts/rag.txt"
         sources = [
             {"reference": i, "text": p.text} for i, p in enumerate(request.passages, 1)
@@ -107,7 +114,9 @@ class Generator:
             with urlopen(http, timeout=25) as response:
                 body = response.read(800001)
             if len(body) > 800000:
-                raise RuntimeError("provider_response_limit")
+                raise ProviderLimitError(
+                    "provider_response_limit", len(body), 800000, "bytes"
+                )
             result = json.loads(body)
             choice = result["choices"][0]
             if choice["finish_reason"] != "stop" or not isinstance(

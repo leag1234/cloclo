@@ -26,7 +26,7 @@ class JourneyReuseTests(unittest.TestCase):
                     json.dumps(
                         {
                             "mode": "replay",
-                            **{f"J{n}_check": True for n in range(1, 50)},
+                            **{f"J{n}_check": True for n in range(1, 54)},
                         }
                     )
                 )
@@ -65,3 +65,17 @@ class JourneyReuseTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "incomplete_ci_journey_evidence"):
                 run(root, "run", incomplete)
             self.assertFalse((root / CACHE).exists())
+
+    def test_owner_accepted_regression_remains_false_in_complete_report(self) -> None:
+        from journey_runner import valid_report
+
+        report = {"mode": "replay", **{f"J{n}_check": True for n in range(1, 54)}}
+        del report["J34_check"]
+        report["J34_spacex_search_first"] = False
+        self.assertTrue(valid_report(report))
+        self.assertIs(report["J34_spacex_search_first"], False)
+        report["J35_check"] = False
+        self.assertFalse(valid_report(report))
+        report["J35_check"] = True
+        report["J34_spacex_search_first"] = None
+        self.assertFalse(valid_report(report))

@@ -21,7 +21,7 @@ class ChatSchemaTests(unittest.TestCase):
         )
         self.assertEqual(len(req.messages), 3)
         self.assertTrue(req.stream)
-        for content in ("", " ", "a" * 32001, "control\x00", "\ud800"):
+        for content in ("", " ", "a" * 1100000, "control\x00", "\ud800"):
             with (
                 self.subTest(content=repr(content[:20])),
                 self.assertRaises(ValueError),
@@ -29,13 +29,33 @@ class ChatSchemaTests(unittest.TestCase):
                 ChatRequest.model_validate(
                     {"messages": [{"role": "user", "content": content}]}
                 )
+        # M25 replaces historical character caps with the active token window.
+        for length in (32001, 40000):
+            accepted = ChatRequest.model_validate(
+                {"messages": [{"role": "user", "content": "a" * length}]}
+            )
+            self.assertEqual(len(accepted.messages[0].text), length)
         payloads: tuple[dict[str, object], ...] = (
             {"messages": []},
             {"messages": messages[:2]},
             {"model": "unknown", "messages": messages},
             {"messages": [{"role": "tool", "content": "unsafe"}]},
-            {"messages": [{"role": "user", "content": "x" * 20000}] * 2},
+            {"messages": [{"role": "user", "content": "x" * 600000}] * 2},
         )
         for payload in payloads:
             with self.assertRaises(ValueError):
                 ChatRequest.model_validate(payload)
+
+    def test_public_output_reservation(self) -> None:
+        for profile in ("atlas-qwen", "atlas-glm", "atlas-deepseek"):
+            payload = {
+                "model": profile,
+                "messages": [{"role": "user", "content": "Explain"}],
+            }
+            self.assertEqual(ChatRequest.model_validate(payload).max_tokens, 6000)
+            self.assertEqual(
+                ChatRequest.model_validate({**payload, "max_tokens": 6000}).max_tokens,
+                6000,
+            )
+            with self.assertRaisesRegex(ValueError, "6001.*6000"):
+                ChatRequest.model_validate({**payload, "max_tokens": 6001})

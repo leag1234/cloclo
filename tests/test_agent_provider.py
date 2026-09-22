@@ -90,6 +90,31 @@ class ProviderTransportTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 session.post.call_args.kwargs["json"]["reasoning_effort"], "none"
             )
+            from packages.limits import LimitError
+
+            data["usage"] = {"prompt_tokens": 100, "completion_tokens": 2049}
+            with self.assertRaises(LimitError) as caught:
+                await provider.complete(payload)
+            self.assertEqual(
+                (caught.exception.measured, caught.exception.limit), (2049, 2048)
+            )
+            data["usage"] = {"prompt_tokens": 100, "completion_tokens": 1800}
+            data["choices"] = [
+                {"finish_reason": "stop", "message": {"content": "x" * 32001}}
+            ]
+            with self.assertRaises(LimitError) as caught:
+                await provider.complete(payload)
+            self.assertEqual(
+                (caught.exception.measured, caught.exception.limit), (32001, 32000)
+            )
+            data["choices"] = [
+                {"finish_reason": "stop", "message": {"content": "x" * 128001}}
+            ]
+            with self.assertRaises(LimitError) as caught:
+                await provider.complete(payload)
+            self.assertEqual(
+                (caught.exception.measured, caught.exception.limit), (128001, 128000)
+            )
             data["choices"] = [
                 {"finish_reason": "length", "message": {"content": "cut"}}
             ]

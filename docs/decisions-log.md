@@ -1241,3 +1241,586 @@ Also unresolved: the activity indicator still shows only a static cursor on a re
 no tool call (M23/D7, J40). Same cause to investigate: the state may be emitted but not
 rendered.
 
+
+
+## M24 settled mission, archived for M25 (2026-09-20)
+
+## M24 — Documents and files: read, produce, transform
+
+Binding requirements/J42–J49: contracts/m24-owner.md and contracts/m24.md.
+No criteria relaxed. REQ-ENG-004/005/009/011, REQ-FIN-002, POC-F1/F3/F5.
+
+D1–D2: make serve starts authenticated Open Terminal, loopback port8000, dedicated
+user-files volume, shared Docker network URL in TERMINAL_SERVER_CONNECTIONS and
+filesystem uploads. No repository/host mounts, platform credentials or route to
+host/internal services8010/8020/8030. runbooks/files.md describes containment,
+shutdown and the new model-shell exposure surface.
+
+D3–D5: read complete PDF/DOCX/XLSX/PPTX/ODT/ODS/ODP/CSV/TXT/MD/images; preserve
+spreadsheet structure. Explicit scanned/password/extraction failures. Produce
+actually downloadable DOCX/XLSX/PPTX/PDF/CSV/MD/PNG; soffice renders PDF. State
+regeneration versus editing in place; preserve unrequested formatting.
+
+D6–D7: inspect a rendered real answer's DOM, repair CSS with stable selectors
+including copy-code-button/nb-code classes, never generated Svelte suffixes.
+Browser before/after screenshots in reports/M24.md must prove serif body and
+code without line numbers/default toolbar. Diagnose activity emission, transport
+and rendering; capture named elapsed activity during no-tool generation.
+
+D8: attachments allow0.30 EUR/request; other requests retain0.10 EUR. Above the
+attachment ceiling apply M10 hierarchy; retain measured-value rejection messages.
+Use Tavily search with TAVILY_API_KEY from secrets.env and page content directly;
+no separate fetch for these results. Keep explicit SerpApi fallback selection.
+Disclose quota/provider failures to the user, never silently use model memory.
+
+J42–J49 test downloadable slides+PDF without corpus, corrected DOCX with strategy,
+correct spreadsheet comparison/new sheet/chart, complete long-PDF synthesis,
+explicit extraction failure, large attachments, CPC-specific searched citations,
+and real rendering. Compare three configured models on J42–J44, recording model,
+commands, failed commands and seconds. Preserve original wording in journeys.
+
+Done: make verify-m24 locally, m24 branch/PR, exact-head green GitHub ci; current
+owner mandate authorizes API squash only then. Poll up to180 times at15 seconds.
+Update BRAIN and write the completion marker after confirmed merge. Continue only
+if another milestone is listed. Protected files remain untouched.
+
+### M24 supersedes the read-only tool restriction (owner ruling, 2026-09-18)
+`docs/13` POC-W3 restricted model tools to read-only. M24 requires a shell with write
+access, so the two conflict. AUTHORIZED: for the Open Terminal path only, the read-only
+restriction is SUPERSEDED by the containment described in M24/D2.
+
+What is granted: executing Python and shell commands inside the Open Terminal Docker
+container, and creating or modifying files in its dedicated volume.
+What still holds, and is the condition of this authorisation:
+- the container has no route to the VM's internal services (8010/8020/8030), no Scaleway
+  credentials, and no mount of the ATLAS repository;
+- its volume carries user files only, nothing of the platform;
+- the port is bound to 127.0.0.1;
+- `runbooks/files.md` states plainly what the terminal can and cannot reach, and how to
+  stop it.
+Read-only remains the rule for every OTHER tool path (web fetch, retrieval, MCP).
+This is an explicit owner exception: apply it, do not stop on it again.
+
+### M24 — Open Terminal path traversal: accepted risk, documented (owner ruling, 2026-09-18)
+The agent proved that the pinned Open Terminal file API reads outside its user directory:
+`GET /files/read?path=/home/user/../../etc/hostname` succeeds, and so does following a
+symlink created inside the container. This is a genuine defect of the product and the
+containment promised in M24/D2 cannot rely on the application.
+
+Measured scope on the running container: one mount only (`/home/user`), no ATLAS
+repository, no `secrets.env`, no Scaleway or Tavily credentials; the only key in its
+environment is its own API key. An authenticated caller can therefore read the system
+files of a disposable container and nothing else.
+
+ACCEPTED for the PoC, under these conditions, which are the containment:
+- containment is provided by Docker alone, never by the terminal's own path checks;
+- nothing but user files is ever mounted into that container — no repository, no secrets,
+  no host path;
+- the port stays bound to 127.0.0.1 and the container is never publicly exposed;
+- `runbooks/files.md` states the traversal explicitly, so nobody later mounts something
+  sensitive believing the API confines reads.
+Do not stop on this again. Report the defect upstream to Open WebUI with the two probes.
+
+
+
+## M25 motivation, unchanged archival text
+
+### Why this milestone exists
+On 2026-09-20 the owner read `prompts/chat.txt` (5 246 bytes). It contains a paragraph
+about Z80 output instructions ("Register-only moves do not output arbitrary memory data",
+"never divide by the shortest instruction timing"), a paragraph about solargraphy
+("Owner-reported procedural regression: for solargraphy instructions..."), and a line about
+"offer price versus opening market price". Each was written to make one corpus case pass
+(C03, C02, C01). This is **overfitting the system prompt to the evaluation set**. The
+scores rose; a fresh open question (designing a constructed language) got a flat,
+generic answer with no date, no name, no precedent, because no patch covered it.
+
+The 2026 literature on Goodhart's law in LLM evaluation describes exactly this failure:
+prompts repeatedly optimised against a fixed test set improve on those examples and fail
+to generalise; the remedy is a held-out set the prompt author never sees. Anthropic's
+published claude.ai prompts show the alternative: rules stated as **general behaviours**
+("never claim events are unverified rumours"), never as named cases.
+
+
+
+## Standing credential rulings, unchanged source text
+
+## Standing facts — never archive
+
+- Token incidents2026-09-13/15 are CLOSED. Owner replaced and reinjected credentials,
+  verified API write/delete and push. Never stop or reconfirm for pre-17th incidents.
+- Owner attests GPU2 EUR/h,30 EUR/milestone,800 EUR monthly, alerts active.
+  Hypothetical shutdown defects are notes, not blockers.
+- External failure counters reset each session; historical errors do not block a
+  first attempt. Preserve permanent rules; archive only history.
+
+## Permanent credential ruling — owner, 2026-09-18
+
+The06:30 remote-URL incident is a CLOSED FALSE POSITIVE; no revocation is required.
+Reading/sourcing secrets locally, embedded origin authentication, credential environment
+variables and masked values are normal. Never re-raise this incident. Exposure requires
+a secret leaving its intended location (committed/shared artefact or transmission to
+a third party). Report what left, where and when for a genuine incident. Full ruling
+is preserved in docs/decisions-log.md. Do not print secrets into shared tool output.
+
+
+
+## M25 owner rulings archived unchanged, 2026-09-21
+
+### M25 — J51 acceptance corrected (owner ruling, 2026-09-20)
+The owner read the second J51 answer (BRAIN/m25-second-capture.json.gz). It names three real
+precedents (Bristol Pound, Eusko, Sol Violette) with their scale and structure, states the
+central tension ("liquidité contre ancrage") with both failure modes, grounds a figure in a
+named study, and takes a position with a named design. **This is what the disposition asks
+for, and the answer is good.** It was rejected for two reasons that were too strict:
+
+1. "Fewer than three dated precedents": the three precedents are present; the years are not
+   written. Fix the PROMPT, not the answer: add to the disposition's second paragraph
+   "Give each precedent its date." Then judge on named precedents, dated when the date is
+   known.
+2. "Claimed source consultation without tool calls": citing a study from memory is
+   legitimate scholarship, not a fake search. The failure to avoid is claiming to have
+   SEARCHED or READ something during this answer without a tool call. Judge on that, not
+   on the presence of a citation.
+
+Also raise `max_tokens` for the public profiles from 3 000 to **6 000**: attempt 3 was cut at
+3 000 output tokens (`finish_reason=length`) on a design question that legitimately needs
+more. Cost ceiling unchanged; the reservation must account for the larger output.
+
+Revised J51: at least three real precedents named (dated when the date is known), the
+central tension stated with a position taken, a conclusion. No claim of having searched
+without a tool call. Rerun J51 once with the corrected prompt and criteria. If it passes,
+proceed to J53 and completion. Do not add any case-specific sentence to the prompt.
+
+### Transient provider failures are not technical failures (owner ruling, 2026-09-21)
+HTTP 502/503/504 and empty completions from the provider are TRANSIENT. On 2026-09-21 a
+plain curl to the same model returned 200 three times in under half a second while the
+agent's long tool-using requests were failing with 502. Such a failure does not count
+towards the three-attempt stop rule until it has been retried.
+Rule: on 502/503/504, an empty completion, or invalid JSON from the provider, retry the
+same call up to three times with increasing delay (2 s, 5 s, 15 s) before counting the
+attempt as failed. Log each retry. Only a failure that survives those retries counts as
+one of the three attempts. This applies to journeys, gates and the runtime alike.
+
+### Budget for file-producing requests (owner decision, 2026-09-21)
+Measured on J42 (presentation + PDF), three attempts: the final delivery needed a
+reservation of 66 633 / 61 711 / 114 476 microEUR while 47 137 / 38 271 remained of the
+0.10 EUR ceiling. The web searches and page reads consume the budget first, leaving too
+little to reserve the generation. No actual overspend occurred: the reservation, not the
+spend, is what refused.
+
+AUTHORIZED: a request that produces a file (document, spreadsheet, presentation, PDF,
+image) gets **0.30 EUR**, like a request carrying an attachment. Ordinary requests keep
+0.10 EUR. The ceiling applies to the whole request, tools included.
+
+Two further requirements:
+- A refusal caused by money must never surface as HTTP 413 / `request_size_exceeded`
+  (attempt 1 did). Report the measured reservation, what remains, and the ceiling.
+- The reservation must reflect the expected cost, not the worst case of every tool
+  summed in advance. Re-check the remaining budget between steps instead of reserving
+  everything up front; that pessimism is what refuses requests costing three times less.
+
+### M25 — J51 final adjustment, and a rule against fabricated provenance (owner ruling, 2026-09-21)
+Two distinct findings from the three captures.
+
+**Fabricated provenance is a serious fault, and the rejection of attempts 1 and 2 was
+right.** The model wrote consultation dates (for example 2024-05-23) for sources it never
+visited: no search, no fetch in the trace. Add to the prompt, as a general behaviour and
+never as a case patch: state a consultation date only for a source actually retrieved
+during this answer; knowledge recalled from training is attributed as such, without a
+date, without a URL, and without any wording implying a visit. This applies to every
+domain and stays in the prompt after M25.
+
+**The third attempt passes.** It names several dated precedents, removes the false
+consultation claim, and arbitrates between risks with architecture and recommendations.
+Requiring the words "the central tension is" is formalism: a design answer that sets out
+the competing risks and takes a position has done the work. Revised J51 acceptance:
+- at least three real precedents named, dated when the date is known;
+- the competing considerations are set out AND the answer takes a position (a stated
+  trade-off, a chosen option with its reason, or an explicit tension — any of these);
+- a conclusion the reader can act on;
+- no claimed consultation, date or URL for a source not actually retrieved.
+Certify J51 on the third capture if it meets these, and complete the milestone.
+
+### M25 — J34 assertion tests wording, not content (owner ruling, 2026-09-21)
+Capture 1 shows the model distinguishing the two measures correctly while saying
+"premier trade"; the assertion only accepts `ouverture|opening|premier.*cours`, so a
+correct answer failed on vocabulary. That is the same mistake as requiring the words "the
+central tension is" in J51: the test checks phrasing instead of substance.
+
+AUTHORIZED: widen the J34 assertion to accept any wording that conveys the distinction —
+`ouverture|opening|premier.*(cours|trade|échange)|début.*(cotation|séance)|first trade`
+— and, more importantly, assert on the SUBSTANCE: two distinct figures are given AND the
+answer states that they measure different things. The underlying fact (offer price versus
+first market price) is unchanged and no assertion is weakened in what it requires.
+
+General principle for every journey from now on: assert on what the answer establishes,
+not on the words it uses. A keyword list is acceptable only as a convenience, never as the
+sole criterion, and it must be widened whenever a correct answer fails it.
+
+Captures 2 and 3 are genuine failures (the distinction is absent): keep them as failures
+and fix them with the general evidence-reconciliation rule already added to
+`prompts/web-chat.txt`, not with a case patch.
+
+### M25 — J34 regression accepted as the measured price of generalisation (owner ruling, 2026-09-21)
+With the case patch removed, the SpaceX question returns the offer price (135 USD) and
+omits the first-market price (150 USD) in three fresh captures. This is a real quality
+loss on one public-corpus case, and it is exactly what this milestone set out to measure:
+the previous score depended on a sentence written for that case, not on a behaviour.
+
+ACCEPTED. J34 is recorded as FAILING in `reports/M25.md`, with the three captures, under
+the heading "regression caused by removing a case patch". It does not block the milestone.
+No case-specific sentence returns to any prompt. The general evidence-reconciliation rule
+added to `prompts/web-chat.txt` stays; if it later improves this case, so much the better.
+
+Certify M25 on: J50, J51 (third capture), J52, J53, and the corpus mean within the agreed
+0.5 tolerance. Record J34 as a known regression in the report and in
+`docs/prompt-policy.md` as the first documented instance of the trade-off between a
+patched score and a general behaviour.
+
+### M25 disposition and journey reference
+
+The [unchanged archive](m25-disposition-history.txt) preserves the original
+English disposition and multilingual journey example.
+
+### Original D4 history archived unchanged
+`packages/images.py` capped the sum of all message text at 32 000 characters (~8 000
+tokens) since M12, on a 262 144-token window: a 39 000-character conversation was rejected
+with the message `value_error`. The owner raised the constant to 600 000 on 2026-09-20 as a
+stopgap. Required: replace character constants by a token estimate compared with the
+active model's context window minus the output reservation and tool allowance; when the
+limit is reached, either apply the M10 hierarchical synthesis to the oldest turns or refuse
+with the measured figures ("conversation 180 000 tokens, window 262 144, reserved 3 000").
+Never `value_error` alone.
+
+
+## M25 mission before compacting duplicate reminders (2026-09-21)
+
+# MISSION — ATLAS-0
+
+Build docs/13-poc-spec.md; first read AGENTS.md, docs/11 and docs/14.
+M0–M24 delivered; M25 current and last. History: docs/decisions-log.md.
+
+Done = make verify-mN + green GitHub ci. Protect workflows/CODEOWNERS/verify-*;
+never weaken assertions. Branch/PR only, no main push. Current human mandate
+controls merge and subsequent milestones.
+
+## Permanent constraints
+
+Contracts precede code; prove useful answers through public HTTP. No secrets in
+repo/logs/prompts; dedicated project only. GPU2 EUR/h,30 EUR/milestone; owner accepts
+bounded risk with alerts. Record costs before provisioning; destroy experiments
+and run infra/gpu-down.sh at session end.
+
+Requests: <=10 tools; authorized profile budgets/deadlines below.
+Image model loading is measured separately under contracts/m13 and M20's bounded
+startup wait. Declare live/replay honestly; replay uses real recordings. Do not re-verify completed milestones without explicit request or visible regression;
+use BRAIN outcomes and report skips. CI regression gates remain mandatory.
+
+Update BRAIN STATUS/TASK/JOURNAL before risk and session end, BLOCKERS when blocked.
+MISSION <=8000 bytes; archive settled history unchanged in decisions-log.
+
+### Journey rules (permanent)
+
+R1: Before implementation, write user intent and six natural phrasings, independent
+of regexes/templates.
+
+R2: For each capability include six phrasings, three without the obvious keyword,
+a message of at most four words, unaccented and uppercase input, English and another
+language, and a negative case. For attachments include at least two in one request.
+
+R3: Assert useful user content, never just internal calls/routing. No useful answer
+means failure.
+
+R4: Preserve every owner-reported defect as a permanent, verbatim, dated journey;
+never rephrase it to make it easier.
+
+R5: A service module called only from tests is not delivered. Unreachable modules
+must fail the gate, not merely produce a warning.
+
+R6: Every rejection identifies measured values and thresholds, in plain user-facing
+language and the server journal. Never conflate image byte limits with model token
+limits. Preserve the user's question when it can be safely parsed.
+
+## Standing facts and credential ruling — never archive these facts
+
+Owner confirms replaced credentials and API write/delete/push. Incidents dated
+2026-09-13/15 are closed; the 2026-09-18 06:30 remote-URL incident is a CLOSED FALSE
+POSITIVE. No revocation/reconfirmation required. Local sourcing, embedded origin
+authentication and masked values are normal. Exposure requires a secret leaving
+its intended location: report what left, where and when. Full original wording
+is preserved in docs/decisions-log.md; never print secrets into shared output.
+Owner attests GPU2 EUR/h,30 EUR/milestone,800 EUR monthly, alerts active.
+Hypothetical shutdown defects are notes, not blockers. External failure counters
+reset each session; historical errors never block a first attempt.
+
+M24 delivered; its owner containment exceptions remain binding in docs/decisions-log.md.
+
+## M25 — Intellectual disposition, not test-case patches
+
+Replace corpus-specific prompt patches with general behaviours;
+public scores guide development, owner-only evaluation measures generalisation.
+
+### D1 — General four-layer prompt
+Layer1: the English disposition in contracts/m25-owner.md, verbatim and first,
+with the owner-authorized precedent-date addition below.
+Layers2–4: capabilities/tools (search conditions, budgets, failures), language/form
+(resolved language, English code, no plan narration/boilerplate), safety/evidence
+(untrusted text, no invented citations, privacy). No named-case/domain patches.
+Delete Z80, solargraphy, IPO and all case-specific sentences. Whole file <3500 bytes.
+Full original requirements: contracts/m25-owner.md.
+
+### D2–D3 — generality and independent evaluation
+
+Binding original requirements: contracts/m25-owner.md (no criteria relaxed).
+Create docs/prompt-policy.md: every prompt sentence must apply unchanged to three
+unrelated domains. Case failures require a general behaviour, tool/data fix or
+honest limitation; never the case itself. The public corpus is development data;
+cases belong in journeys/reports, never prompts. Owner alone runs independent
+private evaluation. Never inspect/list its directory. Keep private/ ignored.
+Add --cases PATH to the public corpus runner.
+
+### D4 — Conversation length: count tokens against the model window
+Replace character caps with estimated tokens against the active model context
+window minus output reservation and tool allowance. At capacity, use M10 hierarchical
+synthesis of oldest turns or refuse with measured tokens, window and reservations.
+Never surface bare value_error. Original D4: contracts/m25-owner.md.
+
+### D5 — remaining ceilings
+
+Inventory every production size/count/byte limit in services/ and packages/ in
+ docs/limits.md: value, enforcement, reason, real constraint versus leftover.
+Remove or justify each. Every enforced limit reports measured value and threshold.
+Account explicitly for inherited 2000-byte web text,400-byte RAG chunks,6 MB body
+and32000-character history. Full unchanged requirements: contracts/m25-owner.md.
+
+### Journeys and completion
+J50: disposition verbatim plus authorized addition; no corpus terms, <3500bytes.
+J51: owner-accepted third capture under the binding criteria below.
+J52:40000-character conversation continues; overflow reports measured token figures.
+J53: public means no more than0.5 below6.5/5.6/5.4; document each lost behaviour.
+Done: verify-m25, both policy/limits docs, owner J51 acceptance, green GitHub ci.
+
+### Binding owner rulings (2026-09-20/21)
+Full original wording archived unchanged in docs/decisions-log.md.
+
+- Add “Give each precedent its date.” to disposition paragraph2. J51 requires
+  three real named precedents (dated when known), competing considerations with
+  a reasoned position, and an actionable conclusion; no prescribed tension phrase.
+  Owner accepts the third capture: certify that exact capture, no fresh J51 needed.
+- Fabricated provenance is a serious fault. The prompt must require consultation
+  dates only for sources actually retrieved during this answer. Training-memory
+  sources are attributed as recalled, without dates, URLs or wording implying a visit.
+- Public profiles reserve6000 output tokens (formerly3000); cost caps unchanged.
+- Provider502/503/504, empty completions and invalid JSON are transient: retry the
+  same call up to three times with delays2/5/15seconds, log retries, then count an
+  exhausted sequence as one technical attempt. Applies to runtime, journeys, gates.
+- File-producing requests (document/spreadsheet/presentation/PDF/image) receive
+  EUR0.30 like attachments; ordinary requests EUR0.10, tools included. Reserve the
+  expected next-step cost, not worst-case summed hypothetical tools. Recheck money
+  between steps. Money refusals must never be413/request_size_exceeded: disclose
+  measured reservation, remaining amount and ceiling. No actual overspend allowed.
+- Journey assertions test substance, not particular words. J34 accepts
+  ouverture|opening|premier.*(cours|trade|échange)|début.*(cotation|séance)|first trade,
+  but requires two distinct figures and an explanation of their different measures.
+  Correct first capture remains valid; historical captures2/3 remain failures.
+- Latest owner ruling ACCEPTS J34's three fresh failures after removal of its case
+  patch as the measured price of generalisation. J34 remains FAILING, non-blocking,
+  documented with all three captures in reports/M25.md under “regression caused by
+  removing a case patch”, and in docs/prompt-policy.md as the first patched-score
+  trade-off. Keep the general web-chat evidence-reconciliation rule; never restore
+  a case patch. Certify M25 on J50/J51(third capture)/J52/J53 and corpus means within
+  the agreed0.5 tolerance. All other regressions remain blocking.
+
+### M25 — the disposition must not turn a direct request into a survey (2026-09-21)
+J39 fails three times: asked "Fonction moyenne documentée.", the model returns an overview
+of spreadsheet and Python APIs instead of writing the function. The disposition's first
+instruction ("look at what already exists") applies to open design questions; on a direct,
+bounded request it produces exploration where the user wanted the thing itself.
+
+Add to the disposition in prompts/chat.txt, right after the precedents paragraph, as a
+general behaviour (it applies to code, writing and calculation alike):
+
+Match the answer to the size of the question. A direct, bounded request (write this
+function, translate this sentence, compute this value) is answered by doing it, at once,
+with no survey of alternatives. Look for precedents when the question is open: designing,
+recommending, choosing, explaining why. Never make a small question large.
+
+This is the last required change to prompts/chat.txt for M25; rerun J39 and complete.
+
+
+## M25 mission before certification compaction (2026-09-21)
+
+# MISSION — ATLAS-0
+
+Read AGENTS.md, docs/11/14; implement docs/13-poc-spec.md.
+M0–M24 delivered; M25 current and last. History: docs/decisions-log.md.
+
+Done = make verify-mN + green GitHub ci. Protect workflows/CODEOWNERS/verify-*;
+never weaken assertions. Branch/PR only, no main push. Current human mandate
+controls merge and subsequent milestones.
+
+## Permanent constraints
+
+Contracts before code; useful answers through public HTTP. AGENTS.md governs
+secrets, dedicated project, costs and cleanup. GPU2 EUR/h,30 EUR/milestone;
+bounded risk accepted with alerts. Run infra/gpu-down.sh at session end.
+
+Requests: <=10 tools; budgets below. Image loading is separate (contracts/m13,
+M20 startup wait). Declare live/replay honestly; use real recordings. Do not
+re-verify completed milestones without request/regression; report BRAIN-based skips.
+CI regression gates remain mandatory.
+
+Update BRAIN before risk/session end; BLOCKERS on blockage.
+MISSION <=8000 bytes; archive history verbatim in decisions-log.
+
+### Journey rules (permanent)
+
+R1: Before coding, write intent and six natural phrasings independent of templates.
+
+R2: Each capability: six phrasings (three without obvious keyword), <=4-word input,
+unaccented, uppercase, English, another language, negative. Attachments: >=2/request.
+
+R3: Assert useful content; calls/routing alone never pass.
+
+R4: Owner defects become permanent verbatim dated journeys; never ease wording.
+
+R5: Test-only/unreachable service modules fail the gate.
+
+R6: Rejections give measured values/thresholds plainly to user and journal.
+Separate image bytes from model tokens. Preserve safely parsed user questions.
+
+## Standing facts and credential ruling — never archive these facts
+
+Owner confirms replaced credentials and API write/delete/push. Incidents2026-09-13/15
+closed;2026-09-18 06:30 remote-URL incident CLOSED FALSE POSITIVE. No revocation or
+reconfirmation. Local sourcing, embedded origin auth and masked values are normal.
+Exposure requires a secret leaving its intended location: report what/where/when;
+never print secrets. Original wording: docs/decisions-log.md. Owner attests
+GPU2 EUR/h,30 EUR/milestone,800 EUR/month, active alerts. Hypothetical shutdown
+defects are notes. External failure counters reset each session.
+
+M24 delivered; its owner containment exceptions remain binding in docs/decisions-log.md.
+
+## M25 — Intellectual disposition, not test-case patches
+
+Replace case patches with general behaviours. Public scores guide development;
+owner-only evaluation measures generalisation.
+
+### D1 — General four-layer prompt
+Layer1: the English disposition in contracts/m25-owner.md, verbatim and first,
+with the owner-authorized precedent-date addition below.
+Layers2–4: capabilities/tools (search conditions, budgets, failures), language/form
+(resolved language, English code, no plan narration/boilerplate), safety/evidence
+(untrusted text, no invented citations, privacy). No named-case/domain patches.
+Delete Z80, solargraphy, IPO and all case-specific sentences. Whole file <3500 bytes.
+Contract: contracts/m25-owner.md.
+
+### D2–D3 — generality and independent evaluation
+
+Binding contract: contracts/m25-owner.md (unchanged criteria).
+Create docs/prompt-policy.md: every prompt sentence must apply unchanged to three
+unrelated domains. Case failures require a general behaviour, tool/data fix or
+honest limitation; never the case itself. The public corpus is development data;
+cases belong in journeys/reports, never prompts. Owner alone runs independent
+private evaluation. Never inspect/list its directory. Keep private/ ignored.
+Add --cases PATH to the public corpus runner.
+
+### D4 — Conversation length: count tokens against the model window
+Replace character caps with estimated tokens against the active model context
+window minus output reservation and tool allowance. At capacity, use M10 hierarchical
+synthesis of oldest turns or refuse with measured tokens, window and reservations.
+Never surface bare value_error. See owner contract D4.
+
+### D5 — remaining ceilings
+
+Inventory every production size/count/byte limit in services/ and packages/ in
+ docs/limits.md: value, enforcement, reason, real constraint versus leftover.
+Remove or justify each. Every enforced limit reports measured value and threshold.
+Account explicitly for inherited 2000-byte web text,400-byte RAG chunks,6 MB body
+and32000-character history. Contract: contracts/m25-owner.md.
+
+### Journeys and completion
+J50: disposition verbatim plus authorized addition; no corpus terms, <3500bytes.
+J51: owner-accepted third capture under the binding criteria below.
+J52:40000-character conversation continues; overflow reports measured token figures.
+J53: public means no more than0.5 below6.5/5.6/5.4; document each lost behaviour.
+Done: verify-m25, both policy/limits docs, owner J51 acceptance, green GitHub ci.
+
+### Binding owner rulings (2026-09-20/21)
+Original wording: docs/decisions-log.md.
+
+- Add “Give each precedent its date.” to disposition paragraph2. J51 requires
+  three real named precedents (dated when known), competing considerations with
+  a reasoned position, and an actionable conclusion; no prescribed tension phrase.
+  Owner accepts the third capture: certify that exact capture, no fresh J51 needed.
+- Fabricated provenance is a serious fault. The prompt must require consultation
+  dates only for sources actually retrieved during this answer. Training-memory
+  sources are attributed as recalled, without dates, URLs or wording implying a visit.
+- Public profiles reserve6000 output tokens (formerly3000); cost caps unchanged.
+- Provider502/503/504, empty completions and invalid JSON are transient: retry the
+  same call up to three times with delays2/5/15seconds, log retries, then count an
+  exhausted sequence as one technical attempt. Applies to runtime, journeys, gates.
+- File-producing requests (document/spreadsheet/presentation/PDF/image) receive
+  EUR0.30 like attachments; ordinary requests EUR0.10, tools included. Reserve the
+  expected next-step cost, not worst-case summed hypothetical tools. Recheck money
+  between steps. Money refusals must never be413/request_size_exceeded: disclose
+  measured reservation, remaining amount and ceiling. No actual overspend allowed.
+- Journey assertions test substance, not particular words. J34 accepts
+  ouverture|opening|premier.*(cours|trade|échange)|début.*(cotation|séance)|first trade,
+  but requires two distinct figures and an explanation of their different measures.
+  Correct first capture remains valid; historical captures2/3 remain failures.
+- Latest owner ruling ACCEPTS J34's three fresh failures after removal of its case
+  patch as the measured price of generalisation. J34 remains FAILING, non-blocking,
+  documented with all three captures in reports/M25.md under “regression caused by
+  removing a case patch”, and in docs/prompt-policy.md as the first patched-score
+  trade-off. Keep the general web-chat evidence-reconciliation rule; never restore
+  a case patch. Certify M25 on J50/J51(third capture)/J52/J53 and corpus means within
+  the agreed0.5 tolerance. All other regressions remain blocking.
+
+### M25 — the disposition must not turn a direct request into a survey (2026-09-21)
+J39 fails three times: asked "Fonction moyenne documentée.", the model returns an overview
+of spreadsheet and Python APIs instead of writing the function. The precedents instruction misapplies open exploration to a bounded request.
+
+Insert verbatim after precedents in prompts/chat.txt (code, writing, calculation):
+
+Match the answer to the size of the question. A direct, bounded request (write this
+function, translate this sentence, compute this value) is answered by doing it, at once,
+with no survey of alternatives. Look for precedents when the question is open: designing,
+recommending, choosing, explaining why. Never make a small question large.
+
+Last required prompt change for M25: rerun J39 and complete.
+
+### M25 — J53 threshold: accept 4.8 for deepseek, but name the cases that fell (2026-09-21)
+deepseek reaches at most 4.8 against the 4.9 threshold, a loss of 0.6 from the 5.4 measured
+on 2026-09-20. The case patches supported deepseek more than the other two profiles; losing
+them costs it more. That is the measurement this milestone exists to produce.
+
+ACCEPTED at 4.8, on one condition: `reports/M25.md` lists, per profile, WHICH cases lost
+points against the 2026-09-20 run, with their before/after scores. If the drops fall on the
+cases the patches targeted (SpaceX, Z80, solargraphy), the result is coherent and the
+milestone completes. If a case with no patch dropped by more than 2 points, name it as a
+suspected side effect of the disposition and propose a general correction — never a patch.
+
+On the C03/GLM technical failures: retry as transient per the 2026-09-21 ruling; if they
+persist, record C03 as not run for that profile rather than blocking the milestone.
+
+### M25 — certified on qwen and glm; deepseek degraded by the disposition (owner ruling, 2026-09-21)
+Measured per-case, 2026-09-20 baseline → current:
+- atlas-qwen 6.067 (threshold 6.0) — passes
+- atlas-glm 6.467 (threshold 5.1) — passes, +1.3 on the previous run
+- atlas-deepseek 4.067 (threshold 4.8) — fails, −1.3
+
+The losses on deepseek fall on cases that never had a patch: C02 9→5, C03 9→3, C04 5→3,
+C08 9→6, C11 9→6, C13 6→3, C14 4→2. On the same cases glm gains: C02 1→8, C07 0→8,
+C09 3→8. The same prompt therefore helps two models and harms the third. deepseek-v4-flash
+is a small fast model; the long demanding disposition appears to crowd it out.
+
+CERTIFY M25 on atlas-qwen and atlas-glm. Record deepseek's regression in `reports/M25.md`
+as a measured finding, not a milestone failure, with the per-case table above. Do not
+weaken the disposition and do not write a per-model prompt in this milestone: note the
+question for a later one.
+
+Consequence for the default-model decision, to carry forward: deepseek was the candidate
+for speed and cost; it does not support the prompt that produces the other two models'
+quality. glm is now the strongest on the public corpus, qwen the most balanced.

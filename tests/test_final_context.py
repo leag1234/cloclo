@@ -33,7 +33,9 @@ class FinalContextTests(unittest.TestCase):
         normalized = final_messages(messages)
         self.assertEqual(messages, original)
         self.assertEqual(normalized[:2], messages[:2])
-        self.assertEqual(normalized[-1], messages[-1])
+        self.assertEqual(normalized[-2], messages[-1])
+        self.assertEqual(normalized[-1], messages[1])
+        self.assertEqual(final_messages(normalized), normalized)
         for index in (2, 3):
             self.assertEqual(normalized[index]["role"], "assistant")
             self.assertNotIn("tool_calls", normalized[index])
@@ -47,6 +49,30 @@ class FinalContextTests(unittest.TestCase):
             {"role": "user", "content": [{"type": "text", "text": "Compare."}]}
         ]
         self.assertEqual(final_messages(messages), messages)
+
+    def test_final_question_does_not_duplicate_image_payloads(self) -> None:
+        messages: list[dict[str, object]] = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Compare the dimensions."},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "data:image/png;base64,a"},
+                    },
+                ],
+            },
+            {"role": "tool", "content": "Dimension evidence."},
+        ]
+        normalized = final_messages(messages)
+        self.assertEqual(normalized[0], messages[0])
+        self.assertEqual(
+            normalized[-1],
+            {
+                "role": "user",
+                "content": "Compare the dimensions.",
+            },
+        )
 
     def test_only_whole_transport_envelopes_are_rejected(self) -> None:
         envelope = json.dumps(

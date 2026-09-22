@@ -1,5 +1,7 @@
 """Strict tool arguments; all untrusted results cross one explicit envelope."""
 
+from packages.limits import LimitError
+
 import asyncio
 import json
 import os
@@ -11,6 +13,8 @@ from pathlib import Path
 from typing import Literal
 
 import aiohttp
+from packages.validation import describe_validation
+
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from services.orchestrator import mcp_client
@@ -138,7 +142,9 @@ class Runtime:
                 async for piece in response.content.iter_chunked(16384):
                     body.extend(piece)
                     if len(body) > MAX_BYTES:
-                        raise ValueError("response_too_large")
+                        raise LimitError(
+                            "response_too_large", len(body), MAX_BYTES, "bytes"
+                        )
                 data = json.loads(body)
         if not isinstance(data, dict) or data.get("error"):
             raise ValueError("search_unavailable")
@@ -163,7 +169,9 @@ class Runtime:
         return output
 
     async def tavily(self, request: Search, timeout: float) -> Message:
-        key = self.cache.key(["tavily-bounded-domain-content", request.model_dump()])
+        key = self.cache.key(
+            ["tavily-advanced-contextual-excerpts", request.model_dump()]
+        )
         cached = self.cache.get(key)
         if cached is not None:
             return cached
@@ -178,7 +186,7 @@ class Runtime:
             validate_url("https://" + domain)
         if not query:
             raise ValueError("invalid_search_query")
-        self.cache.reserve_search("tavily", credits=2 if domains else 1)
+        self.cache.reserve_search("tavily", credits=2)
         async with aiohttp.ClientSession(
             timeout=http_timeout(timeout, SEARCH_TIMEOUT), trust_env=False
         ) as session:
@@ -188,7 +196,7 @@ class Runtime:
                     "api_key": credential,
                     "query": query,
                     "max_results": request.n,
-                    "search_depth": "advanced" if domains else "basic",
+                    "search_depth": "advanced",
                     "include_raw_content": True,
                     **({"include_domains": domains} if domains else {}),
                 },
@@ -202,7 +210,9 @@ class Runtime:
                 async for piece in response.content.iter_chunked(16384):
                     body.extend(piece)
                     if len(body) > MAX_BYTES:
-                        raise ValueError("response_too_large")
+                        raise LimitError(
+                            "response_too_large", len(body), MAX_BYTES, "bytes"
+                        )
                 data = json.loads(body)
         if not isinstance(data, dict) or data.get("error"):
             raise ValueError("search_unavailable")
@@ -211,8 +221,8 @@ class Runtime:
             raise ValueError("invalid_search_response")
         consulted = datetime.now(timezone.utc).isoformat()
         items: list[Message] = []
-        # Bound the combined history, not only each page: later shell/publication
-        # turns must still fit the unchanged cumulative loop token allowance.
+        # Search previews reserve room for reasoning; full provider text remains
+        # available through fetch and hierarchical synthesis.
         page_limit = min(16000, 32000 // max(1, min(len(results), request.n)))
         for result in results[: request.n]:
             if not isinstance(result, dict) or not all(
@@ -230,8 +240,11 @@ class Runtime:
                 {
                     "title": result["title"][:300],
                     "link": result["url"],
-                    "snippet": text[:300],
+                    "snippet": result["content"][:page_limit],
                     "content": text,
+                    "content_characters": len(source),
+                    "preview_limit_characters": page_limit,
+                    "truncated": len(source) > len(text),
                     "date": str(result.get("published_date", ""))[:100],
                 }
             )
@@ -241,10 +254,10 @@ class Runtime:
                 self.cache.key(["tavily-page", result["url"]]),
                 {
                     "url": result["url"],
-                    "text": text,
+                    "text": source,
                     "consulted_at": consulted,
                     "provider": "tavily",
-                    "truncated": len(source) > len(text),
+                    "truncated": False,
                 },
                 3600,
             )
@@ -258,12 +271,12 @@ class Runtime:
 
     async def fetch(self, request: Fetch, timeout: float) -> Message:
         validate_url(request.url)
+        cached = None
         if os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily":
-            supplied = self.cache.get(self.cache.key(["tavily-page", request.url]))
-            if supplied is not None:
-                return supplied
+            cached = self.cache.get(self.cache.key(["tavily-page", request.url]))
         key = self.cache.key(["fetch-full", request.url])
-        cached = self.cache.get(key)
+        if cached is None:
+            cached = self.cache.get(key)
         if cached is None:
             url, body = await self.web.fetch(request.url, timeout)
             text = await asyncio.to_thread(extract, body, url)
@@ -290,6 +303,8 @@ class Runtime:
             "token_budget": 4000,
             "estimated_tokens": estimated_tokens(text),
         }
+        if "provider" in cached:
+            output["provider"] = cached["provider"]
         if estimated_tokens(text) > 4000:
             summary, passages, sections = hierarchical_summary(
                 text, request.query or self.question
@@ -335,7 +350,11 @@ class Runtime:
                     )
                     try:
                         body, _ = await process.communicate(call.arguments.encode())
-                        if process.returncode or len(body) > 300000:
+                        if len(body) > 300000:
+                            raise LimitError(
+                                "retrieval_response_limit", len(body), 300000, "bytes"
+                            )
+                        if process.returncode:
                             raise ValueError("retrieval_unavailable")
                         result = json.loads(body)
                         if not isinstance(result, dict):
@@ -345,9 +364,12 @@ class Runtime:
                             process.kill()
                             await process.wait()
             return {"trust": "untrusted", "data": result}
-        except ValidationError:
+        except LimitError as exc:
+            return {"error": exc.code, "message": exc.detail}
+        except ValidationError as exc:
             return {
                 "error": "invalid_arguments",
+                "message": describe_validation(exc),
                 "schema": SCHEMAS[call.name].model_json_schema(),
             }
         except TimeoutError:

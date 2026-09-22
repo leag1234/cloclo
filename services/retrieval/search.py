@@ -1,5 +1,7 @@
 """Hybrid retrieval; this module never reads evaluation labels (POC-F2)."""
 
+from packages.limits import LimitError
+
 import json
 import logging
 import math
@@ -37,7 +39,7 @@ class Gateway:
     def post(self, operation: str, payload: dict[str, object]) -> object:
         data = json.dumps(payload, allow_nan=False).encode()
         if len(data) > 800000:
-            raise ValueError("context_exceeded")
+            raise LimitError("context_exceeded", len(data), 800000, "request bytes")
         request = Request(
             self.url + "/" + operation,
             data=data,
@@ -47,7 +49,9 @@ class Gateway:
             with urlopen(request, timeout=30) as response:
                 body = response.read(800001)
             if len(body) > 800000:
-                raise ValueError("provider_response_limit")
+                raise LimitError(
+                    "provider_response_limit", len(body), 800000, "response bytes"
+                )
             return json.loads(body)
         except HTTPError as exc:
             raise ValueError("gateway_http_error") from exc
@@ -105,7 +109,11 @@ def rank(
 def rank_scored(
     question: str, chunks: list[Chunk], gateway: Gateway, k: int = 8
 ) -> list[tuple[Chunk, float]]:
-    if not question.strip() or len(question) > 32000 or not 1 <= k <= 8:
+    if len(question) > 32000:
+        raise LimitError("invalid_query", len(question), 32000, "characters")
+    if not 1 <= k <= 8:
+        raise LimitError("invalid_query", k, 8, "results (minimum 1)")
+    if not question.strip():
         raise ValueError("invalid_query")
     if not chunks:
         return []

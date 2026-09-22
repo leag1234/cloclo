@@ -1,5 +1,8 @@
 """Authenticated inference: reserve before I/O, settle usage or retain the bound."""
 
+from packages.limits import LimitError
+from packages.validation import describe_validation
+
 import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import aclosing
@@ -19,8 +22,10 @@ from services.orchestrator.dev_messages import Wire as MessagesWire
 from services.orchestrator.dev_responses import Wire
 
 
-def error(code: str, status: int) -> JSONResponse:
-    return JSONResponse({"error": {"type": code, "message": code}}, status_code=status)
+def error(code: str, status: int, detail: str = "") -> JSONResponse:
+    return JSONResponse(
+        {"error": {"type": code, "message": detail or code}}, status_code=status
+    )
 
 
 async def drive(
@@ -51,8 +56,12 @@ async def drive(
                     )
                     settled = True
                     if charged > plan.reserved:
-                        raise RuntimeError("budget_exceeded")
+                        raise LimitError(
+                            "budget_exceeded", charged, plan.reserved, "microEUR"
+                        )
                 yield chunk
+    except LimitError as exc:
+        yield {"error": {"type": exc.code, "message": exc.detail}}
     except (ValueError, RuntimeError, TimeoutError, OSError, KeyError, TypeError):
         yield {"error": {"type": "provider_error", "message": "provider_error"}}
     finally:
@@ -81,7 +90,7 @@ async def chat(request: Request, protocol: str = "chat") -> Response:
             async for piece in request.stream():
                 body.extend(piece)
                 if len(body) > 1048576:
-                    return error("body_limit", 400)
+                    raise LimitError("body_limit", len(body), 1048576, "bytes")
         raw = json.loads(body)
         parsed = (
             responses(raw)
@@ -93,6 +102,10 @@ async def chat(request: Request, protocol: str = "chat") -> Response:
         plan = gateway.prepare(parsed)
         store, developer = request.state.store, request.state.developer
         request_id = store.reserve(developer, plan.reserved)
+    except LimitError as exc:
+        return error(exc.code, 400, exc.detail)
+    except ValidationError as exc:
+        return error("invalid_request", 400, describe_validation(exc))
     except QuotaError:
         return error("quota_exceeded", 429)
     except PermissionError:

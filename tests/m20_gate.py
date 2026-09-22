@@ -245,6 +245,7 @@ def main() -> None:
                     "ATLAS_GATEWAY_URL": "http://127.0.0.1:18010",
                     "ATLAS_PUBLIC_URL": "http://127.0.0.1:18020",
                     "ATLAS_IMAGE_DIR": directory + "/images",
+                    "ATLAS_SEARCH_PROVIDER": "tavily",
                     "ATLAS_INTERACTION_DIR": directory + "/logs",
                     "ATLAS_IMAGE_ON_DEMAND": "1",
                 },

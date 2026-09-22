@@ -66,11 +66,16 @@ class WorkerTests(unittest.TestCase):
 
                 pipeline.tokenizer_2.return_value = {"input_ids": list(range(513))}
                 count = pipeline.call_count
-                with self.assertRaises(HTTPError):
+                with self.assertRaises(HTTPError) as refused:
                     urlopen(
                         Request(url + "/generate", data=b'{"prompt":"a long prompt"}'),
                         timeout=5,
                     )
+                self.assertEqual(refused.exception.code, 413)
+                self.assertEqual(
+                    json.load(refused.exception),
+                    {"measured": 513, "limit": 512, "unit": "tokens"},
+                )
                 self.assertEqual(pipeline.call_count, count)
                 modules.FluxPipeline.from_pretrained.return_value.to.assert_called_once_with(
                     "cuda"

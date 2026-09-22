@@ -1,5 +1,7 @@
 """Chat input normalization and output assembly; tools are never executed here."""
 
+from packages.limits import LimitError
+
 import json
 import time
 from typing import Any, Literal
@@ -122,12 +124,17 @@ class Output:
                 target["function"]["arguments"] += arguments
                 update["function"]["arguments"] = arguments
                 if len(target["function"]["arguments"]) > 65536:
-                    raise ValueError("arguments_limit")
+                    raise LimitError(
+                        "arguments_limit",
+                        len(target["function"]["arguments"]),
+                        65536,
+                        "characters",
+                    )
                 changes.append(update)
             if changes:
                 clean["tool_calls"] = changes
             if len(self.text) > 131072:
-                raise ValueError("content_limit")
+                raise LimitError("content_limit", len(self.text), 131072, "characters")
             reason = choice["finish_reason"]
             if reason is not None:
                 self.reason = (

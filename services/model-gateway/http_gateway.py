@@ -10,9 +10,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 
 from gateway_cpu import CPUModels, EMBEDDING_REVISION
 from generation import Generator
+from packages.limits import LimitError
+from packages.validation import describe_validation
+from pydantic import ValidationError
 from agent_provider import AgentProvider
 from vision import VisionProvider
 from packages.context_limit import ContextExceeded
+from packages.image_upload import UploadError
 from packages.configuration import MissingConfiguration
 
 import imagegen
@@ -94,7 +98,26 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                         )
                     )
                     async with asyncio.timeout(0.1):
-                        await send({"error": "provider_error"})
+                        if isinstance(exc, LimitError):
+                            await send(
+                                {
+                                    "error": "measured_limit",
+                                    "code": exc.code,
+                                    "measured": exc.measured,
+                                    "limit": exc.limit,
+                                    "unit": exc.unit,
+                                }
+                            )
+                        elif isinstance(exc, ContextExceeded):
+                            await send(
+                                {
+                                    "error": "context_exceeded",
+                                    "tokens": exc.tokens,
+                                    "limit": exc.limit,
+                                }
+                            )
+                        else:
+                            await send({"error": "provider_error"})
 
             try:
                 asyncio.run(bounded_relay())
@@ -109,10 +132,13 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 maximum = (
-                    32 * 1024 * 1024 if self.path == "/vision/complete" else 800000
+                    32 * 1024 * 1024
+                    if self.path
+                    in {"/vision/complete", "/agent/complete", "/agent/stream"}
+                    else 800000
                 )
                 if not 0 < length <= maximum:
-                    raise ValueError("context_exceeded")
+                    raise UploadError("request_size_exceeded", length, maximum, "bytes")
                 self.connection.settimeout(30)
                 request = json.loads(self.rfile.read(length))
                 if not isinstance(request, dict):
@@ -196,6 +222,26 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                 status, response = (
                     503,
                     {"code": "configuration_missing", "missing": list(exc.missing)},
+                )
+            except ValidationError as exc:
+                status, response = (
+                    400,
+                    {"code": "invalid_input", "message": describe_validation(exc)},
+                )
+            except (UploadError, LimitError) as exc:
+                status, response = (
+                    429
+                    if exc.unit.startswith("microEUR")
+                    else 400
+                    if exc.code == "invalid_cardinality"
+                    else 413,
+                    {
+                        "code": exc.code,
+                        "measured": exc.measured,
+                        "limit": exc.limit,
+                        "unit": exc.unit,
+                        "message": str(exc),
+                    },
                 )
             except ContextExceeded as exc:
                 # context_exceeded reports measured tokens against the model limit.

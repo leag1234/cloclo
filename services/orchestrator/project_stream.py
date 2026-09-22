@@ -1,5 +1,7 @@
 """Expose the answer string progressively, never the internal consolidation fields."""
 
+from packages.limits import LimitError
+
 import json
 
 from services.orchestrator.stream_client import Sink
@@ -69,7 +71,7 @@ class AnswerStream:
         if "content" in delta:
             self.buffer += str(delta["content"])
             if len(self.buffer) > 32000:
-                raise ValueError("stream_limit")
+                raise LimitError("stream_limit", len(self.buffer), 32000, "characters")
             answer = self.answer()
             if answer:
                 if not answer.startswith(self.shown):

@@ -9,6 +9,7 @@ from PIL import Image
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from services.guardrails.input_filter import validate_input
+from packages.image_upload import UploadError
 
 
 class Strict(BaseModel):
@@ -18,19 +19,32 @@ class Strict(BaseModel):
 def image_info(url: str) -> dict[str, int | str]:
     prefix, _, encoded = url.partition(",")
     formats = {"data:image/png;base64": "PNG", "data:image/jpeg;base64": "JPEG"}
-    if prefix not in formats or len(encoded) > 2796204:
+    if prefix not in formats:
         raise ValueError("invalid_image")
+    if len(encoded) > 2796204:
+        raise UploadError("image_size_exceeded", len(encoded), 2796204, "encoded bytes")
     uniform: str | None = None
     try:
         raw = base64.b64decode(encoded, validate=True)
         if not raw or len(raw) > 2 * 1024 * 1024:
-            raise ValueError("image_size_exceeded")
+            raise UploadError("image_size_exceeded", len(raw), 2 * 1024 * 1024, "bytes")
         with Image.open(io.BytesIO(raw), formats=[formats[prefix]]) as im:
             width, height = im.size
             if not (0 < width <= 4096 and 0 < height <= 4096):
-                raise ValueError("image_dimensions_exceeded")
-            if width * height > 16000000 or getattr(im, "n_frames", 1) != 1:
-                raise ValueError("image_dimensions_exceeded")
+                raise UploadError(
+                    "image_dimensions_exceeded",
+                    max(width, height),
+                    4096,
+                    "pixels per axis",
+                )
+            if width * height > 16000000:
+                raise UploadError(
+                    "image_dimensions_exceeded", width * height, 16000000, "pixels"
+                )
+            if getattr(im, "n_frames", 1) != 1:
+                raise UploadError(
+                    "image_dimensions_exceeded", getattr(im, "n_frames", 1), 1, "frames"
+                )
             im.verify()
         with Image.open(io.BytesIO(raw), formats=[formats[prefix]]) as im:
             im.load()  # Header validation alone misses a truncated JPEG raster.
@@ -68,7 +82,7 @@ class ImageURL(Strict):
 
 class TextPart(Strict):
     type: Literal["text"]
-    text: str = Field(min_length=1, max_length=200000, pattern=r"\S")
+    text: str = Field(min_length=1, pattern=r"\S")
     _safe_text = field_validator("text")(validate_input)
 
 
@@ -99,10 +113,12 @@ class VisionMessage(BaseModel):
     @model_validator(mode="after")
     def valid_content(self) -> Self:
         if isinstance(self.content, str):
-            if not self.content.strip() or len(self.content) > 200000:
+            if not self.content.strip():
                 raise ValueError("invalid_text")
             validate_input(self.content)
-        elif not 1 <= len(self.content) <= 16 or self.role != "user":
+        elif not 1 <= len(self.content) <= 16:
+            raise UploadError("message_parts_exceeded", len(self.content), 16, "parts")
+        elif self.role != "user":
             raise ValueError("invalid_parts")
         return self
 
@@ -131,11 +147,13 @@ class VisionInput(BaseModel):
     def valid_history(self) -> Self:
         if self.messages[-1].role != "user" or not self.messages[-1].text.strip():
             raise ValueError("last_message_must_have_user_text")
-        if sum(len(m.text) for m in self.messages) > 600000:
-            raise ValueError("context_exceeded")
         images = [im for m in self.messages for im in m.images]
-        if len(images) > 4 or sum(int(im["bytes"]) for im in images) > 4 * 1024 * 1024:
-            raise ValueError("image_size_exceeded")
-        if sum(int(im["width"]) * int(im["height"]) for im in images) > 16000000:
-            raise ValueError("image_dimensions_exceeded")
+        if len(images) > 4:
+            raise UploadError("image_count_exceeded", len(images), 4, "images")
+        size = sum(int(im["bytes"]) for im in images)
+        if size > 4 * 1024 * 1024:
+            raise UploadError("image_size_exceeded", size, 4 * 1024 * 1024, "bytes")
+        pixels = sum(int(im["width"]) * int(im["height"]) for im in images)
+        if pixels > 16000000:
+            raise UploadError("image_dimensions_exceeded", pixels, 16000000, "pixels")
         return self
