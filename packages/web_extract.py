@@ -1,5 +1,7 @@
 """Extract downloaded evidence before applying the model context budget."""
 
+from packages.limits import LimitError
+
 from io import BytesIO
 
 from pypdf import PdfReader
@@ -20,7 +22,7 @@ def extract(body: bytes, url: str) -> str:
             text = page.extract_text()
             size += len(text)
             if size > 1_000_000:
-                raise ValueError("extracted_text_limit")
+                raise LimitError("extracted_text_limit", size, 1_000_000, "characters")
             parts.append(text)
         return "\n".join(parts)
     except PyPdfError:

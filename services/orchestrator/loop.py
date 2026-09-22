@@ -1,6 +1,7 @@
 """POC-P6: reserve worst-case usage before starting cancellable I/O."""
 
 from packages.profiles import PROFILES
+from packages.limits import LimitError
 
 import asyncio
 import json
@@ -13,14 +14,15 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from packages.validation import describe_validation
 
 from services.guardrails.input_filter import validate_input
 
 
 class Query(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    question: str = Field(min_length=1, max_length=32000, pattern=r"\S")
+    question: str = Field(min_length=1, pattern=r"\S")
     lang: Literal["fr", "de", "es", "it", "en"]
 
     _safe_question = field_validator("question")(validate_input)
@@ -28,18 +30,25 @@ class Query(BaseModel):
 
 @dataclass(frozen=True)
 class Limits:
-    tokens: int = 16384
+    tokens: int | None = 16384
     profile: str | None = None
     tool_calls: int = 10
     wall_clock: float = 120
     cost: Decimal = Decimal("0.05")
     has_attachments: bool = False
+    produces_files: bool = False
 
     def __post_init__(self) -> None:
         if self.profile is not None and self.profile not in PROFILES:
             raise ValueError("invalid_limits")
         if not (
-            0 <= self.tokens <= (262144 if self.profile else 16384)
+            (
+                (self.tokens is None and self.profile is not None)
+                or (
+                    self.tokens is not None
+                    and 0 <= self.tokens <= (262144 if self.profile else 16384)
+                )
+            )
             and 0 <= self.tool_calls <= 10
             and (0 <= self.wall_clock <= 120)
             and (
@@ -47,7 +56,8 @@ class Limits:
                 <= self.cost
                 <= Decimal(
                     "0.30"
-                    if self.has_attachments and self.profile is not None
+                    if (self.has_attachments or self.produces_files)
+                    and self.profile is not None
                     else "0.10"
                     if self.profile is not None
                     else "0.05"
@@ -148,6 +158,7 @@ async def run(
     counts: Counter[str] = Counter()
     recent: list[tuple[str, str]] = []
     quota_recovered = False
+    answer_parts: list[str] = []
 
     def remaining() -> float:
         seconds = deadline - clock()
@@ -157,7 +168,7 @@ async def run(
 
     def reserve(usage: Reservation) -> None:
         remaining()
-        if result.tokens + usage.tokens > limits.tokens:
+        if limits.tokens is not None and result.tokens + usage.tokens > limits.tokens:
             raise Stop("tokens")
         if result.cost + usage.cost > limits.cost:
             raise Stop("cost")
@@ -197,8 +208,11 @@ async def run(
             if not turn.calls:
                 if not turn.text.strip():
                     raise ValueError("empty_model_response")
-                result.text, result.state = turn.text, "done"
+                result.text, result.state = "".join([*answer_parts, turn.text]), "done"
                 return result
+            # Streaming already exposes this content; retain it in the final
+            # HTTP answer and journal as well when a tool interrupts the prose.
+            answer_parts.append(turn.text)
             if quota_recovered:
                 raise Stop("tool_quota_exhausted")
             messages.append(
@@ -316,6 +330,33 @@ async def run(
                     )
                     pending_calls.append(retry)
                     retried = True
+                if (
+                    call.name == "web_search"
+                    and not counts["web_fetch"]
+                    and "error" not in output
+                ):
+                    from services.orchestrator.search_policy import requested_page_read
+
+                    data = output.get("data", output)
+                    rows = data.get("results") if isinstance(data, dict) else None
+                    if requested_page_read(query.question) and isinstance(rows, list):
+                        for row in rows:
+                            if isinstance(row, dict) and isinstance(
+                                row.get("link"), str
+                            ):
+                                initial_calls = (
+                                    Call(
+                                        call.id + "-read",
+                                        "web_fetch",
+                                        json.dumps(
+                                            {
+                                                "url": row["link"],
+                                                "query": query.question,
+                                            }
+                                        ),
+                                    ),
+                                )
+                                break
                 event: Message = {
                     "tool": call.name,
                     "arguments": call.arguments,
@@ -343,13 +384,28 @@ async def run(
                 )
     except Stop as exc:
         result.reason = str(exc)
+    except ValidationError as exc:
+        result.state, result.reason, result.text = (
+            "stopped",
+            "provider_error",
+            describe_validation(exc),
+        )
+        return result
+    except LimitError as exc:
+        result.state, result.reason, result.text = "stopped", exc.code, exc.detail
+        return result
     except PublicFailure:
         raise
     except (ValueError, RuntimeError, OSError):
         result.reason = "provider_error"
     result.state = "stopped"
     result.text = (
-        f"Explicit stop: {result.reason}. Tools executed: {result.tool_calls}."
+        f"Explicit stop: {result.reason}. Tools executed: {result.tool_calls}; limit {limits.tool_calls}. "
+        f"Tokens reserved: {result.tokens}; limit {limits.tokens}. "
+        f"Cost reserved: {result.cost} EUR; limit {limits.cost} EUR. "
+        f"Elapsed: {max(0, clock() - (deadline - limits.wall_clock)):.3f} seconds; "
+        f"limit {limits.wall_clock:.3f} seconds. "
+        f"Searches: {counts['web_search']}; limit 3. Fetches: {counts['web_fetch']}; limit 8."
     )
     logging.getLogger(__name__).info(
         json.dumps(

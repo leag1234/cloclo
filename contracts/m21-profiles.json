@@ -1,7 +1,12 @@
 {
-  "models": ["atlas-qwen", "atlas-glm", "atlas-deepseek"],
-  "max_output_tokens": 3000,
+  "models": [
+    "atlas-qwen",
+    "atlas-glm",
+    "atlas-deepseek"
+  ],
+  "max_output_tokens": 6000,
   "max_seconds": 120,
   "max_cost_eur": "0.10",
-  "reasoning_effort": "none"
+  "reasoning_effort": "none",
+  "file_or_attachment_max_cost_eur": "0.30"
 }

@@ -1,5 +1,7 @@
 """Gateway streaming boundary, invoked only after the harness reservation."""
 
+from packages.limits import LimitError
+
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 import json
@@ -29,7 +31,12 @@ async def receive(
                 async for line in response.content:
                     total += len(line)
                     if total > (8000000 if payload.get("profile") else 1000000):
-                        raise ValueError("stream_limit")
+                        raise LimitError(
+                            "stream_limit",
+                            total,
+                            8000000 if payload.get("profile") else 1000000,
+                            "bytes",
+                        )
                     if not line.strip():
                         continue
                     if not line.startswith(b"data:") or result is not None:
@@ -37,6 +44,46 @@ async def receive(
                     event = json.loads(line[5:])
                     if not isinstance(event, dict):
                         raise ValueError("invalid_stream")
+                    if (
+                        event.get("error") == "measured_limit"
+                        and all(
+                            type(event.get(k)) is int and event[k] >= 0
+                            for k in ("measured", "limit")
+                        )
+                        and isinstance(event.get("unit"), str)
+                        and isinstance(event.get("code"), str)
+                    ):
+                        if event["code"] == "cost_budget":
+                            from services.orchestrator.model import GatewayError
+
+                            ceiling = (
+                                "0.30"
+                                if payload.get("has_attachments")
+                                or payload.get("produces_files")
+                                else "0.10"
+                            )
+                            raise GatewayError(
+                                "cost_budget",
+                                504,
+                                f"Cost reservation: {event['measured']} microEUR; remaining {event['limit']} microEUR; request ceiling {ceiling} EUR",
+                            )
+                        raise LimitError(
+                            event["code"],
+                            event["measured"],
+                            event["limit"],
+                            event["unit"],
+                        )
+                    if event.get("error") == "context_exceeded" and all(
+                        type(event.get(k)) is int and event[k] >= 0
+                        for k in ("tokens", "limit")
+                    ):
+                        from services.orchestrator.model import GatewayError
+
+                        raise GatewayError(
+                            "context_exceeded",
+                            413,
+                            f"Conversation: {event['tokens']} tokens, limit {event['limit']} tokens",
+                        )
                     if set(event) == {"result"} and isinstance(event["result"], dict):
                         result = event["result"]
                     elif set(event) == {"phase"} and event["phase"] in {

@@ -60,7 +60,9 @@ async def capture_tool(source: Awaitable[Any], save: Callable[[Any], None]) -> A
     except (ValueError, TimeoutError, asyncio.CancelledError) as exc:
         cancelled = isinstance(exc, asyncio.CancelledError)
         message = "" if cancelled else str(exc)
-        assert re.fullmatch(r"[a-z_]*", message), "unsafe_tool_error_recording"
+        assert re.fullmatch(r"(?:[a-z_]*|http_[1-5][0-9]{2})", message), (
+            "unsafe_tool_error_recording"
+        )
         save(
             {
                 "recorded_exception": "TimeoutError"

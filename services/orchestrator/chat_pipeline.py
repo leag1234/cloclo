@@ -1,6 +1,11 @@
 """Chat uses the bounded harness and resolves citations through retrieval HTTP."""
 
+from packages.limits import LimitError
+from packages.validation import describe_validation
+from pydantic import ValidationError
+
 import json
+import copy
 import os
 import re
 import time
@@ -68,7 +73,7 @@ async def source(key: str) -> dict[str, object]:
                 raise ValueError("invalid_citation")
             body = await response.read()
             if len(body) > 800000:
-                raise ValueError("invalid_citation")
+                raise LimitError("source_response_limit", len(body), 800000, "bytes")
     return Source.model_validate(json.loads(body)).model_dump()
 
 
@@ -145,6 +150,13 @@ class ChatTools(Runtime):
                     self.item.files = list(self.terminal.files)
                     self.item.file_strategies = list(self.terminal.strategies)
                 return {"trust": "untrusted", "data": output}
+            except LimitError as exc:
+                return {"error": exc.code, "message": exc.detail}
+            except ValidationError as exc:
+                return {
+                    "error": "invalid_arguments",
+                    "message": describe_validation(exc),
+                }
             except (ValueError, RuntimeError, aiohttp.ClientError, TimeoutError):
                 self.item.erreurs.append("terminal_operation_failed")
                 return {"error": "terminal_operation_failed"}
@@ -156,11 +168,19 @@ class ChatTools(Runtime):
                     call.arguments
                 ).prompt
                 return {"selected": "generate_image"}
+            except ValidationError as exc:
+                return {
+                    "error": "invalid_image_arguments",
+                    "message": describe_validation(exc),
+                }
             except ValueError:
                 return {"error": "invalid_image_arguments"}
         if call.name != "rag_search":
             output = await super().execute(call, timeout)
             data = output.get("data")
+            if call.name == "web_search" and isinstance(data, dict):
+                data = self.search_evidence(data)
+                output = {**output, "data": data}
             if isinstance(data, dict):
                 self.source_truncated |= data.get("truncated") is True
                 if isinstance(data.get("url"), str):
@@ -237,6 +257,19 @@ class ChatTools(Runtime):
                     "passages": select_passages(result.passages, request.query, 8000)
                 },
             }
+        except LimitError as exc:
+            return {"error": exc.code, "message": exc.detail}
+        except ValidationError as exc:
+            self.item.erreurs.append("retrieval_unavailable")
+            if any(
+                error.get("ctx", {}).get("max_length") is not None
+                for error in exc.errors()
+            ):
+                return {
+                    "error": "retrieval_unavailable",
+                    "message": describe_validation(exc),
+                }
+            return {"error": "retrieval_unavailable"}
         except (ValueError, RuntimeError, TimeoutError):
             self.item.erreurs.append("retrieval_unavailable")
             return {"error": "retrieval_unavailable"}
@@ -251,6 +284,41 @@ class ChatTools(Runtime):
                     }
                 )
             self.item.latence_ms["retrieval"] += (time.monotonic() - started) * 1000
+
+    def search_evidence(self, data: Message) -> Message:
+        """Budget evidence for the next inference; every later step rechecks cost."""
+        from services.orchestrator.content import select_passages as select_text
+
+        rows = data.get("results")
+        if self.model is None or not isinstance(rows, list) or not rows:
+            return data
+        price = self.model.configuration.input_eur_per_mtok
+        if price <= 0:
+            return data
+        # Account for JSON escaping and retain half the allowance for output
+        # and other context. Do not reserve ten hypothetical future calls.
+        budget = max(1, int(self.model.allowance * 1000000 / (price * 2 * 2)))
+        per_source = max(1, budget // len(rows))
+        result = copy.deepcopy(data)
+        copied = result["results"]
+        assert isinstance(copied, list)
+        for row in copied:
+            if not isinstance(row, dict) or not isinstance(row.get("content"), str):
+                continue
+            text = row["content"]
+            measured = len(text.encode())
+            if measured <= per_source:
+                continue
+            parts = select_text(text, self.question, per_source)
+            selected = "\n".join(part.text for part in parts)
+            row.update(
+                content=selected,
+                source_bytes=measured,
+                preview_limit_bytes=per_source,
+                truncated=True,
+                detail=f"Selected {len(selected.encode())} of {measured} preview bytes; limit {per_source} bytes. Use web_fetch on the source link for full evidence.",
+            )
+        return result
 
     def document_evidence(self, output: Message) -> Message:
         """Apply M10 to complete output before reserving another inference."""
@@ -278,6 +346,7 @@ class ChatTools(Runtime):
             "hierarchical_synthesis": True,
             "source_characters": len(text),
             "source_bytes": size,
+            "selected_characters": len(summary),
             "sections_examined": sections,
             "remaining_budget_eur": str(self.model.allowance),
             "estimated_evidence_reservation_eur": str(reservation),
@@ -286,6 +355,13 @@ class ChatTools(Runtime):
         return {
             **output,
             "output": [{"type": "output", "data": summary}],
+            "truncated": True,
+            "detail": (
+                f"Selected {len(summary)} of {len(text)} characters within the "
+                f"remaining {self.model.allowance} EUR budget. These extracts are "
+                "not a complete reading. For an exhaustive summary, read all "
+                "remaining sections in bounded outputs; otherwise state the gap."
+            ),
             "synthesis": metadata,
         }
 
@@ -338,18 +414,6 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         if not followup and not request.documents
         else ()
     )
-    if (
-        os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily"
-        and discovery
-        and all(call.name == "web_search" for call in discovery)
-    ):
-        # Discovery already supplies page contents; do not offer a second fetch.
-        model.tools = [
-            tool
-            for tool in model.tools
-            if isinstance(function := tool.get("function"), dict)
-            and function.get("name") != "web_fetch"
-        ]
     if followup and os.environ.get("ATLAS_TERMINAL_ENABLED") != "1":
         model.tools = []
     else:
@@ -372,13 +436,19 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         ]
     model.observing = True
     model.sink = sink_context.get()
+    from packages.file_intent import produces_file
+
+    produces_files = produces_file(request.messages[-1].text)
     model.configure_quality(
-        request.model, request.max_tokens, has_attachments=bool(request.documents)
+        request.model,
+        request.max_tokens,
+        has_attachments=bool(request.documents),
+        produces_files=produces_files,
     )
     item.reasoning_effort = request.reasoning_effort
     model.local_enabled = os.environ.get("GPU_LOCAL", "0") == "1"
     item.cout_eur = (
-        0.30 if request.documents else 0.10
+        0.30 if request.documents or produces_files else 0.10
     )  # Reserved until ledger returns.
     tools = ChatTools(item, request.messages[-1].text, allow_image=not followup)
     tools.model = model
@@ -402,8 +472,8 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             Query(question=iteration or request.messages[-1].text, lang=request.lang),
             model,
             tools,
-            Path("prompts/chat-agent.txt").read_text()
-            + Path("prompts/chat.txt").read_text()
+            Path("prompts/chat.txt").read_text()
+            + Path("prompts/chat-agent.txt").read_text()
             + Path("prompts/web-chat.txt").read_text()
             + (
                 Path("prompts/tavily.txt").read_text()
@@ -415,9 +485,10 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             + file_context,
             Limits(
                 profile=request.model,
-                tokens=262144,
-                cost=Decimal("0.30" if request.documents else "0.10"),
+                tokens=None,
+                cost=Decimal("0.30" if request.documents or produces_files else "0.10"),
                 has_attachments=bool(request.documents),
+                produces_files=produces_files,
                 wall_clock=max(
                     0, request.timeout_seconds - (time.monotonic() - started)
                 ),

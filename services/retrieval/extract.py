@@ -21,6 +21,10 @@ LOG = logging.getLogger(__name__)
 class InvalidDocument(ValueError):
     """Unsupported, unsafe, empty or malformed document."""
 
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        LOG.warning(message)
+
 
 class HTMLText(HTMLParser):
     def __init__(self) -> None:
@@ -48,8 +52,12 @@ class HTMLText(HTMLParser):
 def extract(path: Path) -> str:
     """Extract a regular local file; the caller supplies corpus ownership metadata."""
     try:
-        if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_BYTES:
+        if path.is_symlink() or not path.is_file():
             raise InvalidDocument("invalid_file")
+        if path.stat().st_size > MAX_BYTES:
+            raise InvalidDocument(
+                f"invalid_file: {path.stat().st_size} bytes; limit {MAX_BYTES} bytes"
+            )
         suffix = path.suffix.lower()
         if suffix == ".pdf":
             reader = PdfReader(path, strict=True)
@@ -61,13 +69,17 @@ def extract(path: Path) -> str:
                 value = page.extract_text()
                 total += len(value)
                 if total > MAX_TEXT:
-                    raise InvalidDocument("text_limit")
+                    raise InvalidDocument(
+                        f"text_limit: {total} characters; limit {MAX_TEXT} characters"
+                    )
                 parts.append(value)
             text = "\n".join(parts)
         elif suffix == ".docx":
             with ZipFile(path) as archive:
                 if sum(i.file_size for i in archive.infolist()) > MAX_TEXT:
-                    raise InvalidDocument("archive_limit")
+                    raise InvalidDocument(
+                        f"archive_limit: {sum(i.file_size for i in archive.infolist())} bytes; limit {MAX_TEXT} bytes"
+                    )
             doc = Document(str(path))
             text = "\n".join(
                 "\n".join("\t".join(c.text for c in row.cells) for row in block.rows)
@@ -88,7 +100,11 @@ def extract(path: Path) -> str:
                 )
         else:
             raise InvalidDocument("unsupported_format")
-        if len(text) > MAX_TEXT or not text.strip():
+        if len(text) > MAX_TEXT:
+            raise InvalidDocument(
+                f"text_limit: {len(text)} characters; limit {MAX_TEXT} characters"
+            )
+        if not text.strip():
             raise InvalidDocument("empty_or_large_text")
     except (
         OSError,

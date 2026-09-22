@@ -220,6 +220,7 @@ def main() -> None:
                 **({} if live else environment()),
                 "ATLAS_IMAGE_DIR": directory + "/images",
                 "ATLAS_WEB_CACHE": directory + "/web.sqlite",
+                "ATLAS_SEARCH_PROVIDER": "tavily",
                 "ATLAS_INTERACTION_DIR": directory + "/logs",
                 "ATLAS_PROJECT_DB": directory + "/projects.sqlite",
                 "ATLAS_PUBLIC_URL": "http://localhost:8020",

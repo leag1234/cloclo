@@ -12,6 +12,7 @@ import urllib.error
 import urllib.request
 
 from packages.configuration import IMAGE_REQUIRED_ENV, require_env
+from packages.limits import ProviderLimitError
 
 
 def ready() -> bool:
@@ -61,7 +62,12 @@ def start_worker() -> None:
         )
         reservation = 2.0  # 1 h at the enforced 2 EUR/h maximum, rounded upwards.
         if reserved + reservation > 30:
-            raise RuntimeError("image_start_budget_exceeded: reserved limit 30 EUR")
+            raise ProviderLimitError(
+                "image_start_budget_exceeded",
+                int((reserved + reservation) * 1000000),
+                30000000,
+                "microEUR",
+            )
         ledger.write_text(json.dumps({"reserved_eur": reserved + reservation}))
         with (directory / "STATUS.md").open("a") as status:
             status.write(
@@ -91,7 +97,9 @@ def start_worker() -> None:
 
 async def ensure_worker(timeout: float) -> None:
     if not 0 <= timeout <= 895:
-        raise ValueError("invalid_startup_timeout")
+        raise ProviderLimitError(
+            "invalid_startup_timeout", int(timeout * 1000), 895000, "milliseconds"
+        )
     if await asyncio.to_thread(ready):
         return
     await asyncio.to_thread(start_worker)

@@ -16,6 +16,28 @@ def final_messages(messages: list[dict[str, object]]) -> list[dict[str, object]]
                     {"untrusted_tool_history": message}, ensure_ascii=False
                 ),
             }
+    if any(
+        message.get("role") == "tool" or message.get("tool_calls")
+        for message in messages
+    ):
+        question = next(
+            (
+                message.get("content")
+                for message in reversed(messages)
+                if message.get("role") == "user"
+            ),
+            None,
+        )
+        if isinstance(question, list):
+            question = "\n".join(
+                str(part.get("text", ""))
+                for part in question
+                if isinstance(part, dict) and part.get("type") == "text"
+            )
+        if isinstance(question, str) and question.strip():
+            # Repeat only the user's own request, never promote source evidence.
+            # Original multimodal inputs and every historical byte remain above.
+            normalized.append({"role": "user", "content": question})
     return normalized
 
 

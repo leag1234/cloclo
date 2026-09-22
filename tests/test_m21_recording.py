@@ -26,6 +26,18 @@ class RecordingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(original[0]["response"], [{"text": "real"}])
         self.assertIsNone(history.take("stream", {"prompt": "original"}))
 
+    async def test_http_status_error_is_recorded_without_provider_body(self) -> None:
+        saved: list[object] = []
+
+        async def tool() -> object:
+            raise ValueError("http_404")
+
+        with self.assertRaisesRegex(ValueError, "^http_404$"):
+            await capture_tool(tool(), saved.append)
+        self.assertEqual(
+            saved, [{"recorded_exception": "ValueError", "message": "http_404"}]
+        )
+
     async def test_cancelled_tool_is_saved_before_propagating(self) -> None:
         async def tool() -> object:
             raise asyncio.CancelledError()

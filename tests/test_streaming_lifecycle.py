@@ -63,6 +63,57 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(rows), 1)
             self.assertIn("cancelled", rows[0]["erreurs"])
 
+    async def test_final_status_reports_completion_time_without_reshowing_spinner(
+        self,
+    ) -> None:
+        async def process(payload: ChatRequest, item: Interaction) -> None:
+            sink = sink_context.get()
+            assert sink is not None
+            await sink({"delta": {"content": "Useful complete answer.\n"}})
+            item.state = "done"
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, {"ATLAS_INTERACTION_DIR": directory}),
+        ):
+            chunks = [
+                str(x)
+                async for x in response(
+                    request(), Interaction(), time.monotonic() - 2, process
+                ).body_iterator
+            ]
+        events = [json.loads(x[6:]) for x in chunks if x.startswith("data: {")]
+        final = next(
+            e
+            for e in events
+            if e.get("choices", [{}])[0].get("finish_reason") == "stop"
+        )
+        self.assertTrue(final["event"]["data"]["done"])
+        self.assertTrue(final["event"]["data"]["hidden"])
+        self.assertGreaterEqual(final["event"]["data"]["elapsed_seconds"], 2)
+
+    async def test_file_failure_discloses_authorized_ceiling(self) -> None:
+        async def process(payload: ChatRequest, item: Interaction) -> None:
+            item.cout_eur = 0.3
+            raise RuntimeError("private-provider-detail")
+
+        payload = ChatRequest.model_validate(
+            {"messages": [{"role": "user", "content": "Create a PDF"}]}
+        )
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, {"ATLAS_INTERACTION_DIR": directory}),
+        ):
+            chunks = [
+                str(x)
+                async for x in response(
+                    payload, Interaction(), time.monotonic(), process
+                ).body_iterator
+            ]
+        text = "".join(chunks)
+        self.assertIn("reserved cost 0.300000 EUR (limit 0.30 EUR)", text)
+        self.assertNotIn("private-provider-detail", text)
+
     async def test_failure_after_delta_never_claims_success(self) -> None:
         async def process(payload: ChatRequest, item: Interaction) -> None:
             sink = sink_context.get()

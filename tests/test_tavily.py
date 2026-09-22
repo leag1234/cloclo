@@ -92,7 +92,8 @@ class TavilyTests(unittest.IsolatedAsyncioTestCase):
                                 {
                                     "title": "Evidence",
                                     "url": "https://example.org/evidence",
-                                    "content": "Excerpt",
+                                    "content": "Context " * 60
+                                    + "Measurement is 73 units.",
                                     "raw_content": raw,
                                 }
                             ]
@@ -134,17 +135,25 @@ class TavilyTests(unittest.IsolatedAsyncioTestCase):
                         session.post.call_args.kwargs["json"]["include_raw_content"]
                     )
                     assert raw is None or isinstance(raw, str)
-                    expected = (raw or "Excerpt")[:16000]
+                    expected = (raw or ("Context " * 60 + "Measurement is 73 units."))[
+                        :16000
+                    ]
                     items = result["results"]
                     assert isinstance(items, list)
                     self.assertEqual(items[0]["content"], expected)
+                    # Preserve the provider's query-relevant excerpt even when
+                    # raw page text starts with navigation or unrelated material.
+                    self.assertIn("Measurement is 73 units.", items[0]["snippet"])
                     page = cache.get(
                         cache.key(["tavily-page", "https://example.org/evidence"])
                     )
                     self.assertIsNotNone(page)
                     assert page is not None
-                    self.assertEqual(page["text"], expected)
-                    self.assertEqual(page["truncated"], bool(raw))
+                    self.assertEqual(
+                        page["text"],
+                        raw or ("Context " * 60 + "Measurement is 73 units."),
+                    )
+                    self.assertFalse(page["truncated"])
 
     async def test_combined_page_content_leaves_room_for_tool_followup(self) -> None:
         async def pieces(size: int) -> AsyncIterator[bytes]:
@@ -179,6 +188,9 @@ class TavilyTests(unittest.IsolatedAsyncioTestCase):
         ):
             runtime = Runtime(Cache(Path(root) / "cache.sqlite"), Decimal(0))
             result = await runtime.tavily(Search(query="evidence", lang="en"), 1)
+            self.assertEqual(
+                session.post.call_args.kwargs["json"]["search_depth"], "advanced"
+            )
             items = result["results"]
             assert isinstance(items, list)
             self.assertEqual(len(items), 5)
@@ -293,4 +305,50 @@ class TavilyTests(unittest.IsolatedAsyncioTestCase):
                 result = await runtime.execute(
                     Call("search", "web_search", '{"query":"CPC","lang":"en"}'), 1
                 )
-                self.assertEqual(result, {"error": expected})
+                self.assertEqual(
+                    result,
+                    {
+                        "error": expected,
+                        **(
+                            {
+                                "message": "response_too_large: measured 2000001 bytes; limit 2000000 bytes"
+                            }
+                            if expected == "response_too_large"
+                            else {}
+                        ),
+                    },
+                )
+
+    async def test_cached_long_page_uses_hierarchy_and_retains_source(self) -> None:
+        text = "Background material. " * 20000 + "\nZephyr warranty: 73 months."
+        url = "https://example.org/long-report"
+        with (
+            tempfile.TemporaryDirectory() as root,
+            patch.dict(os.environ, {"ATLAS_SEARCH_PROVIDER": "tavily"}),
+        ):
+            cache = Cache(Path(root) / "cache.sqlite")
+            cache.put(
+                cache.key(["tavily-page", url]),
+                {
+                    "url": url,
+                    "text": text,
+                    "consulted_at": "2026-09-21",
+                    "provider": "tavily",
+                },
+                3600,
+            )
+            runtime = Runtime(cache, Decimal(0), "Zephyr warranty")
+            with patch.object(runtime.web, "fetch", new=AsyncMock()) as fetch:
+                page = await runtime.fetch(Fetch(url=url), 5)
+            fetch.assert_not_awaited()
+            self.assertIn("73 months", str(page["text"]))
+            tokens = page["estimated_tokens"]
+            assert isinstance(tokens, int)
+            self.assertLessEqual(tokens, 4000)
+            self.assertTrue(page["selected"])
+            self.assertEqual(page["provider"], "tavily")
+            self.assertEqual(page["consulted_at"], "2026-09-21")
+            original = cache.get(str(page["handle"]))
+            self.assertIsNotNone(original)
+            assert original is not None
+            self.assertEqual(original["text"], text)

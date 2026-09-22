@@ -1,12 +1,15 @@
 """Administrator-owned MCP policy; no write execution from model arguments."""
 
+from packages.limits import LimitError
+from packages.validation import describe_validation
+
 import json
 import os
 import time
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from services.orchestrator.mcp_transport import invoke
 
 
@@ -15,8 +18,8 @@ class Strict(BaseModel):
 
 
 class MCPCall(Strict):
-    server: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,64}$")
-    tool: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,64}$")
+    server: str = Field(max_length=64, pattern=r"^[a-zA-Z0-9_-]{1,64}$")
+    tool: str = Field(max_length=64, pattern=r"^[a-zA-Z0-9_-]{1,64}$")
     arguments: dict[str, object]
 
 
@@ -41,7 +44,7 @@ def configuration() -> dict[str, Server]:
     with Path(path).open("rb") as stream:
         raw = stream.read(65537)
     if len(raw) > 65536:
-        raise ValueError("mcp_config_limit")
+        raise LimitError("mcp_config_limit", len(raw), 65536, "bytes")
     return TypeAdapter(dict[str, Server]).validate_json(raw)
 
 
@@ -50,6 +53,10 @@ def resolve(call: MCPCall) -> tuple[Server, Tool, dict[str, str], list[str]]:
     tool = server.tools[call.tool]
     credentials = {key: os.environ[name] for key, name in server.secret_env.items()}
     secrets = list(credentials.values())
+    if len(call.model_dump_json().encode()) > 16384:
+        raise LimitError(
+            "mcp_arguments", len(call.model_dump_json().encode()), 16384, "bytes"
+        )
     if (
         any(not value for value in secrets)
         or len(call.model_dump_json().encode()) > 16384
@@ -61,9 +68,11 @@ def resolve(call: MCPCall) -> tuple[Server, Tool, dict[str, str], list[str]]:
     ):
         raise ValueError("mcp_scope")
     call.arguments = {**call.arguments, **tool.fixed}
-    if len(call.model_dump_json().encode()) > 16384 or any(
-        secret in call.model_dump_json() for secret in secrets
-    ):
+    if len(call.model_dump_json().encode()) > 16384:
+        raise LimitError(
+            "mcp_arguments", len(call.model_dump_json().encode()), 16384, "bytes"
+        )
+    if any(secret in call.model_dump_json() for secret in secrets):
         raise ValueError("mcp_secret_argument")
     env = {**server.env, **credentials}
     return server, tool, env, secrets
@@ -115,7 +124,7 @@ async def execute(raw: str, timeout: float) -> dict[str, object]:
     call, started, state = None, time.monotonic(), "error"
     try:
         if len(raw.encode()) > 16384:
-            raise ValueError("mcp_arguments")
+            raise LimitError("mcp_arguments", len(raw.encode()), 16384, "bytes")
         candidate = MCPCall.model_validate_json(raw)
         server, tool, env, secrets = resolve(candidate)
         call = candidate
@@ -135,6 +144,15 @@ async def execute(raw: str, timeout: float) -> dict[str, object]:
         )
         state = "read_ok"
         return {"trust": "untrusted", "data": result}
+    except ValidationError as exc:
+        if all(failure["type"] == "missing" for failure in exc.errors()):
+            return {"error": "mcp_unavailable_or_refused"}
+        return {
+            "error": "mcp_unavailable_or_refused",
+            "message": describe_validation(exc),
+        }
+    except LimitError as exc:
+        return {"error": exc.code, "message": exc.detail}
     except Exception:
         return {"error": "mcp_unavailable_or_refused"}
     finally:

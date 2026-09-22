@@ -83,7 +83,7 @@ async def live(cases: list[dict[str, Any]], url: str) -> None:
 
 def archive_measurements() -> None:
     measurements = []
-    for case in yaml.safe_load(Path("prompts/demo.yaml").read_text()):
+    for case in yaml.safe_load(Path("tests/journeys/demo.yaml").read_text()):
         data = load_record(Path("tests/cassettes/demo"), case["id"])
         measurements.append(
             {
@@ -100,7 +100,7 @@ def archive_measurements() -> None:
 
 
 def main() -> None:
-    cases = yaml.safe_load(Path("prompts/demo.yaml").read_text())
+    cases = yaml.safe_load(Path("tests/journeys/demo.yaml").read_text())
     if sys.argv[1:]:
         cases = [c for c in cases if c["id"] in sys.argv[1:]]
         if {c["id"] for c in cases} != set(sys.argv[1:]):

@@ -16,7 +16,7 @@ from test_imagegen import png
 
 class ImageToolBudgetTests(unittest.IsolatedAsyncioTestCase):
     async def test_decision_and_image_share_one_budget(self) -> None:
-        for spent in (Decimal("0.07"), Decimal("0.10")):
+        for spent in (Decimal("0.27"), Decimal("0.30")):
             model = GatewayModel(
                 "http://unused",
                 Configuration(
@@ -45,7 +45,7 @@ class ImageToolBudgetTests(unittest.IsolatedAsyncioTestCase):
                 patch.object(
                     model,
                     "estimate",
-                    Mock(return_value=Reservation(100, Decimal("0.10"))),
+                    Mock(return_value=Reservation(100, Decimal("0.30"))),
                 ),
                 patch.object(model, "complete", decision),
                 patch.object(GatewayModel, "post", image),
@@ -53,18 +53,18 @@ class ImageToolBudgetTests(unittest.IsolatedAsyncioTestCase):
                 request = ChatRequest(
                     messages=[ChatMessage(role="user", content="dessine-moi un mouton")]
                 )
-                if spent == Decimal("0.10"):
+                if spent == Decimal("0.30"):
                     with self.assertRaisesRegex(RuntimeError, "cost_budget"):
                         await process(request, item)
                     image.assert_not_awaited()
-                    self.assertEqual(item.cout_eur, 0.10)
+                    self.assertEqual(item.cout_eur, 0.30)
                 else:
                     await process(request, item)
                     payload = image.call_args.args[1]
                     self.assertEqual(Decimal(payload["max_cost_eur"]), Decimal("0.03"))
                     self.assertLess(payload["timeout"], 120)
                     self.assertEqual(payload["lang"], "fr")
-                    self.assertAlmostEqual(item.cout_eur, 0.071)
+                    self.assertAlmostEqual(item.cout_eur, 0.271)
             self.assertEqual(decision.await_count, 1)
 
     async def test_selected_model_image_uses_parent_deadline_and_operation_cap(

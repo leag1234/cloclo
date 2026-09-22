@@ -174,6 +174,8 @@ def main() -> None:
                 {
                     **({} if live or refresh else environment()),
                     "GPU_LOCAL": "0",
+                    # This suite injects SerpApi failures; M24 covers Tavily.
+                    "ATLAS_SEARCH_PROVIDER": "serpapi",
                     "ATLAS_PROJECT_DB": directory + "/projects.sqlite",
                     "ATLAS_IMAGE_DIR": directory + "/images",
                     "ATLAS_WEB_CACHE": directory + "/web.sqlite",

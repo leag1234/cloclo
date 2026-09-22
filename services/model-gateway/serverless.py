@@ -1,6 +1,8 @@
 """M8 task policy: validated capabilities and conservative two-attempt reservation."""
 
 from packages.profiles import PROFILES
+from packages.limits import ProviderLimitError
+from packages.context_limit import ContextExceeded
 
 from dataclasses import dataclass
 from decimal import Decimal
@@ -61,6 +63,7 @@ class Plan:
     fallback: str
     primary_bound: Decimal
     fallback_bound: Decimal
+    incoming: int
 
     @property
     def reserved_eur(self) -> Decimal:
@@ -142,14 +145,19 @@ class ServerlessPolicy:
             if task == "vision" and not capabilities.get("vision"):
                 raise ValueError("missing_capabilities")
             if incoming + 2048 > self.config[role]["capabilities"][model]["context"]:
-                raise ValueError("context_exceeded")
+                raise ContextExceeded(
+                    incoming + 2048, self.config[role]["capabilities"][model]["context"]
+                )
         plan = Plan(
             task,
             primary,
             fallback,
             self.cost(primary, incoming, 2048),
             self.cost(fallback, incoming, 2048),
+            incoming,
         )
         if plan.reserved_eur > Decimal("0.05"):
-            raise ValueError("cost_budget")
+            raise ProviderLimitError(
+                "cost_budget", int(plan.reserved_eur * 1000000), 50000, "microEUR"
+            )
         return plan

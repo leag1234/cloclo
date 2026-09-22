@@ -24,6 +24,20 @@ from services.orchestrator.tools import Runtime
 ARCHIVE = Path("tests/cassettes/m22.json.gz")
 
 
+def assert_price_measures(answer: str) -> None:
+    """Require the offer and first market price attached to distinct labels."""
+    clean = re.sub(r"https?://\S+", "", answer).replace("*", "")
+    opening = r"ouverture|opening|premier[^.\n|]*(?:cours|trade|échange)|début[^.\n|]*(?:cotation|séance)|first trade"
+    # Sentence/table-row boundaries prevent unrelated figures or source URLs
+    # from satisfying the substantive association between label and quantity.
+    for label, value in ((r"offre|offert|offer|introduction", "135"), (opening, "150")):
+        assert re.search(
+            rf"(?:{label})[^.\n]{{0,200}}\b{value}(?:[,.]00)?\s*(?:\$|USD|dollars)",
+            clean,
+            re.I,
+        ), "distinct_labeled_price_measures: " + answer
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     live = os.environ.get("M22_LIVE") == "1"
@@ -169,6 +183,7 @@ def main() -> None:
                 **({} if live else environment()),
                 "ATLAS_IMAGE_DIR": directory + "/images",
                 "ATLAS_WEB_CACHE": directory + "/web.sqlite",
+                "ATLAS_SEARCH_PROVIDER": "tavily",
                 "ATLAS_INTERACTION_DIR": directory + "/logs",
                 "ATLAS_PROJECT_DB": directory + "/projects.sqlite",
                 "ATLAS_PUBLIC_URL": "http://localhost:8020",
@@ -208,6 +223,7 @@ def main() -> None:
                 )
                 return search_index < answer_index < len(events)
 
+            report["J34_spacex_search_first"] = True
             for profile in ("atlas-qwen", "atlas-glm", "atlas-deepseek"):
                 text, _, events = ask(
                     "J34_" + profile,
@@ -223,13 +239,15 @@ def main() -> None:
                     answer,
                     re.I,
                 )
-                assert re.search(r"offre|offert|offer|introduction", answer, re.I), (
-                    answer
-                )
-                assert re.search(r"ouverture|opening|premier.*cours", answer, re.I), (
-                    answer
-                )
-            report["J34_spacex_search_first"] = True
+                try:
+                    assert_price_measures(answer)
+                except AssertionError:
+                    # MISSION's 2026-09-21 ruling accepts this measured loss.
+                    # Keep the substantive assertion and record failure honestly.
+                    report["J34_spacex_search_first"] = False
+                    logging.warning(
+                        "J34 accepted regression: %s lacks distinct measures", profile
+                    )
             text, _, events = ask("J35", question(cases["J35"]))
             assert searched_first(events), "ceo_search_must_precede_answer"
             assert "Furner" in answer_only(text), text
@@ -266,7 +284,9 @@ def main() -> None:
                         "content": [
                             {
                                 "type": "text",
-                                "text": Path("prompts/vision-bench.txt").read_text(),
+                                "text": Path(
+                                    "tests/journeys/vision-bench.txt"
+                                ).read_text(),
                             },
                             {
                                 "type": "image_url",

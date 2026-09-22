@@ -21,7 +21,10 @@ def context_case() -> tuple[dict[str, Any], dict[str, int], int]:
         "model": "atlas-code",
         "max_tokens": 512,
         "messages": [
-            {"role": "system", "content": Path("prompts/dev-context.txt").read_text()},
+            {
+                "role": "system",
+                "content": Path("tests/journeys/dev-context.txt").read_text(),
+            },
             {
                 "role": "user",
                 "content": "Requested: " + ", ".join(expected) + "\n\n" + code,

@@ -1,5 +1,7 @@
 """Public-only HTTP transport: validation happens at the connector DNS boundary."""
 
+from packages.limits import LimitError
+
 import asyncio
 import ipaddress
 import socket
@@ -93,12 +95,19 @@ class Web:
                     response.content_length is not None
                     and response.content_length > MAX_BYTES
                 ):
-                    raise ValueError("response_too_large")
+                    raise LimitError(
+                        "response_too_large",
+                        response.content_length,
+                        MAX_BYTES,
+                        "bytes",
+                    )
                 body = bytearray()
                 async for piece in response.content.iter_chunked(16384):
                     body.extend(piece)
                     if len(body) > MAX_BYTES:
-                        raise ValueError("response_too_large")
+                        raise LimitError(
+                            "response_too_large", len(body), MAX_BYTES, "bytes"
+                        )
                 return (
                     response.status,
                     response.headers.get("Location", ""),
@@ -122,7 +131,7 @@ class Web:
             if not parser.can_fetch(USER_AGENT, url):
                 raise ValueError("robots_denied")
             return
-        raise ValueError("robots_redirect_limit")
+        raise LimitError("robots_redirect_limit", 5, 4, "redirects")
 
     async def fetch(self, url: str, timeout: float = PAGE_TIMEOUT) -> tuple[str, bytes]:
         async with asyncio.timeout(min(PAGE_TIMEOUT, timeout)):
@@ -136,4 +145,4 @@ class Web:
                 if status != 200:
                     raise ValueError(f"http_{status}")
                 return url, body
-        raise ValueError("redirect_limit")
+        raise LimitError("redirect_limit", 5, 4, "redirects")

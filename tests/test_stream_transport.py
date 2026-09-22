@@ -50,6 +50,113 @@ class Session:
 
 
 class TransportTests(unittest.IsolatedAsyncioTestCase):
+    async def test_empty_completion_diagnostic_has_no_payload(self) -> None:
+        from agent_provider import AgentRequest
+        from provider_retry import TransientProviderError
+        from stream_transport import attempt
+
+        class EmptyContent(Content):
+            async def iter_chunked(self, size: int) -> AsyncIterator[bytes]:
+                yield end()
+
+        session = Session()
+        session.response.content = EmptyContent()
+        with (
+            patch.dict(os.environ, environment()),
+            patch("stream_transport.aiohttp.ClientSession", return_value=session),
+            self.assertLogs("stream_transport", level="WARNING") as logs,
+        ):
+            with self.assertRaises(TransientProviderError) as caught:
+                _ = [
+                    event
+                    async for event in attempt(
+                        AgentRequest(
+                            messages=[{"role": "user", "content": "private-question"}],
+                            tools=[],
+                            profile="atlas-qwen",
+                            timeout=5.0,
+                        ),
+                        ServerlessPolicy().models["text"],
+                        5.0,
+                    )
+                ]
+        self.assertIsNotNone(caught.exception.usage)
+        assert caught.exception.usage is not None
+        self.assertEqual(caught.exception.usage.completion_tokens, 8)
+        diagnostic = json.loads(logs.records[0].getMessage())
+        self.assertEqual(diagnostic["category"], "empty_completion")
+        self.assertTrue(diagnostic["usage_present"])
+        self.assertEqual(diagnostic["finish_reason"], "stop")
+        self.assertEqual(diagnostic["content_chars"], 0)
+        self.assertNotIn("private-question", str(logs.output))
+
+    async def test_numeric_decoder_limit_survives_transport(self) -> None:
+        from agent_provider import AgentRequest
+        from stream_transport import attempt
+        from packages.limits import LimitError
+
+        session = Session()
+        with (
+            patch.dict(os.environ, environment()),
+            patch("stream_transport.aiohttp.ClientSession", return_value=session),
+            patch(
+                "stream_transport.StreamDecoder.feed",
+                side_effect=LimitError(
+                    "tool_limit", 16001, 16000, "argument characters"
+                ),
+            ),
+            self.assertRaises(LimitError) as caught,
+        ):
+            _ = [
+                e
+                async for e in attempt(
+                    AgentRequest(
+                        messages=[{"role": "user", "content": "Explain"}],
+                        tools=[],
+                        timeout=5.0,
+                    ),
+                    ServerlessPolicy().models["text"],
+                    5,
+                )
+            ]
+        self.assertEqual(caught.exception.measured, 16001)
+        self.assertEqual(caught.exception.limit, 16000)
+
+    async def test_schema_size_limit_survives_without_echoing_provider_content(
+        self,
+    ) -> None:
+        from agent_provider import AgentRequest
+        from stream_transport import attempt
+        from packages.limits import LimitError
+        from streaming import FunctionDelta
+        from pydantic import ValidationError
+
+        try:
+            FunctionDelta(name="private" * 12)
+        except ValidationError as error:
+            invalid = error
+        session = Session()
+        with (
+            patch.dict(os.environ, environment()),
+            patch("stream_transport.aiohttp.ClientSession", return_value=session),
+            patch("stream_transport.StreamDecoder.feed", side_effect=invalid),
+            self.assertRaises(LimitError) as caught,
+        ):
+            _ = [
+                e
+                async for e in attempt(
+                    AgentRequest(
+                        messages=[{"role": "user", "content": "Explain"}],
+                        tools=[],
+                        timeout=5.0,
+                    ),
+                    ServerlessPolicy().models["text"],
+                    5,
+                )
+            ]
+        self.assertEqual((caught.exception.measured, caught.exception.limit), (84, 80))
+        self.assertNotIn("private", caught.exception.detail)
+
     async def test_vision_none_is_explicit_and_empty_tools_are_omitted(
         self,
     ) -> None:
