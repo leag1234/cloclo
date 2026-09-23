@@ -71,3 +71,21 @@ D7 a URL is cited only if retrieved in the same conversation; facts about existi
 things that may have changed trigger a search.
 Add `make m26-live` writing the evidence format; extend tests/ci_regressions.py to 26.
 Done: make verify-m26 locally with live evidence, green GitHub ci, probe in cron.
+
+### M26 owner rulings (2026-09-23)
+
+1. Deadline. A request that produces a downloadable file (pptx, pdf, docx, xlsx) gets
+   the 300 s deadline, like a request carrying a large attachment. Ordinary requests keep
+   120 s. The 0.30 EUR file-request ceiling is unchanged. The activity indicator states
+   which deadline applies. J54 was measured at 120.005 s, 115.808 s and 120.007 s: one
+   success in three at 120 s is chance, not margin.
+2. Search. The 503 on J59 and the web probe was Tavily HTTP 432 (plan usage limit),
+   reproduced by the owner in 0.29 s. Not a wiring defect. The defect is that the user
+   and the probe received "search unavailable": under D5 a quota exhaustion reaches both
+   as quota exhausted, with the provider status. Until the owner restores search credits,
+   J59 and the web probe are NOT RUN (never passed); spend no search credit elsewhere.
+3. J57. Fix the functional defect recorded in BRAIN/BLOCKERS.md: on terminal failure the
+   answer carries the requested content, not a promise and a diagnostic command.
+4. Inherited M24 defect. tests/journey_server.py forces ATLAS_SEARCH_PROVIDER=serpapi even
+   in live mode. Apply that override in replay only.
+5. At most two live attempts per journey per session, then stop and report.
