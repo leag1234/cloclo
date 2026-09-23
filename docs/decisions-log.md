@@ -1824,3 +1824,27 @@ question for a later one.
 Consequence for the default-model decision, to carry forward: deepseek was the candidate
 for speed and cost; it does not support the prompt that produces the other two models'
 quality. glm is now the strongest on the public corpus, qwen the most balanced.
+
+
+## Archived from MISSION.md on 2026-09-22, at the start of M26
+
+The rest of the M25 section was already archived above, verbatim.
+
+## M25 — Intellectual disposition, not test-case patches
+
+D1–D5 and J50–J53: contracts/m25-owner.md, binding with owner rulings below.
+Four-layer general prompt, verbatim disposition/additions first, <3500bytes;
+no named-case/domain patches. Generality policy and exhaustive production-limits
+inventory required. Token-window conversation admission replaces character caps.
+Public corpus is development data; add --cases PATH to its runner. Owner alone
+runs private evaluation: never inspect/list its directory; keep private/ ignored.
+J51 uses the accepted third capture; J52 covers40000characters and measured
+overflow; J53 follows the latest certification ruling below and reports all losses.
+Done: verify-m25, policy/limits docs, owner J51 acceptance, green GitHub ci.
+
+### J53 reporting and transient exception (2026-09-21)
+The earlier4.8 DeepSeek floor is superseded below. Preserve per-profile before/after
+case tables against2026-09-20; name unpatched losses>2 as suspected disposition
+side effects and propose general corrections, never patches. Retry C03/GLM
+technical failures as transient; if persistent, record not run rather than blocking.
+Original owner wording is archived verbatim in docs/decisions-log.md.
