@@ -134,7 +134,7 @@ class MonetaryTransportTests(unittest.IsolatedAsyncioTestCase):
                     5,
                     sink,
                 )
-            self.assertEqual(caught.exception.status, 504)
+            self.assertEqual(caught.exception.status, 429)
             self.assertEqual(caught.exception.code, "cost_budget")
             for value in ("66633", "47137", "0.30"):
                 self.assertIn(value, caught.exception.detail)

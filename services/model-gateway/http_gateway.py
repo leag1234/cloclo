@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 
 from gateway_cpu import CPUModels, EMBEDDING_REVISION
 from generation import Generator
-from packages.limits import LimitError
+from packages.limits import LimitError, ProviderFailure
 from packages.validation import describe_validation
 from pydantic import ValidationError
 from agent_provider import AgentProvider
@@ -98,7 +98,15 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                         )
                     )
                     async with asyncio.timeout(0.1):
-                        if isinstance(exc, LimitError):
+                        if isinstance(exc, ProviderFailure):
+                            await send(
+                                {
+                                    "error": "provider_failure",
+                                    "message": exc.detail,
+                                    "retries": exc.retries,
+                                }
+                            )
+                        elif isinstance(exc, LimitError):
                             await send(
                                 {
                                     "error": "measured_limit",
@@ -290,6 +298,15 @@ def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
                         "code": "timeout",
                         "elapsed_seconds": round(monotonic() - started, 3),
                         "limit_seconds": limit,
+                    },
+                )
+            except ProviderFailure as exc:
+                status, response = (
+                    502,
+                    {
+                        "code": "provider_failure",
+                        "message": exc.detail,
+                        "retries": exc.retries,
                     },
                 )
             except RuntimeError as exc:

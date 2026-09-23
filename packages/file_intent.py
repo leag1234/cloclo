@@ -22,7 +22,8 @@ def produces_file(text: str) -> bool:
     action = re.search(
         r"\b(cre\w*|gener\w*|produ\w*|export\w*|convert\w*|transform\w*"
         r"|make|build|write|prepare|fais|fait\w*|redig\w*|prepar\w*"
-        r"|erstell\w*|schreib\w*|erstelle|haz|scrivi|disegn\w*|draw)\b",
+        r"|erstell\w*|schreib\w*|erstelle|haz|scrivi|disegn\w*|draw"
+        r"|telecharge\w*|download\w*|herunterlad\w*|descarg\w*|scaric\w*)\b",
         text,
     )
     return artifact is not None and (
@@ -30,7 +31,8 @@ def produces_file(text: str) -> bool:
         or (
             len(text.split()) <= 4
             and not re.search(
-                r"\b(what|why|how|explain|means|was|ist|comment|pourquoi|que)\b", text
+                r"\b(what|why|how|explain|expliqu\w*|explica\w*|erklar\w*|spieg\w*|means|was|ist|comment|pourquoi|que)\b",
+                text,
             )
         )
     )

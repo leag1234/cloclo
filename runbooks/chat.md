@@ -103,3 +103,6 @@ The default reading font is controlled by `--atlas-body-font` in chat-ui.css;
 Open WebUI's user font preference still overrides it. Code scrolls horizontally,
 copy appears on hover or keyboard focus, and both themes share readable spacing.
 Visual acceptance remains an owner check on the original Python debugging answer.
+
+Web replies expose the actual retrieved links in a collapsed section. External URLs
+without matching retrieval are withheld from the answer.

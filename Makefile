@@ -201,3 +201,7 @@ verify-m25: ## general disposition and model-window conversation limits
 .PHONY: verify-m26
 verify-m26: ## live acceptance proved, attachment path, retrieved sources
 	@bash scripts/verify-m26.sh
+
+.PHONY: m26-live
+m26-live: ## fresh public HTTP acceptance with real providers
+	@bash scripts/m26-live.sh

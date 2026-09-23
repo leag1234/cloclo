@@ -62,3 +62,7 @@ class AvailabilityTests(unittest.TestCase):
                 ]
             )
         self.assertEqual(model.available_tools(messages), [])
+        messages = [
+            {"role": "tool", "content": '{"error":"terminal_operation_failed"}'}
+        ]
+        self.assertEqual(model.available_tools(messages), [])

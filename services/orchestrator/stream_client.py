@@ -44,6 +44,15 @@ async def receive(
                     event = json.loads(line[5:])
                     if not isinstance(event, dict):
                         raise ValueError("invalid_stream")
+                    if event.get("error") == "provider_failure":
+                        from services.orchestrator.model import GatewayError
+
+                        raise GatewayError(
+                            "provider_error",
+                            502,
+                            str(event.get("message", "provider_error")),
+                            retries=int(event.get("retries", 0)),
+                        )
                     if (
                         event.get("error") == "measured_limit"
                         and all(
@@ -64,7 +73,7 @@ async def receive(
                             )
                             raise GatewayError(
                                 "cost_budget",
-                                504,
+                                429,
                                 f"Cost reservation: {event['measured']} microEUR; remaining {event['limit']} microEUR; request ceiling {ceiling} EUR",
                             )
                         raise LimitError(

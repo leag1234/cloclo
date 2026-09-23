@@ -401,13 +401,16 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
                 patch.dict(os.environ, environment()),
                 patch("stream_transport.attempt", upstream),
             ):
-                with self.assertRaisesRegex(RuntimeError, "incomplete_provider_answer"):
+                with self.assertRaisesRegex(
+                    RuntimeError, "incomplete_provider_answer"
+                ) as caught:
                     _ = [
                         e
                         async for e in stream_quality(
                             AgentProvider(), request(profile=profile)
                         )
                     ]
+                self.assertIn("finish_reason=length", str(caught.exception))
                 self.assertEqual(len(attempts), 1)
 
     async def test_whitespace_primary_recovers_and_whitespace_retry_is_rejected(
@@ -1345,3 +1348,60 @@ class ReservationDiagnosticTests(unittest.IsolatedAsyncioTestCase):
             ]
         self.assertEqual(len(seen), 1)
         self.assertIn("Complete delivery", str(events))
+
+
+class TerminalContentRecoveryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_failed_document_turn_requests_content_not_shell_diagnostics(
+        self,
+    ) -> None:
+        observed = []
+
+        async def transport(
+            req: AgentRequest, model: str, timeout: float
+        ) -> AsyncGenerator[dict[str, object], None]:
+            observed.append(req)
+            yield result(
+                "The file could not be produced. 1. Set an agenda. 2. Assign roles. 3. Track decisions.",
+                25,
+            )
+
+        original = request(
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Create a DOCX containing three meeting tips.",
+                },
+                {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "failed",
+                            "type": "function",
+                            "function": {
+                                "name": "terminal_command",
+                                "arguments": '{"command":"python generate.py"}',
+                            },
+                        }
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "tool_call_id": "failed",
+                    "content": '{"error":"terminal_operation_failed"}',
+                },
+            ],
+            produces_files=True,
+        )
+        with (
+            patch.dict(os.environ, environment()),
+            patch("stream_transport.attempt", transport),
+        ):
+            events = [
+                event async for event in stream_quality(AgentProvider(), original)
+            ]
+        self.assertTrue(events)
+        self.assertEqual(observed[0].tool_choice, "none")
+        instructions = str(observed[0].messages[-1]["content"])
+        self.assertIn("file could not be produced", instructions)
+        self.assertIn("complete requested content", instructions)
+        self.assertIn("diagnostic commands", instructions)

@@ -192,6 +192,8 @@ class ChatTools(Runtime):
                         for r in results
                         if isinstance(r, dict) and isinstance(r.get("link"), str)
                     ]
+            if call.name in {"web_search", "web_fetch"} and "error" not in output:
+                self.item.retrieved_urls.extend(urls)
             if "error" in output:
                 self.item.erreurs.append(str(output["error"]))
             sink = sink_context.get()
@@ -298,6 +300,8 @@ class ChatTools(Runtime):
         # Account for JSON escaping and retain half the allowance for output
         # and other context. Do not reserve ten hypothetical future calls.
         budget = max(1, int(self.model.allowance * 1000000 / (price * 2 * 2)))
+        if self.model.produces_files:
+            budget = min(budget, 8000)
         per_source = max(1, budget // len(rows))
         result = copy.deepcopy(data)
         copied = result["results"]
@@ -305,12 +309,16 @@ class ChatTools(Runtime):
         for row in copied:
             if not isinstance(row, dict) or not isinstance(row.get("content"), str):
                 continue
+            if self.model.produces_files and isinstance(row.get("snippet"), str):
+                row["snippet"] = row["snippet"][:per_source]
             text = row["content"]
             measured = len(text.encode())
             if measured <= per_source:
                 continue
             parts = select_text(text, self.question, per_source)
             selected = "\n".join(part.text for part in parts)
+            if self.model.produces_files:
+                selected = selected.encode()[:per_source].decode("utf-8", "ignore")
             row.update(
                 content=selected,
                 source_bytes=measured,
@@ -370,8 +378,39 @@ async def process(request: ChatRequest, item: Interaction) -> None:
     from services.orchestrator.narration import clean_answer
 
     await _process(request, item)
-    if item.state == "done":
-        item.reponse = clean_answer(item.reponse)
+    if item.state == "done" and any(
+        d.get("hierarchical_synthesis") for d in item.documents
+    ):
+        labels = json.loads(Path("prompts/activity-labels.json").read_text())
+        notice = labels.get(request.lang, labels["en"])["synthesized"]
+        if not item.reponse.endswith(notice):
+            item.reponse += "\n\n" + notice
+    if item.state == "done" and item.task_type not in {
+        "imagegen",
+        "vision",
+    }:
+        from services.orchestrator.source_truth import (
+            without_unretrieved,
+            source_footer,
+        )
+
+        item.reponse = without_unretrieved(
+            clean_answer(item.reponse),
+            set(item.retrieved_urls)
+            | {str(c.get("source")) for c in item.citations}
+            | set(
+                re.findall(
+                    re.escape(
+                        os.environ.get(
+                            "ATLAS_PUBLIC_URL", "http://localhost:8020"
+                        ).rstrip("/")
+                    )
+                    + r"/sources/[a-f0-9]{64}",
+                    item.reponse,
+                )
+            ),
+        )
+        item.reponse += source_footer(item.retrieved_urls, request.lang)
 
 
 async def _process(request: ChatRequest, item: Interaction) -> None:
@@ -383,9 +422,9 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         return
     from services.orchestrator.project_commands import select
 
-    if not request.documents and await select(request, item, retrieval_url()):
+    if not request.has_attachments and await select(request, item, retrieval_url()):
         return
-    if request.project_id is not None and not request.documents:
+    if request.project_id is not None and not request.has_attachments:
         from services.orchestrator.project_chat import process_project
 
         await process_project(request, item)
@@ -411,7 +450,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             request.lang,
             device_timings=os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily",
         )
-        if not followup and not request.documents
+        if not followup and not request.has_attachments
         else ()
     )
     if followup and os.environ.get("ATLAS_TERMINAL_ENABLED") != "1":
@@ -439,16 +478,27 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
     from packages.file_intent import produces_file
 
     produces_files = produces_file(request.messages[-1].text)
+    if (
+        os.environ.get("ATLAS_TERMINAL_ENABLED") == "1"
+        and not produces_files
+        and not request.has_attachments
+    ):
+        model.tools = [
+            tool
+            for tool in model.tools
+            if isinstance(function := tool.get("function"), dict)
+            and function.get("name") not in {"terminal_command", "publish_document"}
+        ]
     model.configure_quality(
         request.model,
         request.max_tokens,
-        has_attachments=bool(request.documents),
+        has_attachments=request.has_attachments,
         produces_files=produces_files,
     )
     item.reasoning_effort = request.reasoning_effort
     model.local_enabled = os.environ.get("GPU_LOCAL", "0") == "1"
     item.cout_eur = (
-        0.30 if request.documents or produces_files else 0.10
+        0.30 if request.has_attachments or produces_files else 0.10
     )  # Reserved until ledger returns.
     tools = ChatTools(item, request.messages[-1].text, allow_image=not followup)
     tools.model = model
@@ -486,8 +536,10 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             Limits(
                 profile=request.model,
                 tokens=None,
-                cost=Decimal("0.30" if request.documents or produces_files else "0.10"),
-                has_attachments=bool(request.documents),
+                cost=Decimal(
+                    "0.30" if request.has_attachments or produces_files else "0.10"
+                ),
+                has_attachments=request.has_attachments,
                 produces_files=produces_files,
                 wall_clock=max(
                     0, request.timeout_seconds - (time.monotonic() - started)
@@ -511,9 +563,13 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             item.terminal_commands = tools.terminal.commands
             item.terminal_failed_commands = tools.terminal.failed_commands
             item.files = tools.terminal.files
-            if result.state == "done" and item.files:
+            if item.files:
                 from services.orchestrator.file_results import render_files
 
+                if result.state != "done":
+                    # Published files remain usable even if closing prose fails.
+                    item.erreurs.append(result.reason or "closing_answer_failed")
+                    item.state = "done"
                 item.reponse = render_files(
                     item.reponse, item.files, tools.terminal.strategies, request.lang
                 )
@@ -529,7 +585,23 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             item.reponse += (
                 "\n\n" + labels.get(request.ui_locale, labels["en"])["source_truncated"]
             )
+    except GatewayError as exc:
+        if tools.terminal is None or not tools.terminal.files:
+            raise
+        from services.orchestrator.file_results import render_files
+
+        item.files = list(tools.terminal.files)
+        item.file_strategies = list(tools.terminal.strategies)
+        item.terminal_commands = tools.terminal.commands
+        item.terminal_failed_commands = tools.terminal.failed_commands
+        item.erreurs.append(exc.code)
+        item.provider_retries += exc.retries
+        item.reponse = render_files(
+            exc.detail, item.files, item.file_strategies, request.lang
+        )
+        item.state = "done"
     finally:
+        item.provider_retries += model.provider_retries
         item.tokens = {"in": model.input_tokens, "out": model.output_tokens}
         item.provider_model = model.provider_model
         item.reasoning = model.reasoning

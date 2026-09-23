@@ -4,6 +4,8 @@ from packages.profiles import PROFILES, context_window
 from packages.evidence import estimated_tokens
 from pydantic_core import PydanticCustomError
 
+import re
+
 from typing import Literal, Self
 from uuid import UUID
 from pydantic import ConfigDict, Field, model_validator
@@ -28,8 +30,20 @@ class ChatRequest(VisionInput):
     lang: Literal["fr", "de", "es", "it", "en"] = "fr"
 
     @property
+    def has_attachments(self) -> bool:
+        # Open WebUI filesystem uploads arrive as file tags, not document bytes.
+        return bool(self.documents) or any(
+            re.search(r'<file\s[^>]*type=[\'"]filesystem[\'"]', block) is not None
+            for message in self.messages
+            if message.role == "user"
+            for block in re.findall(
+                r"<attached_files>(.*?)</attached_files>", message.text, re.S
+            )
+        )
+
+    @property
     def timeout_seconds(self) -> float:
-        return 120.0
+        return 300.0 if self.has_attachments else 120.0
 
     @model_validator(mode="after")
     def valid_project(self) -> Self:
