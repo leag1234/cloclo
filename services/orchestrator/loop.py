@@ -50,7 +50,11 @@ class Limits:
                 )
             )
             and 0 <= self.tool_calls <= 10
-            and (0 <= self.wall_clock <= 120)
+            and (
+                0
+                <= self.wall_clock
+                <= (300 if self.has_attachments and self.profile else 120)
+            )
             and (
                 0
                 <= self.cost

@@ -12,8 +12,8 @@ from pathlib import Path
 
 from agent_provider import AgentProvider, AgentRequest, Usage, classify
 from packages.context_limit import ContextExceeded
-from provider_retry import RetryLedger, TransientProviderError, retry_stream
-from packages.limits import LimitError, ProviderLimitError
+from provider_retry import TransientProviderError
+from packages.limits import ProviderFailure, LimitError, ProviderLimitError
 
 from packages.tool_history import (
     final_messages,
@@ -175,7 +175,14 @@ async def stream_quality(
                             {
                                 "role": "system",
                                 "content": Path(
-                                    "prompts/budget-answer.txt"
+                                    "prompts/file-failure.txt"
+                                    if any(
+                                        m.get("role") == "tool"
+                                        and '"terminal_operation_failed"'
+                                        in str(m.get("content", ""))
+                                        for m in request.messages
+                                    )
+                                    else "prompts/budget-answer.txt"
                                 ).read_text(),
                             }
                         ]
@@ -270,21 +277,10 @@ async def stream_quality(
         result: dict[str, object] | None = None
         # Reserve time for recovery, still under the original request deadline.
         allotted = remaining * 0.8 if index == 0 else remaining
-        retry_ledger = RetryLedger()
         try:
             async with (
                 asyncio.timeout(allotted),
-                aclosing(
-                    retry_stream(
-                        attempt,
-                        current,
-                        model,
-                        allotted,
-                        budget - spent,
-                        incoming,
-                        retry_ledger,
-                    )
-                ) as events,
+                aclosing(attempt(current, model, allotted)) as events,
             ):
                 async for event in events:
                     terminal = event.get("result")
@@ -317,10 +313,6 @@ async def stream_quality(
         except ProviderLimitError:
             raise
         except (RuntimeError, TimeoutError) as exc:
-            spent += retry_ledger.spent
-            prompt_tokens += retry_ledger.prompt_tokens
-            completion_tokens += retry_ledger.completion_tokens
-            retry_completion_tokens += retry_ledger.completion_tokens
             failed_usage = (
                 exc.usage if isinstance(exc, TransientProviderError) else None
             )
@@ -336,11 +328,11 @@ async def stream_quality(
                 prompt_tokens += failed_usage.prompt_tokens
                 completion_tokens += failed_usage.completion_tokens
                 retry_completion_tokens += failed_usage.completion_tokens
-                estimated |= retry_ledger.estimated
             else:
                 spent += reserved
                 prompt_tokens += incoming
                 completion_tokens += current.max_tokens
+                retry_completion_tokens += current.max_tokens
                 estimated = True
             # Keep the trace actually shown before an interrupted attempt.
             # Its token count is estimated; unknown billing stays fully reserved.
@@ -362,18 +354,17 @@ async def stream_quality(
                 )
             )
             if index or visible_content:
-                raise
+                if isinstance(exc, TimeoutError):
+                    raise
+                raise ProviderFailure(
+                    str(exc), getattr(exc, "finish_reason", None), index
+                ) from None
             role = fallback_role
             model = policy.models[role]
             fallback = True
             retried = False
             yield {"phase": "reasoning_fallback" if retried else "provider_fallback"}
             continue
-        spent += retry_ledger.spent
-        prompt_tokens += retry_ledger.prompt_tokens
-        completion_tokens += retry_ledger.completion_tokens
-        retry_completion_tokens += retry_ledger.completion_tokens
-        estimated |= retry_ledger.estimated
         usage = Usage.model_validate(result["usage"])
         if (
             usage.prompt_tokens > incoming
@@ -445,8 +436,16 @@ async def stream_quality(
             )
             if index or visible_content:
                 if index and (not str(result.get("text", "")).strip()):
-                    raise RuntimeError("empty_content_after_retry")
-                raise RuntimeError("incomplete_provider_answer")
+                    raise ProviderFailure(
+                        "empty_content_after_retry",
+                        str(result.get("finish_reason")),
+                        index,
+                    )
+                raise ProviderFailure(
+                    "incomplete_provider_answer",
+                    str(result.get("finish_reason")),
+                    index,
+                )
         # Empty terminal responses retain validated billing, then get one retry.
         if (
             malformed
@@ -455,7 +454,9 @@ async def stream_quality(
             or (not str(result.get("text", "")).strip() and not result.get("calls"))
         ):
             if index:
-                raise RuntimeError("empty_content_after_retry")
+                raise ProviderFailure(
+                    "empty_content_after_retry", str(result.get("finish_reason")), index
+                )
             # A large evidence input may no longer fit the original provider's
             # conservative reservation. Try the configured alternate before
             # rejecting a recovery that still fits the same request ledger.
@@ -499,6 +500,7 @@ async def stream_quality(
             "answer_tokens": answer_tokens,
             "token_split_estimated": estimated,
             "reasoning_retried": retried,
+            "provider_retries": index,
         }
         if retry_completion_tokens:
             answer["retry_completion_tokens"] = retry_completion_tokens

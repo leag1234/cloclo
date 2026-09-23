@@ -91,7 +91,7 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
         + 256
         + request.max_tokens
     )
-    if measured > 262144:
+    if measured > 262144 or sum(len(s["text"].encode()) for s in sources) > 524288:
         for source, metadata in zip(sources, item.documents, strict=True):
             source["text"], _, _ = hierarchical_summary(
                 source["text"], request.messages[-1].text
@@ -116,6 +116,11 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                 "The provider returned no complete document answer",
             )
         item.reponse, item.state = result.text, "done"
+        if any(metadata.get("hierarchical_synthesis") for metadata in item.documents):
+            labels = json.loads(Path("prompts/activity-labels.json").read_text())
+            item.reponse += (
+                "\n\n" + labels.get(request.lang, labels["en"])["synthesized"]
+            )
         item.cout_eur = float(model.spent)
     except GatewayError:
         raise

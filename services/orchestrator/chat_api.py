@@ -157,12 +157,19 @@ async def chat(request: Request) -> Response:
                 max(0, payload.timeout_seconds - (time.monotonic() - started)),
             )
             if item.state != "done":
-                status = 502 if "provider_error" in item.erreurs else 504
-                code = "request_stopped"
+                status = (
+                    429
+                    if any(e in {"cost", "cost_budget"} for e in item.erreurs)
+                    else 502
+                    if "provider_error" in item.erreurs
+                    else 504
+                )
+                code = "cost_budget" if status == 429 else "request_stopped"
                 detail = item.reponse
     except asyncio.CancelledError:
         status, code = 499, "cancelled"
     except GatewayError as exc:
+        item.provider_retries += exc.retries
         status, code, detail = exc.status, exc.code, exc.detail
     except LimitError as exc:
         status, code, detail = (
@@ -192,7 +199,14 @@ async def chat(request: Request) -> Response:
             )
     if code:
         return JSONResponse(
-            {"error": {"message": detail or code, "type": code, "code": code}},
+            {
+                "error": {"message": detail or code, "type": code, "code": code},
+                "atlas": {
+                    "cost_eur": item.cout_eur,
+                    "cost_kind": "reserved_upper_bound",
+                    "provider_retries": item.provider_retries,
+                },
+            },
             status_code=status,
         )
     usage = {
@@ -212,6 +226,11 @@ async def chat(request: Request) -> Response:
             "choices": [{"index": 0, "message": message, "finish_reason": "stop"}],
             "usage": usage,
             "atlas": {
+                "deadline_seconds": payload.timeout_seconds,
+                "attachment_ceiling_eur": 0.30 if payload.has_attachments else 0.10,
+                "hierarchical": any(
+                    d.get("hierarchical_synthesis") for d in item.documents
+                ),
                 "images": item.images,
                 "files": item.files,
                 "terminal_commands": item.terminal_commands,
@@ -220,6 +239,7 @@ async def chat(request: Request) -> Response:
                 "reasoning_effort": payload.reasoning_effort,
                 "max_output_tokens": payload.max_tokens,
                 "cost_eur": item.cout_eur,
+                "cost_kind": "reserved_upper_bound" if item.erreurs else "measured",
                 "provider_model": item.provider_model,
                 "reasoning_retried": item.reasoning_retried,
                 "status": json.loads(Path("prompts/activity-labels.json").read_text())[

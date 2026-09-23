@@ -15,9 +15,12 @@ from serverless import ServerlessPolicy
 
 
 class TransientProviderError(RuntimeError):
-    def __init__(self, code: str, *, usage: Usage | None = None) -> None:
+    def __init__(
+        self, code: str, *, usage: Usage | None = None, finish_reason: str | None = None
+    ) -> None:
         super().__init__(code)
         self.usage = usage
+        self.finish_reason = finish_reason
 
 
 @dataclass

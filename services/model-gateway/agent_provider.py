@@ -101,8 +101,11 @@ class AgentRequest(BaseModel):
     def quality(self) -> Self:
         if self.profile is not None and self.profile not in PROFILES:
             raise ValueError("invalid_profile")
-        if self.timeout > 120:
-            raise LimitError("timeout_budget", int(self.timeout * 1000), 120000, "ms")
+        deadline = 300 if self.has_attachments and self.profile else 120
+        if self.timeout > deadline:
+            raise LimitError(
+                "timeout_budget", int(self.timeout * 1000), deadline * 1000, "ms"
+            )
         if self.profile is None:
             if (
                 self.has_attachments

@@ -52,7 +52,7 @@ class CitationTests(unittest.IsolatedAsyncioTestCase):
         from services.orchestrator.loop import Result
         from services.orchestrator.model import Observation
 
-        model = Mock(generation_ms=2.0)
+        model = Mock(generation_ms=2.0, provider_retries=0)
         model.input_tokens, model.output_tokens = 20, 10
         model.observations = [Observation(provider="escalade", route="complexe")]
         request = ChatRequest.model_validate(

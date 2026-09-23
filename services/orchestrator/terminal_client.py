@@ -44,6 +44,8 @@ def safe_result(value: dict[str, object]) -> dict[str, object]:
 
 def output_path(root: str, path: str) -> str:
     target = PurePosixPath(path)
+    if not target.is_absolute():
+        target = PurePosixPath(root) / target
     if (
         not target.is_relative_to(root)
         or ".." in target.parts

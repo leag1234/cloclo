@@ -13,3 +13,28 @@ class LimitError(ValueError):
 
 class ProviderLimitError(LimitError, RuntimeError):
     """Retain the provider-failure interface while carrying numeric diagnostics."""
+
+
+class ProviderFailure(RuntimeError):
+    """Only bounded diagnostic categories cross the public provider boundary."""
+
+    def __init__(self, code: str, finish_reason: str | None, retries: int) -> None:
+        self.code = (
+            code
+            if code
+            in {
+                "provider_error",
+                "empty_completion",
+                "empty_content_after_retry",
+                "incomplete_provider_answer",
+            }
+            else "provider_error"
+        )
+        self.finish_reason = (
+            finish_reason
+            if finish_reason in {"stop", "length", "tool_calls"}
+            else "not_received"
+        )
+        self.retries = retries
+        self.detail = f"{self.code}; finish_reason={self.finish_reason}; retries={retries} (limit 1)"
+        super().__init__(self.detail)

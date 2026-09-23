@@ -40,3 +40,6 @@ password-protected document or extraction failure must be named explicitly.
 Render PDF using soffice. For changes, state whether you regenerate or edit in
 place: regeneration can discard formatting; edit in place preserves unrequested
 styles, images and formulas. Never present a local path as a downloadable file.
+
+Publication accepts paths relative to the current request directory and rejects traversal.
+Already published downloads remain available if the closing inference fails.

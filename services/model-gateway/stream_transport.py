@@ -204,7 +204,9 @@ async def attempt(
         ):
             diagnostic("empty_completion")
             raise TransientProviderError(
-                "empty_completion", usage=Usage.model_validate(result["usage"])
+                "empty_completion",
+                usage=Usage.model_validate(result["usage"]),
+                finish_reason=decoder.reason,
             )
         yield {"result": result}
     except TimeoutError:
@@ -245,5 +247,7 @@ async def attempt(
             details["validation_code"] = str(exc)
         diagnostic("validation", **details)
         if isinstance(exc, json.JSONDecodeError) or str(exc) == "empty_stream":
-            raise TransientProviderError("provider_error") from None
+            raise TransientProviderError(
+                "provider_error", finish_reason=decoder.reason
+            ) from None
         raise RuntimeError("provider_error") from None
