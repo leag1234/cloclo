@@ -197,3 +197,7 @@ verify-m24: ## documents, contained file tools and actual rendering
 .PHONY: verify-m25
 verify-m25: ## general disposition and model-window conversation limits
 	@bash scripts/verify-m25.sh
+
+.PHONY: verify-m26
+verify-m26: ## live acceptance proved, attachment path, retrieved sources
+	@bash scripts/verify-m26.sh
