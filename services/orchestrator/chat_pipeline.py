@@ -502,9 +502,10 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         ]
     model.observing = True
     model.sink = sink_context.get()
-    from packages.file_intent import produces_file
+    from packages.file_intent import produces_file, requests_file_delivery
 
     produces_files = produces_file(request.messages[-1].text)
+    deliver_files = requests_file_delivery(request.messages[-1].text)
     if (
         os.environ.get("ATLAS_TERMINAL_ENABLED") == "1"
         and not produces_files
@@ -593,7 +594,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         )
         file_recovery_attempted = False
         if (
-            produces_files
+            deliver_files
             and tools.terminal is not None
             and not tools.terminal.files
             and tools.terminal.commands == 0
@@ -669,7 +670,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             # Preserve substantive first-pass evidence, never an invented recovery URL.
             if not tools.terminal.files:
                 result.text = first_result.text.strip() or result.text.strip()
-        if produces_files and tools.terminal is not None:
+        if deliver_files and tools.terminal is not None:
             from services.orchestrator.file_content import render_command
             from services.orchestrator.file_results import inline_fallback
 
@@ -747,7 +748,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                     )
             else:
                 result.text = answer_content(result.text, preserve_code=preserve_code)
-        elif produces_files:
+        elif deliver_files:
             from services.orchestrator.file_results import inline_fallback
 
             result.text = inline_fallback(
