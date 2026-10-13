@@ -22,10 +22,11 @@ from services.orchestrator.model import Configuration, GatewayError, GatewayMode
 from services.orchestrator.terminal_client import TerminalClient
 
 CAPTURE = json.loads(Path("tests/fixtures/m26_gate4_replies.json").read_text())
-CONTENT = """# Le système mobile
+CONTENT = """\
+# Le syst\u00e8me mobile
 - /e/OS repose sur Android et remplace les services Google pour limiter la collecte de données personnelles.
 - La compatibilité des applications dépend de leurs besoins en services propriétaires.
-# Les services associés
+# Les services associ\u00e9s
 - Murena propose un ensemble de services pour synchroniser les contacts et les fichiers des utilisateurs.
 - Il faut distinguer le système installé sur le téléphone des services accessibles avec un compte.
 # Choisir son installation
