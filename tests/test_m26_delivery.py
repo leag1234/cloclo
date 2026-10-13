@@ -40,6 +40,78 @@ class PublicationTests(unittest.TestCase):
 
 
 class PublishedFileTests(unittest.IsolatedAsyncioTestCase):
+    async def test_file_request_recovers_after_inline_answer_without_terminal_call(
+        self,
+    ) -> None:
+        """J54: an inline answer cannot silently satisfy a requested download."""
+        from decimal import Decimal
+        import os
+        import tempfile
+        from unittest.mock import AsyncMock, patch
+
+        from services.orchestrator.chat_pipeline import process
+        from services.orchestrator.chat_schema import ChatRequest
+        from services.orchestrator.interactions import Interaction
+        from services.orchestrator.loop import Result
+        from services.orchestrator.model import Configuration, GatewayModel
+        from services.orchestrator.terminal_client import TerminalClient
+
+        model = GatewayModel(
+            "http://127.0.0.1",
+            Configuration(
+                input_eur_per_mtok=Decimal("1"),
+                output_eur_per_mtok=Decimal("1"),
+                max_tokens=2048,
+            ),
+        )
+        request = ChatRequest.model_validate(
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Create a downloadable presentation about recycling",
+                    }
+                ]
+            }
+        )
+        inline = "Here is a complete presentation outline with enough detail to use."
+        with (
+            tempfile.TemporaryDirectory() as root,
+            patch.dict(
+                os.environ,
+                {
+                    "ATLAS_TERMINAL_ENABLED": "1",
+                    "ATLAS_WEB_CACHE": root + "/cache.sqlite",
+                },
+            ),
+            patch.object(GatewayModel, "connect", AsyncMock(return_value=model)),
+            patch.object(TerminalClient, "initialize", AsyncMock()),
+            patch(
+                "services.orchestrator.chat_pipeline.run",
+                AsyncMock(
+                    side_effect=[
+                        Result(text=inline, state="done"),
+                        Result(
+                            text="I could not create the presentation file.",
+                            state="done",
+                        ),
+                    ]
+                ),
+            ) as run,
+        ):
+            item = Interaction()
+            await process(request, item)
+
+        self.assertEqual(run.await_count, 2)
+        self.assertIn("terminal_command", run.await_args_list[1].args[3])
+        self.assertEqual(
+            [call.name for call in run.await_args_list[1].kwargs["initial_calls"]],
+            ["terminal_command", "publish_document", "publish_document"],
+        )
+        self.assertIn(inline, item.reponse)
+        self.assertIn("No file was produced", item.reponse)
+        self.assertEqual(item.files, [])
+
     async def test_published_files_survive_failed_closing_inference(self) -> None:
         from decimal import Decimal
         import os
