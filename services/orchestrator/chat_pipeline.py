@@ -4,6 +4,7 @@ from packages.limits import LimitError
 from packages.validation import describe_validation
 from pydantic import ValidationError
 
+import asyncio
 import json
 import copy
 import os
@@ -149,6 +150,19 @@ class ChatTools(Runtime):
                     )
                     self.item.files = list(self.terminal.files)
                     self.item.file_strategies = list(self.terminal.strategies)
+                if call.name == "terminal_command" and (
+                    output.get("error") or output.get("exit_code", 0) != 0
+                ):
+                    self.item.erreurs.append("terminal_operation_failed")
+                    return {"error": "terminal_operation_failed", "data": output}
+                if self.model is not None and self.model.required_file_tool:
+                    if call.name == "terminal_command":
+                        self.model.required_file_tool = "publish_document"
+                    elif all(
+                        any(url.endswith("." + ext) for url in self.terminal.files)
+                        for ext in self.model.required_file_formats
+                    ):
+                        self.model.required_file_tool = None
                 return {"trust": "untrusted", "data": output}
             except LimitError as exc:
                 return {"error": exc.code, "message": exc.detail}
@@ -567,6 +581,17 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             if not followup
             else frozenset(),
         )
+        from services.orchestrator.file_content import answer_content, requested_formats
+
+        formats = requested_formats(request.messages[-1].text)
+        preserve_code = bool(
+            re.search(
+                r"\b(?:script|code|python|sql|function|fonction|programm)\b",
+                request.messages[-1].text,
+                re.I,
+            )
+        )
+        file_recovery_attempted = False
         if (
             produces_files
             and tools.terminal is not None
@@ -575,6 +600,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             and "terminal_operation_failed" not in item.erreurs
             and result.tool_calls <= 7
         ):
+            file_recovery_attempted = True
             first_result = result
             remaining_seconds = max(
                 0, request.timeout_seconds - (time.monotonic() - started)
@@ -590,6 +616,8 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                     if isinstance(function := tool.get("function"), dict)
                     and function.get("name") in {"terminal_command", "publish_document"}
                 ]
+                model.required_file_tool = "terminal_command"
+                model.required_file_formats = formats
                 recovery_history: list[Message] = [
                     {"role": m.role, "content": m.text} for m in request.messages
                 ]
@@ -625,11 +653,12 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                             cost=remaining_cost,
                             has_attachments=request.has_attachments,
                             produces_files=True,
-                            wall_clock=remaining_seconds,
+                            wall_clock=max(0, remaining_seconds - 30),
                         ),
                         history=recovery_history,
                     )
                     result.cost += first_result.cost
+                    result.tool_calls += first_result.tool_calls
                 except GatewayError as exc:
                     # Unknown failed usage retains the full remaining reservation.
                     # A delivery failure must not discard an already usable answer.
@@ -637,14 +666,93 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                     item.provider_retries += exc.retries
                     result = first_result
                     result.cost += remaining_cost
+            # Preserve substantive first-pass evidence, never an invented recovery URL.
             if not tools.terminal.files:
-                from services.orchestrator.file_results import inline_fallback
+                result.text = first_result.text.strip() or result.text.strip()
+        if produces_files and tools.terminal is not None:
+            from services.orchestrator.file_content import render_command
+            from services.orchestrator.file_results import inline_fallback
 
-                result.text = inline_fallback(
-                    first_result.text.strip() or result.text.strip(), request.lang
-                )
-                result.state = "done"
-                result.reason = "file_not_produced"
+            terminal_already_failed = "terminal_operation_failed" in item.erreurs
+            missing = tuple(
+                ext
+                for ext in formats
+                if not any(url.endswith("." + ext) for url in tools.terminal.files)
+            )
+            if missing and "terminal_operation_failed" not in item.erreurs:
+                command, paths = render_command(result.text, missing)
+                remaining = request.timeout_seconds - (time.monotonic() - started)
+                if (
+                    command
+                    and result.tool_calls + 1 + len(paths) <= 10
+                    and remaining > 0
+                    and result.cost < Decimal("0.30")
+                ):
+                    # Deterministic rendering uses no inference; all I/O stays in
+                    # the original deadline and remaining tool allowance.
+                    result.tool_calls += 1
+                    try:
+                        async with asyncio.timeout(remaining):
+                            created = await tools.execute(
+                                Call(
+                                    "content-render",
+                                    "terminal_command",
+                                    json.dumps({"command": command}),
+                                ),
+                                min(30, remaining),
+                            )
+                            data = created.get("data")
+                            if (
+                                isinstance(data, dict)
+                                and data.get("exit_code") == 0
+                                and not created.get("error")
+                            ):
+                                for path in paths:
+                                    remaining = request.timeout_seconds - (
+                                        time.monotonic() - started
+                                    )
+                                    if remaining <= 0:
+                                        break
+                                    result.tool_calls += 1
+                                    await tools.execute(
+                                        Call(
+                                            "content-publish-" + path,
+                                            "publish_document",
+                                            json.dumps(
+                                                {"path": path, "strategy": "created"}
+                                            ),
+                                        ),
+                                        min(30, remaining),
+                                    )
+                    except TimeoutError:
+                        item.erreurs.append("file_render_timeout")
+            missing = tuple(
+                ext
+                for ext in formats
+                if not any(url.endswith("." + ext) for url in tools.terminal.files)
+            )
+            if not tools.terminal.files or missing:
+                if not terminal_already_failed or file_recovery_attempted:
+                    result.text = inline_fallback(
+                        result.text,
+                        request.lang,
+                        preserve_code=preserve_code,
+                        partial=bool(tools.terminal.files),
+                    )
+                    result.state = "done"
+                    result.reason = "file_not_produced"
+                else:
+                    result.text = answer_content(
+                        result.text, preserve_code=preserve_code
+                    )
+            else:
+                result.text = answer_content(result.text, preserve_code=preserve_code)
+        elif produces_files:
+            from services.orchestrator.file_results import inline_fallback
+
+            result.text = inline_fallback(
+                result.text, request.lang, preserve_code=preserve_code
+            )
         item.reponse, item.state, item.cout_eur = (
             result.text,
             result.state,
