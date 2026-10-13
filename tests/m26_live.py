@@ -63,7 +63,7 @@ def main() -> None:
         "REPLAY" in key and value not in ("", "0") for key, value in os.environ.items()
     ):
         raise RuntimeError("replay_environment_forbidden")
-    root = Path("BRAIN/m26")
+    root = Path(os.environ.get("M26_OUTPUT_DIR", "BRAIN/m26"))
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     root.chmod(0o700)
     report: dict[str, Any] = {}
@@ -199,7 +199,7 @@ def main() -> None:
                 selected = set(selection.split(",")) if selection else None
                 with patch.dict(os.environ, {"ATLAS_SEARCH_PROVIDER": "serpapi"}):
                     probe = daily_probe.run(post, selected=selected, observer=observe)
-                if selected and "J59" not in selected:
+                if selected and not selected.intersection({"J56", "J57", "J59"}):
                     if not probe or not all(row["status"] for row in probe.values()):
                         raise SystemExit(1)
                     return

@@ -11,6 +11,12 @@ from time import monotonic
 from pathlib import Path
 
 from agent_provider import AgentProvider, AgentRequest, Usage, classify
+from answer_content import (
+    ANSWER_NOW,
+    is_promise_only,
+    possible_promise_answer,
+    missing_file_failure,
+)
 from packages.context_limit import ContextExceeded
 from provider_retry import TransientProviderError
 from packages.limits import (
@@ -163,16 +169,25 @@ async def stream_quality(
         and function.get("name") in {"terminal_command", "publish_document"}
         for tool in request.tools
     )
+    terminal_failed = any(
+        m.get("role") == "tool"
+        and '"terminal_operation_failed"' in str(m.get("content", ""))
+        for m in request.messages
+    )
     evidence_without_tools = not request.tools and any(
         message.get("role") == "tool" for message in request.messages
     )
-    if evidence_without_tools or (
-        request.tools
-        and not file_tools
-        and (
-            policy.cost(model, incoming, request.max_tokens)
-            + policy.cost(model, incoming, 3000)
-            > budget
+    if (
+        terminal_failed
+        or evidence_without_tools
+        or (
+            request.tools
+            and not file_tools
+            and (
+                policy.cost(model, incoming, request.max_tokens)
+                + policy.cost(model, incoming, 3000)
+                > budget
+            )
         )
     ):
         request = request.model_copy(
@@ -312,13 +327,19 @@ async def stream_quality(
                     if isinstance(delta, dict) and delta.get("content"):
                         # A tool-enabled draft may precede an invalid tool call.
                         # Hold it until validation so recovery cannot duplicate text.
-                        if current.max_tokens < request.max_tokens or current.tools:
+                        if (
+                            current.max_tokens < request.max_tokens
+                            or current.tools
+                            or terminal_failed
+                        ):
                             buffered.append(event)
                             continue
                         if prefix_open:
                             prefix += str(delta["content"])
                             buffered.append(event)
-                            if possible_history_answer(prefix):
+                            if possible_history_answer(
+                                prefix
+                            ) or possible_promise_answer(prefix):
                                 continue
                             prefix_open = False
                             # Visible answers cannot be retried. Let this attempt
@@ -466,6 +487,33 @@ async def stream_quality(
                 if malformed_name is not None:
                     raise MalformedToolCall(malformed_name.measured, index)
                 raise RuntimeError("unexpected_tool_history_answer")
+        promise_only = not calls and is_promise_only(str(result.get("text", "")))
+        missing_failure = (
+            terminal_failed
+            and not calls
+            and missing_file_failure(str(result.get("text", "")))
+        )
+        delivery_error = (
+            "promise_only_final_answer" if promise_only else "missing_file_failure"
+        )
+        if promise_only or missing_failure:
+            logging.getLogger(__name__).warning(
+                json.dumps({"event": delivery_error, "attempt": index + 1})
+            )
+            if index or visible_content:
+                raise ProviderFailure(
+                    delivery_error, str(result.get("finish_reason")), index
+                )
+            request = request.model_copy(
+                update={
+                    "tool_choice": "none",
+                    "messages": [
+                        *request.messages,
+                        {"role": "system", "content": ANSWER_NOW},
+                    ],
+                }
+            )
+            incoming = input_bound(request.messages, request.tools)
         incomplete = result.get("finish_reason") == "length"
         if incomplete:
             logging.getLogger(__name__).warning(
@@ -496,7 +544,9 @@ async def stream_quality(
                 )
         # Empty terminal responses retain validated billing, then get one retry.
         if (
-            malformed
+            promise_only
+            or missing_failure
+            or malformed
             or malformed_arguments
             or incomplete
             or (not str(result.get("text", "")).strip() and not result.get("calls"))

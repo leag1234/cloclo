@@ -28,6 +28,8 @@ class ProviderFailure(RuntimeError):
                 "empty_content_after_retry",
                 "incomplete_provider_answer",
                 "malformed_tool_call",
+                "promise_only_final_answer",
+                "missing_file_failure",
             }
             else "provider_error"
         )
