@@ -113,6 +113,38 @@ class ProviderFailureTests(unittest.IsolatedAsyncioTestCase):
 
 
 class AttachmentTests(unittest.TestCase):
+    def test_file_requests_have_bounded_deadline_without_attachment(self) -> None:
+        from agent_provider import AgentRequest
+        from pydantic import ValidationError
+
+        for question in (
+            "Crée un PPTX",
+            "PREPARE UN PDF",
+            "genere un docx",
+            "Build a spreadsheet",
+            "Erstelle eine Präsentation",
+            "Convertis ceci en XLSX",
+        ):
+            with self.subTest(question=question):
+                payload = ChatRequest(
+                    messages=[ChatMessage(role="user", content=question)]
+                )
+                self.assertFalse(payload.has_attachments)
+                self.assertEqual(payload.timeout_seconds, 300)
+        Limits(profile=PROFILES[0], produces_files=True, wall_clock=300)
+        data = dict(
+            profile=PROFILES[0],
+            produces_files=True,
+            messages=[{"role": "user", "content": "Create a PDF"}],
+            tools=[],
+            timeout=300.0,
+        )
+        AgentRequest.model_validate(data)
+        with self.assertRaises(ValidationError):
+            AgentRequest.model_validate({**data, "timeout": 301.0})
+        with self.assertRaises(ValueError):
+            Limits(profile=PROFILES[0], produces_files=True, wall_clock=301)
+
     def test_filesystem_attachment_phrasings_keep_their_budget(self) -> None:
         for question in (
             "Résume ces deux pièces",

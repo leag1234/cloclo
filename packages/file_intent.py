@@ -4,19 +4,20 @@ import re
 import unicodedata
 
 
-def produces_file(text: str) -> bool:
+def produces_file(text: str, *, include_images: bool = True) -> bool:
     text = "".join(
         c
         for c in unicodedata.normalize("NFKD", text.casefold())
         if not unicodedata.combining(c)
     )
-    if re.search(r"\b(dessine\w*|zeichne\w*|dibuja\w*)\b", text):
+    if include_images and re.search(r"\b(dessine\w*|zeichne\w*|dibuja\w*)\b", text):
         return True
     artifact = re.search(
         r"\b(pdf|docx|xlsx|pptx|csv|document|presentation|diaporama|slides?"
         r"|spreadsheet|tableur|fichier|file|datei|dokument|prasentation"
         r"|tabellenkalkulation|archivo|documento|presentacion|foglio|presentazione"
-        r"|image|imagen|immagine|bild)\b",
+        + (r"|image|imagen|immagine|bild" if include_images else "")
+        + r")\b",
         text,
     )
     action = re.search(

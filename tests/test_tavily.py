@@ -14,6 +14,38 @@ from services.orchestrator.tools import Fetch, Runtime, Search
 
 
 class TavilyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_provider_quota_status_survives_tool_boundary(self) -> None:
+        from services.orchestrator.loop import Call
+
+        for status in (429, 432):
+            response = MagicMock(status=status)
+            context = MagicMock()
+            context.__aenter__ = AsyncMock(return_value=response)
+            session = MagicMock()
+            session.post.return_value = context
+            client = MagicMock()
+            client.__aenter__ = AsyncMock(return_value=session)
+            with (
+                self.subTest(status=status),
+                tempfile.TemporaryDirectory() as root,
+                patch.dict(
+                    os.environ,
+                    {"ATLAS_SEARCH_PROVIDER": "tavily", "TAVILY_API_KEY": "test-only"},
+                ),
+                patch(
+                    "services.orchestrator.tools.aiohttp.ClientSession",
+                    return_value=client,
+                ),
+            ):
+                runtime = Runtime(Cache(Path(root) / "cache.sqlite"), Decimal(0))
+                result = await runtime.execute(
+                    Call("1", "web_search", '{"query":"public news","lang":"en"}'), 1
+                )
+                self.assertEqual(
+                    result, {"error": "quota_exceeded", "provider_status": status}
+                )
+                self.assertEqual(session.post.call_count, 1)
+
     async def test_content_reused_without_fetch_and_provider_key_not_cached(
         self,
     ) -> None:
@@ -255,9 +287,7 @@ class TavilyTests(unittest.IsolatedAsyncioTestCase):
                 "execute",
                 new=AsyncMock(return_value={"error": "quota_exceeded"}),
             ):
-                with self.assertRaisesRegex(
-                    GatewayError, "search_unavailable"
-                ) as caught:
+                with self.assertRaisesRegex(GatewayError, "quota_exceeded") as caught:
                     await tools.execute(
                         Call("search", "web_search", '{"query":"CPC","lang":"fr"}'), 1
                     )
@@ -309,6 +339,11 @@ class TavilyTests(unittest.IsolatedAsyncioTestCase):
                     result,
                     {
                         "error": expected,
+                        **(
+                            {"provider_status": status}
+                            if expected == "quota_exceeded"
+                            else {}
+                        ),
                         **(
                             {
                                 "message": "response_too_large: measured 2000001 bytes; limit 2000000 bytes"

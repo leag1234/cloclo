@@ -232,9 +232,17 @@ class ChatTools(Runtime):
                     else "provider failed or returned no results"
                 )
                 raise GatewayError(
-                    "search_unavailable",
+                    "quota_exceeded"
+                    if output.get("error") == "quota_exceeded"
+                    else "search_unavailable",
                     503,
-                    f"Web search unavailable: {reason}. No verified result was obtained "
+                    f"Web search unavailable: {reason}. "
+                    + (
+                        f"Provider HTTP {output['provider_status']}. "
+                        if type(output.get("provider_status")) is int
+                        else ""
+                    )
+                    + "No verified result was obtained "
                     "(required: at least 1). I cannot verify this answer from current sources. "
                     "Search limits: 3 calls per request and 900 local reservations per month.",
                 )
