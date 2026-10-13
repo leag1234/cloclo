@@ -4,6 +4,15 @@ import re
 import unicodedata
 
 
+def requests_file_delivery(text: str, *, include_images: bool = True) -> bool:
+    """Check requested output separately from the legacy budget eligibility."""
+    # Upload normalization appends input filenames to the user text. Their
+    # extensions must not turn "write a summary" into a request for a PDF.
+    text = re.sub(r"^\[Attachment: [^\n]*\]$", "", text, flags=re.M)
+    text = re.sub(r"<attached_files>.*?</attached_files>", "", text, flags=re.S)
+    return produces_file(text, include_images=include_images)
+
+
 def produces_file(text: str, *, include_images: bool = True) -> bool:
     text = "".join(
         c

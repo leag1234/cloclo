@@ -11,7 +11,7 @@ import re
 import time
 
 from fastapi.responses import StreamingResponse
-from packages.file_intent import produces_file
+from packages.file_intent import produces_file, requests_file_delivery
 from packages.limits import LimitError
 
 from services.orchestrator.chat_schema import ChatRequest
@@ -27,7 +27,9 @@ def response(
     started: float,
     process: Callable[[ChatRequest, Interaction], Awaitable[None]],
 ) -> StreamingResponse:
-    file_request = produces_file(payload.messages[-1].text, include_images=False)
+    file_request = requests_file_delivery(
+        payload.messages[-1].text, include_images=False
+    )
     ceiling = (
         "0.30"
         if payload.has_attachments or produces_file(payload.messages[-1].text)
