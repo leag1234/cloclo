@@ -6,6 +6,17 @@ import re
 from urllib.parse import unquote, urlsplit
 
 
+def inline_fallback(text: str, language: str) -> str:
+    notices = {
+        "fr": "Aucun fichier n'a pu être publié. Le contenu ci-dessus est la solution de secours en texte.",
+        "de": "Keine Datei konnte veröffentlicht werden. Der obige Inhalt dient als Ersatz in Textform.",
+        "es": "No se pudo publicar ningún archivo. El contenido anterior es la alternativa en texto.",
+        "it": "Nessun file è stato pubblicato. Il contenuto sopra è l'alternativa in testo.",
+        "en": "No file was produced for download. The content above is the inline fallback.",
+    }
+    return text + "\n\n" + notices[language]
+
+
 def render_files(
     text: str, files: list[str], strategies: list[str], language: str
 ) -> str:

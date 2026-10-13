@@ -104,10 +104,7 @@ class PublishedFileTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(run.await_count, 2)
         self.assertIn("terminal_command", run.await_args_list[1].args[3])
-        self.assertEqual(
-            [call.name for call in run.await_args_list[1].kwargs["initial_calls"]],
-            ["terminal_command", "publish_document", "publish_document"],
-        )
+        self.assertFalse(run.await_args_list[1].kwargs.get("initial_calls"))
         self.assertIn(inline, item.reponse)
         self.assertIn("No file was produced", item.reponse)
         self.assertEqual(item.files, [])

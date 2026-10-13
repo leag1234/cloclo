@@ -5,7 +5,7 @@ if [[ -f ../secrets.env ]]; then set -a; source ../secrets.env; set +a; fi
 if [[ -f .env ]]; then set -a; source .env; set +a; fi
 export PATH="$PWD/.venv/bin:$PATH" PYTHONPATH=".:tests:services/model-gateway"
 case "${M26_CASES:-all}" in
-  J59) atlas_providers=(tavily); atlas_searches=(3) ;;
+  J54|J59) atlas_providers=(tavily); atlas_searches=(3) ;;
   all) atlas_providers=(tavily serpapi); atlas_searches=(9 18) ;;
   *) atlas_providers=(serpapi); atlas_searches=(18) ;;
 esac

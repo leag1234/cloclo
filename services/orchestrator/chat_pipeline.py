@@ -8,8 +8,6 @@ import json
 import copy
 import os
 import re
-import base64
-import shlex
 import time
 from decimal import Decimal
 from pathlib import Path
@@ -581,133 +579,72 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             remaining_seconds = max(
                 0, request.timeout_seconds - (time.monotonic() - started)
             )
-            if remaining_seconds > 0:
-                recovery_text = first_result.text.encode("utf-8")[:8000].decode(
-                    "utf-8", "ignore"
+            remaining_cost = max(Decimal(0), Decimal("0.30") - first_result.cost)
+            if remaining_seconds > 0 and remaining_cost > 0:
+                # The same model retains its spending ledger. Recovery only needs
+                # file tools; reopening search would reset its per-request quotas.
+                model.spent = max(model.spent, first_result.cost)
+                model.tools = [
+                    tool
+                    for tool in model.tools
+                    if isinstance(function := tool.get("function"), dict)
+                    and function.get("name") in {"terminal_command", "publish_document"}
+                ]
+                recovery_history: list[Message] = [
+                    {"role": m.role, "content": m.text} for m in request.messages
+                ]
+                recovery_history.append(
+                    {"role": "assistant", "content": first_result.text}
                 )
-                encoded_recovery = base64.b64encode(
-                    recovery_text.encode("utf-8")
-                ).decode("ascii")
-                recovery_script = f'''\
-import base64
-from pathlib import Path
-from pptx import Presentation
-from pptx.util import Pt
-
-text = base64.b64decode("{encoded_recovery}").decode("utf-8")
-presentation = Presentation()
-for number, start in enumerate(range(0, len(text), 1400), 1):
-    slide = presentation.slides.add_slide(presentation.slide_layouts[1])
-    slide.shapes.title.text = "Requested presentation" if number == 1 else f"Requested presentation ({{number}})"
-    frame = slide.placeholders[1].text_frame
-    frame.text = text[start : start + 1400]
-    for paragraph in frame.paragraphs:
-        for run in paragraph.runs:
-            run.font.size = Pt(16)
-presentation.save("presentation.pptx")
-
-pdf_texts = [
-    "Requested presentation",
-    "The full requested content is in presentation.pptx.",
-    "Generated as a downloadable presentation recovery.",
-]
-streams = [
-    f"BT /F1 12 Tf 72 720 Td ({{value}}) Tj ET".encode("latin-1")
-    for value in pdf_texts
-]
-objects = [
-    b"<< /Type /Catalog /Pages 2 0 R >>",
-    b"<< /Type /Pages /Kids [3 0 R 4 0 R 5 0 R] /Count 3 >>",
-    *[
-        f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 9 0 R >> >> /Contents {{6 + index}} 0 R >>".encode()
-        for index in range(3)
-    ],
-    *[
-        b"<< /Length " + str(len(stream)).encode() + b" >>\\nstream\\n" + stream + b"\\nendstream"
-        for stream in streams
-    ],
-    b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-]
-pdf = bytearray(b"%PDF-1.4\\n")
-offsets = [0]
-for number, value in enumerate(objects, 1):
-    offsets.append(len(pdf))
-    pdf.extend(f"{{number}} 0 obj\\n".encode() + value + b"\\nendobj\\n")
-xref = len(pdf)
-pdf.extend(f"xref\\n0 {{len(objects) + 1}}\\n0000000000 65535 f \\n".encode())
-pdf.extend(b"".join(f"{{offset:010d}} 00000 n \\n".encode() for offset in offsets[1:]))
-pdf.extend(f"trailer\\n<< /Size {{len(objects) + 1}} /Root 1 0 R >>\\nstartxref\\n{{xref}}\\n%%EOF\\n".encode())
-Path("presentation.pdf").write_bytes(pdf)
-'''
-                recovery_calls = (
-                    Call(
-                        "file-recovery-create",
-                        "terminal_command",
-                        json.dumps(
-                            {"command": "python3 -c " + shlex.quote(recovery_script)}
+                try:
+                    result = await run(
+                        Query(
+                            question=iteration or request.messages[-1].text,
+                            lang=request.lang,
                         ),
-                    ),
-                    Call(
-                        "file-recovery-pptx",
-                        "publish_document",
-                        json.dumps(
-                            {"path": "presentation.pptx", "strategy": "created"}
+                        model,
+                        tools,
+                        Path("prompts/chat.txt").read_text()
+                        + Path("prompts/chat-agent.txt").read_text()
+                        + language_instruction(request.lang)
+                        + file_context
+                        + "\n\nFile-delivery recovery: the prior answer produced no file. "
+                        "Use terminal_command to create the requested files from the "
+                        "actual answer content, then publish_document for each file. "
+                        "Follow the original request and its language for all titles "
+                        "and content. For a presentation with PDF, render the same "
+                        "substantive slide content into both formats, one PDF page per "
+                        "slide. Never add placeholder or filler pages. Do not claim a "
+                        "file or link exists unless publish_document succeeded. If "
+                        "creation fails, return the actual requested content inline "
+                        "and explain the failure in the request language.",
+                        Limits(
+                            profile=request.model,
+                            tokens=None,
+                            tool_calls=10 - first_result.tool_calls,
+                            cost=remaining_cost,
+                            has_attachments=request.has_attachments,
+                            produces_files=True,
+                            wall_clock=remaining_seconds,
                         ),
-                    ),
-                    Call(
-                        "file-recovery-pdf",
-                        "publish_document",
-                        json.dumps({"path": "presentation.pdf", "strategy": "created"}),
-                    ),
-                )
-                result = await run(
-                    Query(
-                        question=iteration or request.messages[-1].text,
-                        lang=request.lang,
-                    ),
-                    model,
-                    tools,
-                    Path("prompts/chat.txt").read_text()
-                    + Path("prompts/chat-agent.txt").read_text()
-                    + Path("prompts/web-chat.txt").read_text()
-                    + language_instruction(request.lang)
-                    + file_context
-                    + "\n\nFile-delivery recovery: a downloadable file was requested, "
-                    "but the prior answer made no terminal call and produced no file. "
-                    "Use terminal_command to create the requested file in the request "
-                    "directory, then use publish_document to deliver it. Do not claim a "
-                    "file or link exists unless publish_document succeeded. If the file "
-                    "cannot be created, provide the requested content inline and state "
-                    "plainly why no file was produced.",
-                    Limits(
-                        profile=request.model,
-                        tokens=None,
-                        tool_calls=10 - first_result.tool_calls,
-                        cost=Decimal("0.30"),
-                        has_attachments=request.has_attachments,
-                        produces_files=True,
-                        wall_clock=remaining_seconds,
-                    ),
-                    history=[
-                        {"role": m.role, "content": m.text}
-                        for m in request.messages[:-1]
-                    ],
-                    retry_web=True,
-                    terminal_tools=frozenset({"generate_image"})
-                    if not followup
-                    else frozenset(),
-                    initial_calls=recovery_calls,
-                )
-                if not tools.terminal.files:
-                    inline = first_result.text.strip() or result.text.strip()
-                    result.text = (
-                        inline
-                        + "\n\nNo file was produced because the terminal tool did not "
-                        "create a publishable file."
+                        history=recovery_history,
                     )
-                    result.state = "done"
-                    result.reason = "file_not_produced"
                     result.cost += first_result.cost
+                except GatewayError as exc:
+                    # Unknown failed usage retains the full remaining reservation.
+                    # A delivery failure must not discard an already usable answer.
+                    item.erreurs.append(exc.code)
+                    item.provider_retries += exc.retries
+                    result = first_result
+                    result.cost += remaining_cost
+            if not tools.terminal.files:
+                from services.orchestrator.file_results import inline_fallback
+
+                result.text = inline_fallback(
+                    first_result.text.strip() or result.text.strip(), request.lang
+                )
+                result.state = "done"
+                result.reason = "file_not_produced"
         item.reponse, item.state, item.cout_eur = (
             result.text,
             result.state,
