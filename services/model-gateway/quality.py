@@ -300,7 +300,10 @@ async def stream_quality(
             raise ContextExceeded(
                 incoming + current.max_tokens, capabilities["context"]
             )
-        visible_content = False
+        # Track the pre-validation streaming decision separately from withholding
+        # tool-enabled text. Only malformed names may undo that decision.
+        answer_started = False
+        held_content: list[dict[str, object]] = []
         buffered: list[dict[str, object]] = []
         prefix = ""
         prefix_open = True
@@ -325,13 +328,7 @@ async def stream_quality(
                         if isinstance(delta.get("reasoning_content"), str):
                             partial_reasoning += str(delta["reasoning_content"])
                     if isinstance(delta, dict) and delta.get("content"):
-                        # A tool-enabled draft may precede an invalid tool call.
-                        # Hold it until validation so recovery cannot duplicate text.
-                        if (
-                            current.max_tokens < request.max_tokens
-                            or current.tools
-                            or terminal_failed
-                        ):
+                        if current.max_tokens < request.max_tokens or terminal_failed:
                             buffered.append(event)
                             continue
                         if prefix_open:
@@ -347,19 +344,32 @@ async def stream_quality(
                             # early to reserve time for an ineligible recovery.
                             deadline.reschedule(full_deadline)
                             for pending_event in buffered:
-                                yield pending_event
+                                if current.tools:
+                                    held_content.append(pending_event)
+                                else:
+                                    yield pending_event
                             buffered.clear()
-                            visible_content = True
+                            answer_started = True
                             continue
-                        visible_content = True
+                        answer_started = True
+                        if current.tools:
+                            held_content.append(event)
+                            continue
                     yield event
             if result is None:
                 raise RuntimeError("provider_response_invalid")
         except ProviderLimitError:
+            for event in held_content:
+                yield event
             raise
         except (RuntimeError, TimeoutError, LimitError) as exc:
             if isinstance(exc, MalformedToolCall):
                 malformed_name = exc
+                if current.tools:
+                    answer_started = False
+            else:
+                for event in held_content:
+                    yield event
             # Invalid provider fields are recoverable output failures. Keep the
             # same decoder limits and charge the unknown attempt in full.
             # Request/output budgets must never enter this recovery path.
@@ -406,11 +416,11 @@ async def stream_quality(
                         "elapsed_seconds": round(monotonic() - started, 3),
                         "reserved_unknown_eur": str(spent),
                         "final_usage_measured": failed_usage is not None,
-                        "visible_content": visible_content,
+                        "visible_content": answer_started,
                     }
                 )
             )
-            if index or visible_content:
+            if index or answer_started:
                 if malformed_name is not None and not isinstance(exc, LimitError):
                     raise MalformedToolCall(malformed_name.measured, index) from None
                 if isinstance(exc, (TimeoutError, LimitError)):
@@ -428,6 +438,8 @@ async def stream_quality(
                 request = request.model_copy(update={"tool_choice": "none"})
             yield {"phase": "reasoning_fallback" if retried else "provider_fallback"}
             continue
+        for event in held_content:
+            yield event
         usage = Usage.model_validate(result["usage"])
         if (
             usage.prompt_tokens > incoming
@@ -467,7 +479,7 @@ async def stream_quality(
             logging.getLogger(__name__).warning(
                 json.dumps({"event": "invalid_tool_arguments", "attempt": index + 1})
             )
-            if index or visible_content:
+            if index or answer_started:
                 if malformed_name is not None:
                     raise MalformedToolCall(malformed_name.measured, index)
                 raise RuntimeError("invalid_tool_arguments")
@@ -483,7 +495,7 @@ async def stream_quality(
                     }
                 )
             )
-            if index or visible_content:
+            if index or answer_started:
                 if malformed_name is not None:
                     raise MalformedToolCall(malformed_name.measured, index)
                 raise RuntimeError("unexpected_tool_history_answer")
@@ -500,7 +512,7 @@ async def stream_quality(
             logging.getLogger(__name__).warning(
                 json.dumps({"event": delivery_error, "attempt": index + 1})
             )
-            if index or visible_content:
+            if index or answer_started:
                 raise ProviderFailure(
                     delivery_error, str(result.get("finish_reason")), index
                 )
@@ -528,7 +540,7 @@ async def stream_quality(
                     }
                 )
             )
-            if index or visible_content:
+            if index or answer_started:
                 if malformed_name is not None:
                     raise MalformedToolCall(malformed_name.measured, index)
                 if index and (not str(result.get("text", "")).strip()):
