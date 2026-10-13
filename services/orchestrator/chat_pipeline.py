@@ -574,6 +574,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             and tools.terminal is not None
             and not tools.terminal.files
             and tools.terminal.commands == 0
+            and "terminal_operation_failed" not in item.erreurs
             and result.tool_calls <= 7
         ):
             first_result = result
