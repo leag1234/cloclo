@@ -97,6 +97,7 @@ class GatewayModel:
         self.max_tokens = configuration.max_tokens
         self.provider_model = ""
         self.spent = Decimal(0)
+        self.delivery_reserve = Decimal(0)
         self.has_attachments = False
         self.provider_retries = 0
         self.produces_files = False
@@ -133,7 +134,8 @@ class GatewayModel:
                 if self.profile is not None
                 else "0.05"
             )
-            - self.spent,
+            - self.spent
+            - self.delivery_reserve,
         )
 
     @staticmethod

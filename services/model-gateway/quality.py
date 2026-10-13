@@ -17,6 +17,7 @@ from answer_content import (
     failed_terminal_content,
     possible_promise_answer,
     missing_file_failure,
+    strip_file_promises,
 )
 from packages.context_limit import ContextExceeded
 from provider_retry import TransientProviderError
@@ -505,11 +506,27 @@ async def stream_quality(
                 if malformed_name is not None:
                     raise MalformedToolCall(malformed_name.measured, index)
                 raise RuntimeError("unexpected_tool_history_answer")
+        future_action = (
+            terminal_failed
+            and not calls
+            and (
+                strip_file_promises(str(result.get("text", "")))
+                != result.get("text", "")
+            )
+        )
+        if future_action and index:
+            # The single retry is exhausted. Only validated substantive content
+            # and the failure disclosure may survive; no rejected delta escapes.
+            result["text"] = strip_file_promises(str(result["text"]))
+            buffered = [{"delta": {"content": result["text"]}}]
+            future_action = False
         invalid_content = terminal_failed and failed_terminal_content(
             str(result.get("text", "")), request.messages
         )
         promise_only = not calls and (
-            is_promise_only(str(result.get("text", ""))) or invalid_content
+            is_promise_only(str(result.get("text", "")))
+            or invalid_content
+            or future_action
         )
         missing_failure = (
             terminal_failed
@@ -542,7 +559,9 @@ async def stream_quality(
                             + (
                                 " The last response was rejected: deliver the content itself, "
                                 "not document-generation code, intentions, or an apology. "
-                                "Keep only a brief failure disclosure before the requested content."
+                                "Keep only a brief failure disclosure before the requested content. "
+                                "Remove EVERY sentence promising a future file action or retry, "
+                                "even when the rest of the answer already contains useful content."
                                 if terminal_failed
                                 else ""
                             ),

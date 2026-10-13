@@ -3,6 +3,8 @@
 import re
 import unicodedata
 
+from packages.file_answers import strip_file_promises as strip_file_promises
+
 
 _INTENTS = (
     "i will ",
