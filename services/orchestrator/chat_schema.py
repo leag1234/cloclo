@@ -1,6 +1,7 @@
 """OpenAI-compatible text/image chat; clients cannot alter tool budgets."""
 
 from packages.profiles import PROFILES, context_window
+from packages.file_intent import produces_file
 from packages.evidence import estimated_tokens
 from pydantic_core import PydanticCustomError
 
@@ -43,7 +44,12 @@ class ChatRequest(VisionInput):
 
     @property
     def timeout_seconds(self) -> float:
-        return 300.0 if self.has_attachments else 120.0
+        return (
+            300.0
+            if self.has_attachments
+            or produces_file(self.messages[-1].text, include_images=False)
+            else 120.0
+        )
 
     @model_validator(mode="after")
     def valid_project(self) -> Self:

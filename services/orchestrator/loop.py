@@ -53,7 +53,11 @@ class Limits:
             and (
                 0
                 <= self.wall_clock
-                <= (300 if self.has_attachments and self.profile else 120)
+                <= (
+                    300
+                    if (self.has_attachments or self.produces_files) and self.profile
+                    else 120
+                )
             )
             and (
                 0

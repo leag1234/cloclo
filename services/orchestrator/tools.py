@@ -33,6 +33,14 @@ from services.orchestrator.web import (
 )
 
 
+class SearchQuotaError(ValueError):
+    """Provider quota response without retaining credentials or response bodies."""
+
+    def __init__(self, status: int) -> None:
+        self.status = status
+        super().__init__("quota_exceeded")
+
+
 class Arguments(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -203,7 +211,7 @@ class Runtime:
                 allow_redirects=False,
             ) as response:
                 if response.status in (429, 432):
-                    raise ValueError("quota_exceeded")
+                    raise SearchQuotaError(response.status)
                 if response.status != 200:
                     raise ValueError("search_unavailable")
                 body = bytearray()
@@ -364,6 +372,8 @@ class Runtime:
                             process.kill()
                             await process.wait()
             return {"trust": "untrusted", "data": result}
+        except SearchQuotaError as exc:
+            return {"error": "quota_exceeded", "provider_status": exc.status}
         except LimitError as exc:
             return {"error": exc.code, "message": exc.detail}
         except ValidationError as exc:

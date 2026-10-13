@@ -88,7 +88,11 @@ class SearchJourneyTests(unittest.TestCase):
                 AsyncMock(side_effect=AssertionError("memory_answer")),
             ) as complete,
             patch.object(
-                Runtime, "execute", AsyncMock(return_value={"error": "quota_exceeded"})
+                Runtime,
+                "execute",
+                AsyncMock(
+                    return_value={"error": "quota_exceeded", "provider_status": 432}
+                ),
             ),
             TestClient(app) as client,
         ):
@@ -105,6 +109,8 @@ class SearchJourneyTests(unittest.TestCase):
             )
             self.assertEqual(reply.status_code, 503)
             self.assertIn("quota exhausted", reply.json()["error"]["message"])
+            self.assertEqual(reply.json()["error"]["code"], "quota_exceeded")
+            self.assertIn("432", reply.json()["error"]["message"])
             complete.assert_not_called()
             self.assertIn(
                 "web_fetch",

@@ -218,6 +218,7 @@ def run(
             ),
             "http_status": status,
             "error_code": code,
+            "error_message": answer.get("error", {}).get("message", ""),
         }
         report[name] = row
         if observer:
