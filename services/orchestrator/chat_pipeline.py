@@ -582,7 +582,11 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             if not followup
             else frozenset(),
         )
-        from services.orchestrator.file_content import answer_content, requested_formats
+        from services.orchestrator.file_content import (
+            answer_content,
+            requested_formats,
+            presentable,
+        )
 
         formats = requested_formats(request.messages[-1].text)
         preserve_code = bool(
@@ -593,6 +597,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             )
         )
         file_recovery_attempted = False
+        file_recovery_failed = False
         if (
             deliver_files
             and tools.terminal is not None
@@ -607,7 +612,12 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                 0, request.timeout_seconds - (time.monotonic() - started)
             )
             remaining_cost = max(Decimal(0), Decimal("0.30") - first_result.cost)
-            if remaining_seconds > 0 and remaining_cost > 0:
+            # A failed forced-tool call has unknown usage even when the original
+            # answer is substantive. Always leave room to finish the content.
+            content_reserve = min(Decimal("0.08"), remaining_cost / 2)
+            recovery_allowance = remaining_cost - content_reserve
+            model.delivery_reserve = content_reserve
+            if remaining_seconds > 0 and recovery_allowance > 0:
                 # The same model retains its spending ledger. Recovery only needs
                 # file tools; reopening search would reset its per-request quotas.
                 model.spent = max(model.spent, first_result.cost)
@@ -654,7 +664,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                             cost=remaining_cost,
                             has_attachments=request.has_attachments,
                             produces_files=True,
-                            wall_clock=max(0, remaining_seconds - 30),
+                            wall_clock=max(0, remaining_seconds - 90),
                         ),
                         history=recovery_history,
                     )
@@ -666,7 +676,10 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                     item.erreurs.append(exc.code)
                     item.provider_retries += exc.retries
                     result = first_result
-                    result.cost += remaining_cost
+                    result.cost += recovery_allowance
+                    file_recovery_failed = True
+                finally:
+                    model.delivery_reserve = Decimal(0)
             # Preserve substantive first-pass evidence, never an invented recovery URL.
             if not tools.terminal.files:
                 result.text = first_result.text.strip() or result.text.strip()
@@ -681,7 +694,16 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                 if not any(url.endswith("." + ext) for url in tools.terminal.files)
             )
             if missing and "terminal_operation_failed" not in item.erreurs:
-                command, paths = render_command(result.text, missing)
+                ready = not file_recovery_failed and presentable(result.text, missing)
+                if not ready and result.tool_calls + 1 + len(missing) <= 10:
+                    from services.orchestrator.content_recovery import recover_content
+
+                    ready = await recover_content(
+                        model, request, item, result, missing, started
+                    )
+                command, paths = (
+                    render_command(result.text, missing) if ready else ("", [])
+                )
                 remaining = request.timeout_seconds - (time.monotonic() - started)
                 if (
                     command

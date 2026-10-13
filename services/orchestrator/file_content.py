@@ -6,6 +6,8 @@ import shlex
 import textwrap
 import unicodedata
 
+from packages.file_answers import strip_file_promises
+
 
 def folded(text: str) -> str:
     return "".join(
@@ -28,6 +30,8 @@ def failure_notice(text: str) -> bool:
 
 def answer_content(text: str, *, preserve_code: bool = False) -> str:
     text = text if preserve_code else re.sub(r"```.*?(?:```|$)", "", text, flags=re.S)
+    if not preserve_code:
+        text = strip_file_promises(text)
     lines = []
     for line in text.splitlines():
         value = folded(line)
@@ -38,7 +42,11 @@ def answer_content(text: str, *, preserve_code: bool = False) -> str:
             continue
         # Publication comes exclusively from the terminal's verified file list.
         if (
-            "untrusted_tool_history" in line
+            re.search(
+                r"(?:j'ai|i have|i've|ich habe|he |ho ).{0,40}(?:cree|created|generated|gener|erstell|creado|creato).{0,60}(?:presentation|file|fichier|document|pdf|pptx)",
+                value,
+            )
+            or "untrusted_tool_history" in line
             or "sandbox:" in line
             or re.search(r"download|telecharg|herunterlad|descarg|scaric", value)
             or re.search(
@@ -137,3 +145,36 @@ prs.save("answer.pptx")
 assert Path("answer.pdf").stat().st_size > 0
 """
     return "python3 -c " + shlex.quote(code), ["answer." + ext for ext in selected]
+
+
+def presentable(
+    text: str, formats: tuple[str, ...], *, structured: bool = False
+) -> bool:
+    """A content turn needs three substantive titled sections for slides, one otherwise.
+
+    Existing prose can still be paginated. New content must have explicit section
+    titles; page wrapping cannot turn a single paragraph into accepted sections.
+    Plans, apologies and promised generation never count as deliverable content.
+    """
+    value = folded(answer_content(text))
+    if re.search(
+        r"plan (?:de la|de|for the) (?:presentation|document)|"
+        r"(?:je vais|i will|i'll|ich werde|voy a|procedero a).{0,100}"
+        r"integrer|(?:je vais|i will|i'll|ich werde|voy a|procedero a).{0,100}"
+        r"(?:gener|creer|create|prepare|publish|publier|erstell|crear)|"
+        r"(?:sorry|desole|apolog).{0,60}(?:cannot|impossible|pas)",
+        value,
+    ):
+        return False
+    groups = sections(text)
+    minimum = 3 if "pptx" in formats else 1
+    if structured:
+        titles = {
+            title for title, lines in groups if title and len(" ".join(lines)) >= 60
+        }
+        if len(titles) < minimum:
+            return False
+    return (
+        len(groups) >= minimum
+        and sum(len(" ".join(lines)) for _, lines in groups) >= 100 * minimum
+    )
