@@ -89,3 +89,21 @@ Done: make verify-m26 locally with live evidence, green GitHub ci, probe in cron
 4. Inherited M24 defect. tests/journey_server.py forces ATLAS_SEARCH_PROVIDER=serpapi even
    in live mode. Apply that override in replay only.
 5. At most two live attempts per journey per session, then stop and report.
+
+### M26 owner rulings (2026-10-13)
+
+6. Search credits. The clause of ruling 2 "spend no search credit elsewhere" is lifted
+   for 30 days from 2026-10-13. Two providers are available: Tavily (1000 credits,
+   2 per advanced search) and SerpAPI (renews 2026-11-12). Live runs follow
+   ATLAS_SEARCH_PROVIDER from the owner environment. Before and after each live batch,
+   record the remaining credits of the provider used (Tavily GET /usage, SerpAPI
+   total_searches_left; both free; never print a key).
+7. Allocation. Tavily: J59, the M25 public corpus remeasure, live acceptance.
+   SerpAPI: the daily probe and a reserve for retries. Stop live search work at
+   150 Tavily credits left and at 50 SerpAPI searches left; those belong to the probe.
+8. D5 applies to both providers. Tavily HTTP 432 and SerpAPI HTTP 429 "run out of
+   searches" reach the user and the probe as quota exhausted, with the provider
+   status, never as search_unavailable. A 429 on the hourly limit is reported as such.
+9. Order: J59, the web probe, then the M25 public corpus remeasure. If a profile falls
+   below its threshold, report the per-case scores and stop. No prompt change.
+   A live harness may pin a provider only as assigned in ruling 7.
