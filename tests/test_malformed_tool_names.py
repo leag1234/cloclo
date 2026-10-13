@@ -246,7 +246,10 @@ class MalformedToolNameTests(unittest.IsolatedAsyncioTestCase):
         ) -> dict[str, object]:
             raise MalformedToolCall(277, 1)
 
-        with patch.object(AgentProvider, "complete", failure):
+        with (
+            patch.object(AgentProvider, "complete", failure),
+            patch.dict(os.environ, {"ESCALATION_MODEL": "local"}),
+        ):
             gateway = serve(Mock(spec=CPUModels), 0)
             thread = threading.Thread(target=gateway.serve_forever, daemon=True)
             thread.start()
