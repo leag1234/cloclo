@@ -15,6 +15,7 @@ import tempfile
 import threading
 import time
 from typing import Any
+from urllib.parse import unquote
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -30,6 +31,23 @@ from streaming import StreamDecoder
 
 sys.path.insert(0, str(Path("scripts").resolve()))
 import daily_probe
+
+
+def preserve_files(root: Path, name: str, files: list[str]) -> list[dict[str, Any]]:
+    artifacts = []
+    for index, url in enumerate(files):
+        entry: dict[str, Any] = {"url": url}
+        try:
+            raw = daily_probe.download(url)
+            directory = root / "files" / name / str(index)
+            directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+            target = directory / Path(unquote(url)).name
+            target.write_bytes(raw)
+            entry.update(path=str(target), bytes=len(raw))
+        except (OSError, ValueError) as exc:
+            entry["copy_error"] = type(exc).__name__
+        artifacts.append(entry)
+    return artifacts
 
 
 @contextmanager
@@ -142,6 +160,9 @@ def main() -> None:
             "mode": "live",
             "capture": str(capture),
             "error": answer.get("error"),
+            "preserved_files": preserve_files(
+                root, name, answer.get("atlas", {}).get("files", [])
+            ),
         }
         (root / "report.json").write_text(
             json.dumps(report, ensure_ascii=False, indent=2)
@@ -197,8 +218,16 @@ def main() -> None:
 
                 selection = os.environ.get("M26_CASES")
                 selected = set(selection.split(",")) if selection else None
-                with patch.dict(os.environ, {"ATLAS_SEARCH_PROVIDER": "serpapi"}):
-                    probe = daily_probe.run(post, selected=selected, observer=observe)
+                probe_selected = (
+                    {"presentation" if name == "J54" else name for name in selected}
+                    if selected
+                    else None
+                )
+                provider = "tavily" if selected == {"J54"} else "serpapi"
+                with patch.dict(os.environ, {"ATLAS_SEARCH_PROVIDER": provider}):
+                    probe = daily_probe.run(
+                        post, selected=probe_selected, observer=observe
+                    )
                 if selected and not selected.intersection({"J56", "J57", "J59"}):
                     if not probe or not all(row["status"] for row in probe.values()):
                         raise SystemExit(1)
