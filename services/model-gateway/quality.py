@@ -13,7 +13,12 @@ from pathlib import Path
 from agent_provider import AgentProvider, AgentRequest, Usage, classify
 from packages.context_limit import ContextExceeded
 from provider_retry import TransientProviderError
-from packages.limits import ProviderFailure, LimitError, ProviderLimitError
+from packages.limits import (
+    ProviderFailure,
+    LimitError,
+    ProviderLimitError,
+    MalformedToolCall,
+)
 
 from packages.tool_history import (
     final_messages,
@@ -105,6 +110,7 @@ async def stream_quality(
     started = monotonic()
     current = request
     model = primary
+    malformed_name: MalformedToolCall | None = None
 
     def select_affordable_model() -> None:
         nonlocal role, model, fallback_role, fallback
@@ -208,6 +214,8 @@ async def stream_quality(
     for index in range(2):
         remaining = request.timeout - (monotonic() - started)
         if remaining <= 0:
+            if malformed_name is not None:
+                raise MalformedToolCall(malformed_name.measured, index) from None
             raise TimeoutError("timeout")
         # Retain room for one bounded recovery, not all future tool turns.
         # Actual cost is reserved immediately before each transport call.
@@ -302,7 +310,9 @@ async def stream_quality(
                         if isinstance(delta.get("reasoning_content"), str):
                             partial_reasoning += str(delta["reasoning_content"])
                     if isinstance(delta, dict) and delta.get("content"):
-                        if current.max_tokens < request.max_tokens:
+                        # A tool-enabled draft may precede an invalid tool call.
+                        # Hold it until validation so recovery cannot duplicate text.
+                        if current.max_tokens < request.max_tokens or current.tools:
                             buffered.append(event)
                             continue
                         if prefix_open:
@@ -327,6 +337,8 @@ async def stream_quality(
         except ProviderLimitError:
             raise
         except (RuntimeError, TimeoutError, LimitError) as exc:
+            if isinstance(exc, MalformedToolCall):
+                malformed_name = exc
             # Invalid provider fields are recoverable output failures. Keep the
             # same decoder limits and charge the unknown attempt in full.
             # Request/output budgets must never enter this recovery path.
@@ -364,7 +376,9 @@ async def stream_quality(
                 json.dumps(
                     {
                         "event": "quality_attempt_failed",
-                        "category": "timeout"
+                        "category": "malformed_tool_call"
+                        if isinstance(exc, MalformedToolCall)
+                        else "timeout"
                         if isinstance(exc, TimeoutError)
                         else "provider",
                         "attempt": index + 1,
@@ -376,6 +390,8 @@ async def stream_quality(
                 )
             )
             if index or visible_content:
+                if malformed_name is not None and not isinstance(exc, LimitError):
+                    raise MalformedToolCall(malformed_name.measured, index) from None
                 if isinstance(exc, (TimeoutError, LimitError)):
                     raise
                 raise ProviderFailure(
@@ -385,6 +401,10 @@ async def stream_quality(
             model = policy.models[role]
             fallback = True
             retried = False
+            if isinstance(exc, MalformedToolCall):
+                # Keep the original history and its reservation; the rejected
+                # name is never sent back. No additional retry is introduced.
+                request = request.model_copy(update={"tool_choice": "none"})
             yield {"phase": "reasoning_fallback" if retried else "provider_fallback"}
             continue
         usage = Usage.model_validate(result["usage"])
@@ -427,6 +447,8 @@ async def stream_quality(
                 json.dumps({"event": "invalid_tool_arguments", "attempt": index + 1})
             )
             if index or visible_content:
+                if malformed_name is not None:
+                    raise MalformedToolCall(malformed_name.measured, index)
                 raise RuntimeError("invalid_tool_arguments")
         malformed = is_history_answer(str(result.get("text", "")))
         if malformed:
@@ -441,6 +463,8 @@ async def stream_quality(
                 )
             )
             if index or visible_content:
+                if malformed_name is not None:
+                    raise MalformedToolCall(malformed_name.measured, index)
                 raise RuntimeError("unexpected_tool_history_answer")
         incomplete = result.get("finish_reason") == "length"
         if incomplete:
@@ -457,6 +481,8 @@ async def stream_quality(
                 )
             )
             if index or visible_content:
+                if malformed_name is not None:
+                    raise MalformedToolCall(malformed_name.measured, index)
                 if index and (not str(result.get("text", "")).strip()):
                     raise ProviderFailure(
                         "empty_content_after_retry",
@@ -476,6 +502,8 @@ async def stream_quality(
             or (not str(result.get("text", "")).strip() and not result.get("calls"))
         ):
             if index:
+                if malformed_name is not None:
+                    raise MalformedToolCall(malformed_name.measured, index)
                 raise ProviderFailure(
                     "empty_content_after_retry", str(result.get("finish_reason")), index
                 )

@@ -4,7 +4,15 @@ import logging
 
 from pydantic import ValidationError
 from packages.image_upload import UploadError
-from packages.limits import LimitError
+from packages.limits import LimitError, MalformedToolCall
+
+
+def malformed_tool_name(error: ValidationError) -> MalformedToolCall | None:
+    for failure in error.errors(include_url=False):
+        if failure["loc"][-2:] == ("function", "name"):
+            value = failure.get("input")
+            return MalformedToolCall(len(value) if isinstance(value, str) else 0)
+    return None
 
 
 def describe_validation(error: ValidationError) -> str:

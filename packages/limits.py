@@ -27,6 +27,7 @@ class ProviderFailure(RuntimeError):
                 "empty_completion",
                 "empty_content_after_retry",
                 "incomplete_provider_answer",
+                "malformed_tool_call",
             }
             else "provider_error"
         )
@@ -38,3 +39,17 @@ class ProviderFailure(RuntimeError):
         self.retries = retries
         self.detail = f"{self.code}; finish_reason={self.finish_reason}; retries={retries} (limit 1)"
         super().__init__(self.detail)
+
+
+class MalformedToolCall(ProviderFailure):
+    """Provider output diagnostics retain only a size, never the invalid name."""
+
+    def __init__(self, measured: int, retries: int = 0) -> None:
+        super().__init__("malformed_tool_call", None, retries)
+        self.measured = measured
+        self.limit = 80
+        self.detail = (
+            "The provider returned a malformed tool call: invalid name; "
+            f"measured {measured} characters; allowed 1..80 characters; " + self.detail
+        )
+        self.args = (self.detail,)

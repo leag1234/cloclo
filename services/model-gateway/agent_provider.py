@@ -1,6 +1,6 @@
 """Validated tool-calling transport and human-confirmed pricing, POC-P6."""
 
-from packages.limits import LimitError, ProviderLimitError
+from packages.limits import LimitError, ProviderLimitError, MalformedToolCall
 
 from packages.profiles import PROFILES
 
@@ -18,7 +18,7 @@ from collections.abc import AsyncGenerator
 import aiohttp
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator, ValidationError
-from packages.validation import numeric_limit
+from packages.validation import numeric_limit, malformed_tool_name
 
 
 def classify(messages: list[dict[str, object]]) -> str:
@@ -267,9 +267,12 @@ class AgentProvider:
             raise ValueError("provider_configuration")
         started = monotonic()
         unknown = Decimal(0)
+        malformed_name: MalformedToolCall | None = None
         for index, model in enumerate((plan.primary, plan.fallback)):
             remaining = request.timeout - (monotonic() - started)
             if remaining <= 0:
+                if malformed_name is not None:
+                    raise MalformedToolCall(malformed_name.measured, index)
                 raise TimeoutError("timeout")
             # Leave time for one fallback while keeping the original total deadline.
             allotted = remaining * 0.7 if index == 0 else remaining
@@ -309,7 +312,9 @@ class AgentProvider:
                         answer = value
             except ProviderLimitError:
                 raise
-            except (RuntimeError, TimeoutError):
+            except (RuntimeError, TimeoutError) as exc:
+                if isinstance(exc, MalformedToolCall):
+                    malformed_name = exc
                 unknown += ledger.spent + (
                     plan.fallback_bound if index else plan.primary_bound
                 )
@@ -324,7 +329,15 @@ class AgentProvider:
                     )
                 )
                 if index:
+                    if malformed_name is not None:
+                        raise MalformedToolCall(
+                            malformed_name.measured, index
+                        ) from None
                     raise
+                if isinstance(exc, MalformedToolCall):
+                    request = request.model_copy(
+                        update={"tools": [], "tool_choice": "none"}
+                    )
                 continue
             unknown += ledger.spent
             usage = answer.get("usage")
@@ -428,6 +441,9 @@ class AgentProvider:
         except json.JSONDecodeError:
             raise TransientProviderError("provider_error") from None
         except ValidationError as exc:
+            malformed = malformed_tool_name(exc)
+            if malformed is not None:
+                raise malformed from None
             limit = numeric_limit(exc)
             if limit is not None:
                 raise limit from None
