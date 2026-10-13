@@ -18,7 +18,7 @@ from streaming import StreamDecoder
 from provider_retry import TransientProviderError, RetryLedger, retry_stream
 from decimal import Decimal
 from packages.limits import LimitError
-from packages.validation import numeric_limit
+from packages.validation import numeric_limit, malformed_tool_name
 from packages.tool_history import final_messages
 from serverless import ServerlessPolicy
 
@@ -251,6 +251,9 @@ async def attempt(
         }
         details: dict[str, object] = {}
         if isinstance(exc, ValidationError):
+            malformed = malformed_tool_name(exc)
+            if malformed is not None:
+                raise malformed from None
             measured = numeric_limit(exc)
             if measured is not None:
                 raise measured from None

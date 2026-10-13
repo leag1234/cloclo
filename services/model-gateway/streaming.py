@@ -1,6 +1,6 @@
 """Bounded SSE decoder; deltas precede the validated terminal result (M11)."""
 
-from packages.limits import LimitError
+from packages.limits import LimitError, MalformedToolCall
 
 import json
 from typing import Literal
@@ -116,6 +116,10 @@ class StreamDecoder:
                         ("arguments", 16000),
                     ):
                         if len(target[key]) > maximum:
+                            if key == "name":
+                                measured = len(target[key])
+                                self.calls.clear()
+                                raise MalformedToolCall(measured)
                             raise LimitError(
                                 "tool_limit",
                                 len(target[key]),
