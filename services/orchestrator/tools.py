@@ -36,9 +36,9 @@ from services.orchestrator.web import (
 class SearchQuotaError(ValueError):
     """Provider quota response without retaining credentials or response bodies."""
 
-    def __init__(self, status: int) -> None:
+    def __init__(self, status: int, code: str = "quota_exceeded") -> None:
         self.status = status
-        super().__init__("quota_exceeded")
+        super().__init__(code)
 
 
 class Arguments(BaseModel):
@@ -144,7 +144,7 @@ class Runtime:
             async with session.get(
                 "https://serpapi.com/search.json", params=params, allow_redirects=False
             ) as response:
-                if response.status != 200:
+                if response.status not in (200, 429):
                     raise ValueError("search_unavailable")
                 body = bytearray()
                 async for piece in response.content.iter_chunked(16384):
@@ -154,6 +154,18 @@ class Runtime:
                             "response_too_large", len(body), MAX_BYTES, "bytes"
                         )
                 data = json.loads(body)
+                if response.status == 429:
+                    error = (
+                        str(data.get("error", "")).lower()
+                        if isinstance(data, dict)
+                        else ""
+                    )
+                    code = (
+                        "quota_exceeded"
+                        if "run out of searches" in error
+                        else "search_rate_limited"
+                    )
+                    raise SearchQuotaError(response.status, code)
         if not isinstance(data, dict) or data.get("error"):
             raise ValueError("search_unavailable")
         results = data.get("news_results" if request.news else "organic_results", [])
@@ -373,7 +385,7 @@ class Runtime:
                             await process.wait()
             return {"trust": "untrusted", "data": result}
         except SearchQuotaError as exc:
-            return {"error": "quota_exceeded", "provider_status": exc.status}
+            return {"error": str(exc), "provider_status": exc.status}
         except LimitError as exc:
             return {"error": exc.code, "message": exc.detail}
         except ValidationError as exc:

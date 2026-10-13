@@ -217,7 +217,10 @@ class ChatTools(Runtime):
                     )
             if (
                 call.name == "web_search"
-                and os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily"
+                and (
+                    os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily"
+                    or output.get("error") in {"quota_exceeded", "search_rate_limited"}
+                )
                 and (
                     "error" in output
                     or not isinstance(data, dict)
@@ -229,11 +232,13 @@ class ChatTools(Runtime):
                 reason = (
                     "quota exhausted"
                     if output.get("error") == "quota_exceeded"
+                    else "hourly limit reached"
+                    if output.get("error") == "search_rate_limited"
                     else "provider failed or returned no results"
                 )
                 raise GatewayError(
-                    "quota_exceeded"
-                    if output.get("error") == "quota_exceeded"
+                    str(output["error"])
+                    if output.get("error") in {"quota_exceeded", "search_rate_limited"}
                     else "search_unavailable",
                     503,
                     f"Web search unavailable: {reason}. "

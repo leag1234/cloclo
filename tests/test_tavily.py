@@ -46,6 +46,59 @@ class TavilyTests(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertEqual(session.post.call_count, 1)
 
+    async def test_serpapi_limits_reach_public_error(self) -> None:
+        from services.orchestrator.chat_pipeline import ChatTools
+        from services.orchestrator.interactions import Interaction
+        from services.orchestrator.loop import Call
+        from services.orchestrator.model import GatewayError
+
+        for message, code, detail in (
+            ("You have run out of searches.", "quota_exceeded", "quota exhausted"),
+            (
+                "Your account has exceeded the hourly limit.",
+                "search_rate_limited",
+                "hourly limit",
+            ),
+        ):
+
+            async def pieces(size: int) -> AsyncIterator[bytes]:
+                yield json.dumps({"error": message}).encode()
+
+            response = MagicMock(status=429)
+            response.content.iter_chunked = pieces
+            context = MagicMock()
+            context.__aenter__ = AsyncMock(return_value=response)
+            session = MagicMock()
+            session.get.return_value = context
+            client = MagicMock()
+            client.__aenter__ = AsyncMock(return_value=session)
+            with (
+                self.subTest(code=code),
+                tempfile.TemporaryDirectory() as root,
+                patch.dict(
+                    os.environ,
+                    {
+                        "ATLAS_SEARCH_PROVIDER": "serpapi",
+                        "SERPAPI_KEY": "test-only",
+                        "ATLAS_WEB_CACHE": root + "/cache.sqlite",
+                    },
+                ),
+                patch(
+                    "services.orchestrator.tools.aiohttp.ClientSession",
+                    return_value=client,
+                ),
+            ):
+                with self.assertRaises(GatewayError) as caught:
+                    await ChatTools(Interaction()).execute(
+                        Call("1", "web_search", '{"query":"public news","lang":"en"}'),
+                        1,
+                    )
+                self.assertIn(code, str(caught.exception))
+                self.assertIn(detail, caught.exception.detail)
+                self.assertIn("429", caught.exception.detail)
+                self.assertNotIn(message, caught.exception.detail)
+                self.assertEqual(session.get.call_count, 1)
+
     async def test_content_reused_without_fetch_and_provider_key_not_cached(
         self,
     ) -> None:

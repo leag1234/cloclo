@@ -1,7 +1,8 @@
 """Cancellable upstream streaming transport; no retry after emitted deltas."""
 
 from collections.abc import AsyncGenerator
-from contextlib import aclosing
+from contextlib import aclosing, asynccontextmanager
+from contextvars import ContextVar
 import asyncio
 import json
 import logging
@@ -20,6 +21,21 @@ from packages.limits import LimitError
 from packages.validation import numeric_limit
 from packages.tool_history import final_messages
 from serverless import ServerlessPolicy
+
+
+_response_timeout: ContextVar[float | None] = ContextVar(
+    "response_timeout", default=None
+)
+
+
+@asynccontextmanager
+async def response_window(seconds: float) -> AsyncGenerator[None, None]:
+    """The quality controller owns the early retry cutoff and the hard deadline."""
+    token = _response_timeout.set(seconds)
+    try:
+        yield
+    finally:
+        _response_timeout.reset(token)
 
 
 class StreamRequest(AgentRequest):
@@ -176,7 +192,8 @@ async def attempt(
 
     try:
         async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=timeout), trust_env=False
+            timeout=aiohttp.ClientTimeout(total=_response_timeout.get() or timeout),
+            trust_env=False,
         ) as session:
             async with session.post(
                 endpoint + "/chat/completions",
