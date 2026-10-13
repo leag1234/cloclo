@@ -80,6 +80,8 @@ class GatewayModel:
     def __init__(self, url: str, configuration: Configuration) -> None:
         self.url, self.configuration = url.rstrip("/"), configuration
         self.tools = declarations()
+        self.required_file_tool: str | None = None
+        self.required_file_formats: tuple[str, ...] = ()
         self.prefix: list[Message] = []
         self.prompt_tokens = 0
         self.input_tokens = 0
@@ -401,6 +403,11 @@ class GatewayModel:
             "tools": self.available_tools(messages),
             "timeout": timeout,
         }
+        if self.required_file_tool and payload["tools"]:
+            payload["tool_choice"] = {
+                "type": "function",
+                "function": {"name": self.required_file_tool},
+            }
         if self.profile:
             payload.update(
                 profile=self.profile,

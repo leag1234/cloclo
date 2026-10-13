@@ -76,7 +76,7 @@ class AgentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     messages: list[dict[str, object]] = Field(min_length=1, max_length=100)
     tools: list[dict[str, object]] = Field(min_length=0, max_length=8)
-    tool_choice: Literal["auto", "none"] = Field(
+    tool_choice: Literal["auto", "none"] | dict[str, object] = Field(
         default="auto", exclude_if=lambda value: value == "auto"
     )
     timeout: float = Field(gt=0, le=300)
@@ -99,6 +99,21 @@ class AgentRequest(BaseModel):
 
     @model_validator(mode="after")
     def quality(self) -> Self:
+        if isinstance(self.tool_choice, dict):
+            function = self.tool_choice.get("function")
+            if (
+                set(self.tool_choice) != {"type", "function"}
+                or self.tool_choice.get("type") != "function"
+                or not isinstance(function, dict)
+                or set(function) != {"name"}
+                or function.get("name") not in {"terminal_command", "publish_document"}
+                or not any(
+                    declared.get("name") == function["name"]
+                    for tool in self.tools
+                    if isinstance(declared := tool.get("function"), dict)
+                )
+            ):
+                raise ValueError("invalid_required_file_tool")
         if self.profile is not None and self.profile not in PROFILES:
             raise ValueError("invalid_profile")
         deadline = (
@@ -380,7 +395,7 @@ class AgentProvider:
             "model": model,
             "messages": request.messages,
             "tools": request.tools,
-            **({"tool_choice": "auto"} if request.tools else {}),
+            **({"tool_choice": request.tool_choice} if request.tools else {}),
             "max_tokens": 2048,
             "temperature": 0,
             "reasoning_effort": "none",

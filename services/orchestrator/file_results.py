@@ -6,7 +6,9 @@ import re
 from urllib.parse import unquote, urlsplit
 
 
-def inline_fallback(text: str, language: str) -> str:
+def inline_fallback(
+    text: str, language: str, *, preserve_code: bool = False, partial: bool = False
+) -> str:
     notices = {
         "fr": "Aucun fichier n'a pu être publié. Le contenu ci-dessus est la solution de secours en texte.",
         "de": "Keine Datei konnte veröffentlicht werden. Der obige Inhalt dient als Ersatz in Textform.",
@@ -14,7 +16,20 @@ def inline_fallback(text: str, language: str) -> str:
         "it": "Nessun file è stato pubblicato. Il contenuto sopra è l'alternativa in testo.",
         "en": "No file was produced for download. The content above is the inline fallback.",
     }
-    return text + "\n\n" + notices[language]
+    from services.orchestrator.file_content import answer_content
+
+    partial_notices = {
+        "fr": "Certains fichiers demandés n'ont pas pu être publiés. Leur contenu est fourni ci-dessus.",
+        "de": "Einige angeforderte Dateien konnten nicht veröffentlicht werden. Ihr Inhalt steht oben.",
+        "es": "No se pudieron publicar algunos archivos solicitados. Su contenido aparece arriba.",
+        "it": "Alcuni file richiesti non sono stati pubblicati. Il loro contenuto è riportato sopra.",
+        "en": "Some requested files could not be published. Their content is provided above.",
+    }
+    return (
+        answer_content(text, preserve_code=preserve_code)
+        + "\n\n"
+        + (partial_notices if partial else notices)[language]
+    )
 
 
 def render_files(

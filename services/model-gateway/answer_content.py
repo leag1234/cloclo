@@ -106,5 +106,45 @@ ANSWER_NOW = (
     "If evidence is missing, explain the uncertainty and give the supported analysis; "
     "never invent sources. If a file operation failed, explicitly say the file "
     "could not be produced and supply the complete requested content inline, "
-    "preserving the requested structure and number of items."
+    "preserving the requested structure and number of items. "
+    "A script that would generate a document is not the document content. "
+    "Return prose directly unless the user explicitly requested code. "
+    "An apology or a plan alone is not an answer."
 )
+
+
+def failed_terminal_content(text: str, messages: list[dict[str, object]]) -> bool:
+    """A file-generation script is not the requested prose after tool failure."""
+    question = next(
+        (
+            str(m.get("content", ""))
+            for m in reversed(messages)
+            if m.get("role") == "user"
+        ),
+        "",
+    )
+    code_requested = re.search(
+        r"\b(?:script|code|python|sql|function|fonction|programm)\b",
+        normalized(question),
+    )
+    if not code_requested and (
+        "```" in text
+        or re.search(
+            r"(?m)^\s*(?:from \w+ import |import \w+|def \w+\(|doc\.add_|print\()", text
+        )
+    ):
+        return True
+    prose = re.sub(r"```.*?(?:```|$)", "", text, flags=re.S)
+    parts = re.split(r"[.!?;:\n]+\s*", prose.strip())
+    substantive = []
+    for part in parts:
+        value = _ACK.sub("", normalized(part)).strip()
+        if not value or any(value.startswith(intent) for intent in _INTENTS):
+            continue
+        if re.search(
+            r"could not|cannot|failed|failure|unable|sorry|apologi|pas pu|impossible|echou|echec|desole|excuse|fehlgeschlagen|konnte nicht|leider|lo siento|no pudo|fallo|mi dispiace|non ho potuto",
+            value,
+        ):
+            continue
+        substantive.append(value)
+    return not substantive and not (code_requested and "```" in text)

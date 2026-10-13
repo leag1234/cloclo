@@ -14,6 +14,7 @@ from agent_provider import AgentProvider, AgentRequest, Usage, classify
 from answer_content import (
     ANSWER_NOW,
     is_promise_only,
+    failed_terminal_content,
     possible_promise_answer,
     missing_file_failure,
 )
@@ -196,7 +197,11 @@ async def stream_quality(
                 # Research finalization presupposes acquired evidence. Before
                 # any tool result, preserve the original task and disposition.
                 "messages": [
-                    *request.messages,
+                    *(
+                        final_messages(request.messages)
+                        if terminal_failed
+                        else request.messages
+                    ),
                     *(
                         [
                             {
@@ -210,7 +215,8 @@ async def stream_quality(
                                         for m in request.messages
                                     )
                                     else "prompts/budget-answer.txt"
-                                ).read_text(),
+                                ).read_text()
+                                + ("\n" + ANSWER_NOW if terminal_failed else ""),
                             }
                         ]
                         if any(m.get("role") == "tool" for m in request.messages)
@@ -499,7 +505,12 @@ async def stream_quality(
                 if malformed_name is not None:
                     raise MalformedToolCall(malformed_name.measured, index)
                 raise RuntimeError("unexpected_tool_history_answer")
-        promise_only = not calls and is_promise_only(str(result.get("text", "")))
+        invalid_content = terminal_failed and failed_terminal_content(
+            str(result.get("text", "")), request.messages
+        )
+        promise_only = not calls and (
+            is_promise_only(str(result.get("text", ""))) or invalid_content
+        )
         missing_failure = (
             terminal_failed
             and not calls
@@ -521,7 +532,21 @@ async def stream_quality(
                     "tool_choice": "none",
                     "messages": [
                         *request.messages,
-                        {"role": "system", "content": ANSWER_NOW},
+                        {
+                            "role": "system",
+                            "content": (
+                                str(request.messages[-1]["content"])
+                                if terminal_failed
+                                else ANSWER_NOW
+                            )
+                            + (
+                                " The last response was rejected: deliver the content itself, "
+                                "not document-generation code, intentions, or an apology. "
+                                "Keep only a brief failure disclosure before the requested content."
+                                if terminal_failed
+                                else ""
+                            ),
+                        },
                     ],
                 }
             )

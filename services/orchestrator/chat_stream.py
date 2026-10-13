@@ -27,6 +27,7 @@ def response(
     started: float,
     process: Callable[[ChatRequest, Interaction], Awaitable[None]],
 ) -> StreamingResponse:
+    file_request = produces_file(payload.messages[-1].text, include_images=False)
     ceiling = (
         "0.30"
         if payload.has_attachments or produces_file(payload.messages[-1].text)
@@ -240,6 +241,8 @@ def response(
             if "reasoning_content" in delta:
                 activity = "thinking"
                 await queue.put(event)
+            if file_request:
+                return
             if isinstance(delta.get("content"), str):
                 count = len(narration.removed)
                 text = narration.feed(delta["content"])
@@ -285,8 +288,10 @@ def response(
                     await process(payload, item)
                     if item.state != "done":
                         raise RuntimeError("request_stopped")
-                    await content(pending + narration.finish())
-                    if item.files:
+                    await content(
+                        item.reponse if file_request else pending + narration.finish()
+                    )
+                    if item.files and (not file_request or not item.reponse):
                         from services.orchestrator.file_results import file_footer
                         from packages.language import conversation_language
 
