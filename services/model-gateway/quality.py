@@ -84,7 +84,7 @@ async def complete(provider: AgentProvider, request: AgentRequest) -> dict[str, 
 async def stream_quality(
     provider: AgentProvider, request: AgentRequest
 ) -> AsyncGenerator[dict[str, object], None]:
-    from stream_transport import attempt
+    from stream_transport import attempt, response_window
 
     policy = ServerlessPolicy()
     task = classify_task(request.messages)
@@ -105,42 +105,48 @@ async def stream_quality(
     started = monotonic()
     current = request
     model = primary
-    # A large evidence input can exceed the primary's conservative reservation
-    # even when the configured alternate can answer within the same ledger.
-    alternate = policy.models[fallback_role]
-    if policy.cost(model, incoming, 1) > budget:
-        selected = None
-        if policy.cost(alternate, incoming, 1) <= budget:
-            selected = fallback_role
-        elif task != "vision":
-            # Preserve complete attachment context when both configured expert
-            # roles exceed the cap. Only already configured public text roles are
-            # eligible; no input sampling or larger cost allowance is permitted.
-            affordable_roles = [
-                candidate
-                for candidate in dict.fromkeys(policy.public_profiles.values())
-                if incoming + 1
-                <= policy.config[candidate]["capabilities"][policy.models[candidate]][
-                    "context"
+
+    def select_affordable_model() -> None:
+        nonlocal role, model, fallback_role, fallback
+        alternate = policy.models[fallback_role]
+        if policy.cost(model, incoming, 1) > budget:
+            selected = None
+            if policy.cost(alternate, incoming, 1) <= budget:
+                selected = fallback_role
+            elif task != "vision":
+                # Preserve complete attachment context when both configured expert
+                # roles exceed the cap. Only already configured public text roles are
+                # eligible; no input sampling or larger cost allowance is permitted.
+                affordable_roles = [
+                    candidate
+                    for candidate in dict.fromkeys(policy.public_profiles.values())
+                    if incoming + 1
+                    <= policy.config[candidate]["capabilities"][
+                        policy.models[candidate]
+                    ]["context"]
+                    and policy.cost(policy.models[candidate], incoming, 1) <= budget
                 ]
-                and policy.cost(policy.models[candidate], incoming, 1) <= budget
-            ]
-            if affordable_roles:
-                selected = min(
-                    affordable_roles,
-                    key=lambda candidate: policy.cost(
-                        policy.models[candidate], incoming, request.max_tokens
-                    ),
+                if affordable_roles:
+                    selected = min(
+                        affordable_roles,
+                        key=lambda candidate: policy.cost(
+                            policy.models[candidate], incoming, request.max_tokens
+                        ),
+                    )
+                    fallback_role = policy.config[selected]["fallback"]
+            if selected is not None:
+                role, model = selected, policy.models[selected]
+                fallback = True
+                logging.getLogger(__name__).info(
+                    json.dumps(
+                        {
+                            "event": "quality_affordable_alternate",
+                            "budget_eur": str(budget),
+                        }
+                    )
                 )
-                fallback_role = policy.config[selected]["fallback"]
-        if selected is not None:
-            role, model = selected, policy.models[selected]
-            fallback = True
-            logging.getLogger(__name__).info(
-                json.dumps(
-                    {"event": "quality_affordable_alternate", "budget_eur": str(budget)}
-                )
-            )
+
+    select_affordable_model()
     # Research is optional once another selection turn plus the full-context
     # answer no longer fit. Keep all acquired evidence and the selected effort.
     # File operations are the requested deliverable, so an answer-only turn
@@ -197,6 +203,8 @@ async def stream_quality(
         logging.getLogger(__name__).info(
             json.dumps({"event": "quality_answer_budget", "remaining_eur": str(budget)})
         )
+    # Finalization instructions may invalidate the initial affordability check.
+    select_affordable_model()
     for index in range(2):
         remaining = request.timeout - (monotonic() - started)
         if remaining <= 0:
@@ -277,9 +285,11 @@ async def stream_quality(
         result: dict[str, object] | None = None
         # Reserve time for recovery, still under the original request deadline.
         allotted = remaining * 0.8 if index == 0 else remaining
+        full_deadline = asyncio.get_running_loop().time() + remaining
         try:
             async with (
-                asyncio.timeout(allotted),
+                response_window(remaining),
+                asyncio.timeout(allotted) as deadline,
                 aclosing(attempt(current, model, allotted)) as events,
             ):
                 async for event in events:
@@ -301,6 +311,10 @@ async def stream_quality(
                             if possible_history_answer(prefix):
                                 continue
                             prefix_open = False
+                            # Visible answers cannot be retried. Let this attempt
+                            # use the original deadline instead of cancelling it
+                            # early to reserve time for an ineligible recovery.
+                            deadline.reschedule(full_deadline)
                             for pending_event in buffered:
                                 yield pending_event
                             buffered.clear()
@@ -312,7 +326,15 @@ async def stream_quality(
                 raise RuntimeError("provider_response_invalid")
         except ProviderLimitError:
             raise
-        except (RuntimeError, TimeoutError) as exc:
+        except (RuntimeError, TimeoutError, LimitError) as exc:
+            # Invalid provider fields are recoverable output failures. Keep the
+            # same decoder limits and charge the unknown attempt in full.
+            # Request/output budgets must never enter this recovery path.
+            if isinstance(exc, LimitError) and exc.code not in {
+                "provider_response_limit",
+                "tool_limit",
+            }:
+                raise
             failed_usage = (
                 exc.usage if isinstance(exc, TransientProviderError) else None
             )
@@ -354,7 +376,7 @@ async def stream_quality(
                 )
             )
             if index or visible_content:
-                if isinstance(exc, TimeoutError):
+                if isinstance(exc, (TimeoutError, LimitError)):
                     raise
                 raise ProviderFailure(
                     str(exc), getattr(exc, "finish_reason", None), index

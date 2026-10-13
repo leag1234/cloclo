@@ -197,34 +197,40 @@ def main() -> None:
 
                 selection = os.environ.get("M26_CASES")
                 selected = set(selection.split(",")) if selection else None
-                probe = daily_probe.run(post, selected=selected, observer=observe)
-                if selected:
+                with patch.dict(os.environ, {"ATLAS_SEARCH_PROVIDER": "serpapi"}):
+                    probe = daily_probe.run(post, selected=selected, observer=observe)
+                if selected and "J59" not in selected:
+                    if not probe or not all(row["status"] for row in probe.values()):
+                        raise SystemExit(1)
                     return
-                # Exercise the alarm through the public failure path as well.
-                from services.orchestrator.model import GatewayError
-                from services.orchestrator.chat_schema import ChatRequest
-                from services.orchestrator.interactions import Interaction
+                if not selected:
+                    # Exercise the alarm through the public failure path as well.
+                    from services.orchestrator.model import GatewayError
+                    from services.orchestrator.chat_schema import ChatRequest
+                    from services.orchestrator.interactions import Interaction
 
-                async def failed_probe(request: ChatRequest, item: Interaction) -> None:
-                    raise GatewayError(
-                        "injected_probe_failure",
-                        503,
-                        "Deliberate probe failure: 0 completed requests, minimum 1",
+                    async def failed_probe(
+                        request: ChatRequest, item: Interaction
+                    ) -> None:
+                        raise GatewayError(
+                            "injected_probe_failure",
+                            503,
+                            "Deliberate probe failure: 0 completed requests, minimum 1",
+                        )
+
+                    with patch("services.orchestrator.chat_api.process", failed_probe):
+                        failure = daily_probe.run(post, selected={"plain"})
+                    alarm = (
+                        failure["plain"]["status"] is False
+                        and "injected_probe_failure"
+                        in Path("BRAIN/PROBE_FAILED.txt").read_text()
                     )
-
-                with patch("services.orchestrator.chat_api.process", failed_probe):
-                    failure = daily_probe.run(post, selected={"plain"})
-                alarm = (
-                    failure["plain"]["status"] is False
-                    and "injected_probe_failure"
-                    in Path("BRAIN/PROBE_FAILED.txt").read_text()
-                )
-                daily_probe.write_report(probe)
-                report["J58"]["status"] = (
-                    alarm
-                    and len(probe) == 6
-                    and all(r["status"] for r in probe.values())
-                )
+                    daily_probe.write_report(probe)
+                    report["J58"]["status"] = (
+                        alarm
+                        and len(probe) == 6
+                        and all(r["status"] for r in probe.values())
+                    )
                 for name, question in (
                     (
                         "J56",
@@ -239,6 +245,8 @@ def main() -> None:
                         "conçois une monnaie locale pour une ville de 50 000 habitants",
                     ),
                 ):
+                    if selected and name not in selected:
+                        continue
                     rows.clear()
                     started = time.monotonic()
 
@@ -306,6 +314,12 @@ def main() -> None:
                         answer,
                     )
                     print(name, good, status, flush=True)
+                if selected:
+                    if not all(
+                        report.get(name, {}).get("status") is True for name in selected
+                    ):
+                        raise SystemExit(1)
+                    return
                 rows.clear()
                 status, answer = post(
                     {
