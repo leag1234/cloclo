@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import time
+import traceback
 
 from fastapi.responses import StreamingResponse
 from packages.file_intent import produces_file, requests_file_delivery
@@ -48,7 +49,7 @@ def response(
         queue: asyncio.Queue[dict[str, object] | None] = asyncio.Queue(maxsize=8)
         pending = ""
         turn = 0
-        activity = "reading_document" if payload.documents else "thinking"
+        activity = "reading_document" if payload.has_attachments else "thinking"
         answer_started = False
         activity_urls: list[str] = []
         last_activity = time.monotonic()
@@ -352,17 +353,26 @@ def response(
                         }
                     }
                 )
-            except Exception:
+            except Exception as exc:
                 item.state = "error"
                 item.erreurs.append("stream_error")
                 detail = (
-                    "The provider did not complete a valid answer. "
+                    "The request did not complete because of an unexpected failure "
+                    f"({type(exc).__name__}), which is not a budget or deadline refusal. "
                     f"Elapsed {time.monotonic() - started:.3f}s "
                     f"(limit {payload.timeout_seconds:.0f}s); "
                     f"reserved cost {item.cout_eur:.6f} EUR (limit {ceiling} EUR)."
                 )
                 item.rejection = {"code": "stream_error", "message": detail}
-                logging.getLogger(__name__).warning(json.dumps(item.rejection))
+                frames = traceback.extract_tb(exc.__traceback__)
+                logging.getLogger(__name__).error(
+                    "Unexpected stream exception %s; traceback:\n%s",
+                    type(exc).__name__,
+                    "\n".join(
+                        f"  {frame.filename}:{frame.lineno} in {frame.name}"
+                        for frame in frames
+                    ),
+                )
                 await queue.put(
                     {
                         "error": {

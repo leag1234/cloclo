@@ -8,6 +8,7 @@ from pathlib import Path
 import time
 
 from packages.evidence import estimated_tokens
+from packages.language import language_instruction
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.content import hierarchical_summary
 from services.orchestrator.documents import DocumentError, extract_document
@@ -29,6 +30,9 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
     sink = sink_context.get()
     if sink:
         await sink({"phase": "reading_document"})
+    from services.orchestrator.attachment_reading import failure_notice
+
+    failures: list[dict[str, object]] = []
     sources = []
     for attachment in request.documents:
         try:
@@ -45,9 +49,13 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                     "error": str(exc),
                 }
             )
-            raise GatewayError(
-                "document_extraction_failed", 422, attachment.filename + ": " + str(exc)
-            ) from None
+            failures.append({"filename": attachment.filename, "errors": [str(exc)]})
+            sources.append({"filename": attachment.filename, "text": ""})
+            continue
+        if document.errors:
+            failures.append(
+                {"filename": document.filename, "errors": list(document.errors)}
+            )
         sources.append({"filename": document.filename, "text": document.text})
         item.documents.append(
             {
@@ -56,8 +64,14 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                 "pages": document.pages,
                 "extracted_characters": len(document.text),
                 "hierarchical_synthesis": False,
+                "error": "; ".join(document.errors),
             }
         )
+    notice = failure_notice(failures, request.lang)
+    if not any(source["text"] for source in sources):
+        raise GatewayError("document_extraction_failed", 422, notice)
+    if notice and sink:
+        await sink({"delta": {"content": notice + "\n\n"}})
     model = await GatewayModel.connect(
         os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"),
         local_enabled=False,
@@ -67,7 +81,9 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
     model.observing = True
     model.sink = sink
     instructions = (
-        Path("prompts/chat.txt").read_text() + Path("prompts/documents.txt").read_text()
+        Path("prompts/chat.txt").read_text()
+        + Path("prompts/documents.txt").read_text()
+        + language_instruction(request.lang)
     )
     history: list[dict[str, object]] = [
         {"role": m.role, "content": m.text} for m in request.messages
@@ -115,24 +131,19 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                 502,
                 "The provider returned no complete document answer",
             )
-        item.reponse, item.state = result.text, "done"
+        item.reponse, item.state = (
+            (notice + "\n\n" if notice else "") + result.text,
+            "done",
+        )
         if any(metadata.get("hierarchical_synthesis") for metadata in item.documents):
             labels = json.loads(Path("prompts/activity-labels.json").read_text())
-            item.reponse += (
+            synthesis_notice = (
                 "\n\n" + labels.get(request.lang, labels["en"])["synthesized"]
             )
+            item.reponse += synthesis_notice
+            if sink:
+                await sink({"delta": {"content": synthesis_notice}})
         item.cout_eur = float(model.spent)
-    except GatewayError:
-        raise
-    except (RuntimeError, ValueError) as exc:
-        raise GatewayError(
-            "document_generation_failed",
-            502,
-            f"Document generation failed: {measured} estimated input/output tokens; "
-            f"context limit 262144 tokens, request cost limit 0.30 EUR, "
-            f"elapsed {time.monotonic() - started:.1f}s of {request.timeout_seconds:.0f}s. "
-            "The full attachment was extracted; no corpus retrieval was used.",
-        ) from exc
     finally:
         item.tokens = {"in": model.input_tokens, "out": model.output_tokens}
         item.provider_model = model.provider_model

@@ -6,10 +6,10 @@ from dataclasses import dataclass
 import io
 from pathlib import Path
 import zipfile
+from xml.etree.ElementTree import ParseError
 
 from docx import Document
 from pydantic import BaseModel, ConfigDict, Field
-from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
 MAX_BYTES = 16 * 1024 * 1024
@@ -36,6 +36,7 @@ class Extracted:
     size: int
     pages: int
     text: str
+    errors: tuple[str, ...] = ()
 
 
 def extract_document(attachment: Attachment) -> Extracted:
@@ -55,32 +56,16 @@ def extract_document(attachment: Attachment) -> Extracted:
     if not 0 < len(raw) <= MAX_BYTES:
         raise DocumentError(f"Document bytes: {len(raw)}; allowed 1–{MAX_BYTES}")
     extension = Path(attachment.filename).suffix.lower()
+    errors: list[str] = []
     pages = characters = 0
     try:
         if extension == ".pdf":
-            reader = PdfReader(io.BytesIO(raw), strict=True)
-            if reader.is_encrypted:
-                raise DocumentError(
-                    "Password-protected PDF: provide an unencrypted document"
-                )
-            pages = len(reader.pages)
-            if pages > 1000:
-                raise DocumentError(f"Document pages: {pages}; limit 1000")
-            parts = []
-            characters = 0
-            for index, page in enumerate(reader.pages, 1):
-                text = page.extract_text() or ""
-                if not text.strip():
-                    raise DocumentError(
-                        f"PDF page {index}/{pages} has no text layer; OCR is required"
-                    )
-                characters += len(text)
-                if characters > MAX_TEXT:
-                    raise DocumentError(
-                        f"Extracted characters: {characters}; limit {MAX_TEXT}"
-                    )
-                parts.append(f"[Page {index}]\n{text}")
-            text = "\n\n".join(parts)
+            from packages.attachment_reader import extract_bytes
+
+            text, pages, errors = extract_bytes(raw, extension)
+            characters = len(text)
+            if not text.strip():
+                raise DocumentError("; ".join(errors))
         elif extension == ".docx":
             with zipfile.ZipFile(io.BytesIO(raw)) as archive:
                 expanded = sum(info.file_size for info in archive.infolist())
@@ -95,18 +80,33 @@ def extract_document(attachment: Attachment) -> Extracted:
                 for node in document.element.body
                 if node.tag.endswith(("}p", "}tbl"))
             )
+        elif extension in {".xlsx", ".pptx"}:
+            from packages.attachment_reader import office_parts
+
+            text = "\n\n".join(office_parts(raw, extension))
         elif extension in {".txt", ".md", ".csv"}:
             text = raw.decode("utf-8-sig")
         else:
             raise DocumentError(
-                "Unsupported document type; allowed PDF, DOCX, TXT, MD, CSV"
+                "Unsupported document type; allowed PDF, DOCX, XLSX, PPTX, TXT, MD, CSV"
             )
     except DocumentError as exc:
         exc.size, exc.pages, exc.characters = len(raw), pages, characters
         raise
-    except (ValueError, OSError, KeyError, zipfile.BadZipFile, PdfReadError):
+    except (
+        ValueError,
+        OSError,
+        KeyError,
+        IndexError,
+        StopIteration,
+        zipfile.BadZipFile,
+        PdfReadError,
+        ParseError,
+    ) as exc:
+        from packages.attachment_reader import failure_reason
+
         raise DocumentError(
-            "Document extraction failed; provide a valid PDF, DOCX or UTF-8 text file",
+            failure_reason(exc),
             size=len(raw),
             pages=pages,
             characters=characters,
@@ -119,4 +119,4 @@ def extract_document(attachment: Attachment) -> Extracted:
         )
     if len(text) > MAX_TEXT:
         raise DocumentError(f"Extracted characters: {len(text)}; limit {MAX_TEXT}")
-    return Extracted(attachment.filename, len(raw), pages, text)
+    return Extracted(attachment.filename, len(raw), pages, text, tuple(errors))
