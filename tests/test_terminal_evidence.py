@@ -111,3 +111,11 @@ class EvidenceTests(unittest.TestCase):
             self.assertTrue(row["truncated"])
             self.assertIn("fetch", row["detail"])
             self.assertEqual(model.allowance, Decimal("0.10"))
+
+            model.produces_files = True
+            data = {"results": [dict(row, content=source, snippet=source)]}
+            compact = tools.search_evidence(data)["results"]
+            assert isinstance(compact, list)
+            self.assertLessEqual(len(compact[0]["content"].encode()), 8000)
+            self.assertEqual(compact[0]["link"], row["link"])
+            self.assertLessEqual(len(compact[0]["snippet"]), 8000)

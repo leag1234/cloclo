@@ -1,6 +1,6 @@
 """Bounded SSE decoder; deltas precede the validated terminal result (M11)."""
 
-from packages.limits import LimitError
+from packages.limits import LimitError, MalformedToolCall
 
 import json
 from typing import Literal
@@ -36,6 +36,7 @@ class StreamChoice(BaseModel):
 
 
 class Frame(BaseModel):
+    id: str | None = None
     error: None = None
     choices: list[StreamChoice] = Field(max_length=1)
     usage: dict[str, object] | None = None
@@ -44,6 +45,7 @@ class Frame(BaseModel):
 class StreamDecoder:
     def __init__(self, allow_length: bool = False) -> None:
         self.allow_length = allow_length
+        self.provider_id: str | None = None
         self.reasoning = ""
         self.buffer = bytearray()
         self.total = 0
@@ -79,6 +81,10 @@ class StreamDecoder:
                 self._done()
                 continue
             frame = Frame.model_validate(json.loads(data))
+            if frame.id:
+                if self.provider_id and frame.id != self.provider_id:
+                    raise ValueError("provider_id_changed")
+                self.provider_id = frame.id
             if frame.usage is not None:
                 if self.usage is not None:
                     raise ValueError("duplicate_usage")
@@ -110,6 +116,10 @@ class StreamDecoder:
                         ("arguments", 16000),
                     ):
                         if len(target[key]) > maximum:
+                            if key == "name":
+                                measured = len(target[key])
+                                self.calls.clear()
+                                raise MalformedToolCall(measured)
                             raise LimitError(
                                 "tool_limit",
                                 len(target[key]),
@@ -162,6 +172,8 @@ class StreamDecoder:
             "calls": calls,
             "usage": completion.usage.model_dump(),
         }
+        if self.provider_id:
+            self.result["provider_id"] = self.provider_id
         if self.allow_length:
             details = (self.usage or {}).get("completion_tokens_details")
             reasoning_tokens = (

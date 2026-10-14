@@ -1,7 +1,8 @@
 """Cancellable upstream streaming transport; no retry after emitted deltas."""
 
 from collections.abc import AsyncGenerator
-from contextlib import aclosing
+from contextlib import aclosing, asynccontextmanager
+from contextvars import ContextVar
 import asyncio
 import json
 import logging
@@ -17,9 +18,24 @@ from streaming import StreamDecoder
 from provider_retry import TransientProviderError, RetryLedger, retry_stream
 from decimal import Decimal
 from packages.limits import LimitError
-from packages.validation import numeric_limit
+from packages.validation import numeric_limit, malformed_tool_name
 from packages.tool_history import final_messages
 from serverless import ServerlessPolicy
+
+
+_response_timeout: ContextVar[float | None] = ContextVar(
+    "response_timeout", default=None
+)
+
+
+@asynccontextmanager
+async def response_window(seconds: float) -> AsyncGenerator[None, None]:
+    """The quality controller owns the early retry cutoff and the hard deadline."""
+    token = _response_timeout.set(seconds)
+    try:
+        yield
+    finally:
+        _response_timeout.reset(token)
 
 
 class StreamRequest(AgentRequest):
@@ -176,7 +192,8 @@ async def attempt(
 
     try:
         async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=timeout), trust_env=False
+            timeout=aiohttp.ClientTimeout(total=_response_timeout.get() or timeout),
+            trust_env=False,
         ) as session:
             async with session.post(
                 endpoint + "/chat/completions",
@@ -204,7 +221,9 @@ async def attempt(
         ):
             diagnostic("empty_completion")
             raise TransientProviderError(
-                "empty_completion", usage=Usage.model_validate(result["usage"])
+                "empty_completion",
+                usage=Usage.model_validate(result["usage"]),
+                finish_reason=decoder.reason,
             )
         yield {"result": result}
     except TimeoutError:
@@ -232,6 +251,9 @@ async def attempt(
         }
         details: dict[str, object] = {}
         if isinstance(exc, ValidationError):
+            malformed = malformed_tool_name(exc)
+            if malformed is not None:
+                raise malformed from None
             measured = numeric_limit(exc)
             if measured is not None:
                 raise measured from None
@@ -245,5 +267,7 @@ async def attempt(
             details["validation_code"] = str(exc)
         diagnostic("validation", **details)
         if isinstance(exc, json.JSONDecodeError) or str(exc) == "empty_stream":
-            raise TransientProviderError("provider_error") from None
+            raise TransientProviderError(
+                "provider_error", finish_reason=decoder.reason
+            ) from None
         raise RuntimeError("provider_error") from None

@@ -49,6 +49,7 @@ class Observation(BaseModel):
 
 
 class WireTurn(BaseModel):
+    provider_retries: int = Field(default=0, ge=0, le=1)
     provider_model: str = Field(default="", max_length=200)
     observation: Observation | None = None
     usage: WireUsage
@@ -67,8 +68,11 @@ class WireTurn(BaseModel):
 
 
 class GatewayError(PublicFailure):
-    def __init__(self, code: str, status: int, detail: str = "") -> None:
+    def __init__(
+        self, code: str, status: int, detail: str = "", retries: int = 0
+    ) -> None:
         self.code, self.status, self.detail = code, status, detail
+        self.retries = retries
         super().__init__(code)
 
 
@@ -76,6 +80,8 @@ class GatewayModel:
     def __init__(self, url: str, configuration: Configuration) -> None:
         self.url, self.configuration = url.rstrip("/"), configuration
         self.tools = declarations()
+        self.required_file_tool: str | None = None
+        self.required_file_formats: tuple[str, ...] = ()
         self.prefix: list[Message] = []
         self.prompt_tokens = 0
         self.input_tokens = 0
@@ -91,7 +97,9 @@ class GatewayModel:
         self.max_tokens = configuration.max_tokens
         self.provider_model = ""
         self.spent = Decimal(0)
+        self.delivery_reserve = Decimal(0)
         self.has_attachments = False
+        self.provider_retries = 0
         self.produces_files = False
         self.reasoning = ""
         self.trace_tokens = 0
@@ -126,7 +134,8 @@ class GatewayModel:
                 if self.profile is not None
                 else "0.05"
             )
-            - self.spent,
+            - self.spent
+            - self.delivery_reserve,
         )
 
     @staticmethod
@@ -151,7 +160,7 @@ class GatewayModel:
                         ):
                             raise GatewayError(
                                 "cost_budget",
-                                504,
+                                429,
                                 f"Cost reservation: {error['measured']} microEUR, remaining limit {error['limit']} microEUR; request ceiling "
                                 + (
                                     "0.30"
@@ -201,13 +210,25 @@ class GatewayModel:
                                 f"Conversation: {error['tokens']} tokens, limit {error['limit']} tokens",
                             )
                         raise GatewayError("request_size_exceeded", 413)
+                    if response.status == 502:
+                        error = json.loads(await response.content.read(1024))
+                        if (
+                            isinstance(error, dict)
+                            and error.get("code") == "provider_failure"
+                        ):
+                            raise GatewayError(
+                                "provider_error",
+                                502,
+                                str(error.get("message", "provider_error")),
+                                retries=int(error.get("retries", 0)),
+                            )
                     if response.status != 200:
                         if url.endswith(
                             ("/vision/complete", "/images/generate", "/images/start")
                         ):
                             error = json.loads(await response.content.read(512))
                             codes = {
-                                "cost_budget": 504,
+                                "cost_budget": 429,
                                 "configuration_missing": 503,
                                 "timeout": 504,
                                 "context_exceeded": 413,
@@ -346,6 +367,13 @@ class GatewayModel:
                     counts[name] = counts.get(name, 0) + 1
         if sum(counts.values()) >= 10:
             return []
+        if any(
+            message.get("role") == "tool"
+            and isinstance(message.get("content"), str)
+            and '"terminal_operation_failed"' in str(message["content"])
+            for message in messages
+        ):
+            return []
         ceilings = {"web_search": 3, "web_fetch": 8}
         available = []
         for tool in self.tools:
@@ -377,6 +405,11 @@ class GatewayModel:
             "tools": self.available_tools(messages),
             "timeout": timeout,
         }
+        if self.required_file_tool and payload["tools"]:
+            payload["tool_choice"] = {
+                "type": "function",
+                "function": {"name": self.required_file_tool},
+            }
         if self.profile:
             payload.update(
                 profile=self.profile,
@@ -432,6 +465,7 @@ class GatewayModel:
                 if tail:
                     await sink({"delta": {"content": tail}})
             result = WireTurn.model_validate(wire)
+            self.provider_retries += result.provider_retries
             if result.text:
                 result.text = clean_answer(result.text, allow_empty=bool(result.calls))
             if (

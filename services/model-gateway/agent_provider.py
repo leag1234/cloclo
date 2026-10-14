@@ -1,6 +1,6 @@
 """Validated tool-calling transport and human-confirmed pricing, POC-P6."""
 
-from packages.limits import LimitError, ProviderLimitError
+from packages.limits import LimitError, ProviderLimitError, MalformedToolCall
 
 from packages.profiles import PROFILES
 
@@ -18,7 +18,7 @@ from collections.abc import AsyncGenerator
 import aiohttp
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator, ValidationError
-from packages.validation import numeric_limit
+from packages.validation import numeric_limit, malformed_tool_name
 
 
 def classify(messages: list[dict[str, object]]) -> str:
@@ -76,7 +76,7 @@ class AgentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     messages: list[dict[str, object]] = Field(min_length=1, max_length=100)
     tools: list[dict[str, object]] = Field(min_length=0, max_length=8)
-    tool_choice: Literal["auto", "none"] = Field(
+    tool_choice: Literal["auto", "none"] | dict[str, object] = Field(
         default="auto", exclude_if=lambda value: value == "auto"
     )
     timeout: float = Field(gt=0, le=300)
@@ -99,10 +99,32 @@ class AgentRequest(BaseModel):
 
     @model_validator(mode="after")
     def quality(self) -> Self:
+        if isinstance(self.tool_choice, dict):
+            function = self.tool_choice.get("function")
+            if (
+                set(self.tool_choice) != {"type", "function"}
+                or self.tool_choice.get("type") != "function"
+                or not isinstance(function, dict)
+                or set(function) != {"name"}
+                or function.get("name") not in {"terminal_command", "publish_document"}
+                or not any(
+                    declared.get("name") == function["name"]
+                    for tool in self.tools
+                    if isinstance(declared := tool.get("function"), dict)
+                )
+            ):
+                raise ValueError("invalid_required_file_tool")
         if self.profile is not None and self.profile not in PROFILES:
             raise ValueError("invalid_profile")
-        if self.timeout > 120:
-            raise LimitError("timeout_budget", int(self.timeout * 1000), 120000, "ms")
+        deadline = (
+            300
+            if (self.has_attachments or self.produces_files) and self.profile
+            else 120
+        )
+        if self.timeout > deadline:
+            raise LimitError(
+                "timeout_budget", int(self.timeout * 1000), deadline * 1000, "ms"
+            )
         if self.profile is None:
             if (
                 self.has_attachments
@@ -260,9 +282,12 @@ class AgentProvider:
             raise ValueError("provider_configuration")
         started = monotonic()
         unknown = Decimal(0)
+        malformed_name: MalformedToolCall | None = None
         for index, model in enumerate((plan.primary, plan.fallback)):
             remaining = request.timeout - (monotonic() - started)
             if remaining <= 0:
+                if malformed_name is not None:
+                    raise MalformedToolCall(malformed_name.measured, index)
                 raise TimeoutError("timeout")
             # Leave time for one fallback while keeping the original total deadline.
             allotted = remaining * 0.7 if index == 0 else remaining
@@ -302,7 +327,9 @@ class AgentProvider:
                         answer = value
             except ProviderLimitError:
                 raise
-            except (RuntimeError, TimeoutError):
+            except (RuntimeError, TimeoutError) as exc:
+                if isinstance(exc, MalformedToolCall):
+                    malformed_name = exc
                 unknown += ledger.spent + (
                     plan.fallback_bound if index else plan.primary_bound
                 )
@@ -317,7 +344,15 @@ class AgentProvider:
                     )
                 )
                 if index:
+                    if malformed_name is not None:
+                        raise MalformedToolCall(
+                            malformed_name.measured, index
+                        ) from None
                     raise
+                if isinstance(exc, MalformedToolCall):
+                    request = request.model_copy(
+                        update={"tools": [], "tool_choice": "none"}
+                    )
                 continue
             unknown += ledger.spent
             usage = answer.get("usage")
@@ -360,7 +395,7 @@ class AgentProvider:
             "model": model,
             "messages": request.messages,
             "tools": request.tools,
-            **({"tool_choice": "auto"} if request.tools else {}),
+            **({"tool_choice": request.tool_choice} if request.tools else {}),
             "max_tokens": 2048,
             "temperature": 0,
             "reasoning_effort": "none",
@@ -421,6 +456,9 @@ class AgentProvider:
         except json.JSONDecodeError:
             raise TransientProviderError("provider_error") from None
         except ValidationError as exc:
+            malformed = malformed_tool_name(exc)
+            if malformed is not None:
+                raise malformed from None
             limit = numeric_limit(exc)
             if limit is not None:
                 raise limit from None

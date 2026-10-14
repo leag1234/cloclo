@@ -141,6 +141,21 @@ def main() -> None:
                         runtime.item.documents = recorded["documents"]
                         runtime.item.erreurs = recorded["errors"]
                         output: Message = recorded["output"]
+                        # This seam bypasses ChatTools.execute; restore provenance
+                        # only from the actual, exactly matched recorded tool result.
+                        data = output.get("data")
+                        if (
+                            call.name in {"web_search", "web_fetch"}
+                            and "error" not in output
+                            and isinstance(data, dict)
+                        ):
+                            if isinstance(data.get("url"), str):
+                                runtime.item.retrieved_urls.append(data["url"])
+                            for entry in data.get("results", []):
+                                if isinstance(entry, dict) and isinstance(
+                                    entry.get("link"), str
+                                ):
+                                    runtime.item.retrieved_urls.append(entry["link"])
                         return copy.deepcopy(output)
 
                     with (

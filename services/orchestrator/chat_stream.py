@@ -11,7 +11,7 @@ import re
 import time
 
 from fastapi.responses import StreamingResponse
-from packages.file_intent import produces_file
+from packages.file_intent import produces_file, requests_file_delivery
 from packages.limits import LimitError
 
 from services.orchestrator.chat_schema import ChatRequest
@@ -27,9 +27,12 @@ def response(
     started: float,
     process: Callable[[ChatRequest, Interaction], Awaitable[None]],
 ) -> StreamingResponse:
+    file_request = requests_file_delivery(
+        payload.messages[-1].text, include_images=False
+    )
     ceiling = (
         "0.30"
-        if payload.documents or produces_file(payload.messages[-1].text)
+        if payload.has_attachments or produces_file(payload.messages[-1].text)
         else "0.10"
     )
     language = payload.ui_locale
@@ -67,7 +70,8 @@ def response(
             return {
                 "type": "status",
                 "data": {
-                    "description": f"{description} ({elapsed:.1f}s)",
+                    "description": f"{description} ({elapsed:.1f}s / {payload.timeout_seconds:.0f}s)",
+                    "deadline_seconds": payload.timeout_seconds,
                     "done": done,
                     "elapsed_seconds": elapsed,
                     "action": "atlas_activity",
@@ -101,7 +105,28 @@ def response(
             if not text:
                 return
             temporary = Interaction()
+            from services.orchestrator.source_truth import without_unretrieved
+
             temporary.reponse = canonical_links(text, item.files)
+            if item.task_type not in {"imagegen", "vision"}:
+                temporary.reponse = without_unretrieved(
+                    temporary.reponse,
+                    set(item.retrieved_urls)
+                    | {
+                        u
+                        for m in payload.messages[:-1]
+                        if m.role == "assistant"
+                        for u in re.findall(
+                            re.escape(
+                                os.environ.get(
+                                    "ATLAS_PUBLIC_URL", "http://localhost:8020"
+                                ).rstrip("/")
+                            )
+                            + r"/sources/[a-f0-9]{64}",
+                            m.text,
+                        )
+                    },
+                )
             temporary.chunks_recuperes = item.chunks_recuperes
             if payload.project_id:
                 from services.orchestrator.project_chat import render_project_citations
@@ -218,6 +243,8 @@ def response(
             if "reasoning_content" in delta:
                 activity = "thinking"
                 await queue.put(event)
+            if file_request:
+                return
             if isinstance(delta.get("content"), str):
                 count = len(narration.removed)
                 text = narration.feed(delta["content"])
@@ -233,7 +260,6 @@ def response(
                 in {
                     "vision",
                     "imagegen",
-                    "followup",
                 }
             ):
                 await queue.put({"delta": {"content": delta["content"]}})
@@ -243,10 +269,15 @@ def response(
                 pending += str(delta["content"])
                 suffix = re.search(r"(?<!\w)[`\[]?[a-f0-9]{1,64}$|[`\[]$", pending)
                 end = suffix.start() if suffix else len(pending)
-                if item.files:
-                    link = re.search(r"\[[^\]]*$|\[[^\]]*\](?:\([^)]*)?$", pending)
-                    if link:
-                        end = min(end, link.start())
+                # A URL may cross provider chunks, including the scheme itself.
+                trailing = re.search(
+                    r"(?<!\w)h(?:t(?:t(?:ps?(?::[^\s)\]>]*)?)?)?)?$", pending
+                )
+                if trailing:
+                    end = min(end, trailing.start())
+                link = re.search(r"\[[^\]]*$|\[[^\]]*\](?:\([^)]*)?$", pending)
+                if link:
+                    end = min(end, link.start())
                 await content(pending[:end])
                 pending = pending[end:]
 
@@ -259,8 +290,10 @@ def response(
                     await process(payload, item)
                     if item.state != "done":
                         raise RuntimeError("request_stopped")
-                    await content(pending + narration.finish())
-                    if item.files:
+                    await content(
+                        item.reponse if file_request else pending + narration.finish()
+                    )
+                    if item.files and (not file_request or not item.reponse):
                         from services.orchestrator.file_results import file_footer
                         from packages.language import conversation_language
 
@@ -293,6 +326,7 @@ def response(
                     }
                 )
             except GatewayError as exc:
+                item.provider_retries += exc.retries
                 item.state = "error"
                 item.erreurs.append(exc.code)
                 item.rejection = {"code": exc.code, "message": exc.detail}

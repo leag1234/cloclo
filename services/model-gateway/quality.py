@@ -11,9 +11,22 @@ from time import monotonic
 from pathlib import Path
 
 from agent_provider import AgentProvider, AgentRequest, Usage, classify
+from answer_content import (
+    ANSWER_NOW,
+    is_promise_only,
+    failed_terminal_content,
+    possible_promise_answer,
+    missing_file_failure,
+    strip_file_promises,
+)
 from packages.context_limit import ContextExceeded
-from provider_retry import RetryLedger, TransientProviderError, retry_stream
-from packages.limits import LimitError, ProviderLimitError
+from provider_retry import TransientProviderError
+from packages.limits import (
+    ProviderFailure,
+    LimitError,
+    ProviderLimitError,
+    MalformedToolCall,
+)
 
 from packages.tool_history import (
     final_messages,
@@ -84,7 +97,7 @@ async def complete(provider: AgentProvider, request: AgentRequest) -> dict[str, 
 async def stream_quality(
     provider: AgentProvider, request: AgentRequest
 ) -> AsyncGenerator[dict[str, object], None]:
-    from stream_transport import attempt
+    from stream_transport import attempt, response_window
 
     policy = ServerlessPolicy()
     task = classify_task(request.messages)
@@ -105,42 +118,49 @@ async def stream_quality(
     started = monotonic()
     current = request
     model = primary
-    # A large evidence input can exceed the primary's conservative reservation
-    # even when the configured alternate can answer within the same ledger.
-    alternate = policy.models[fallback_role]
-    if policy.cost(model, incoming, 1) > budget:
-        selected = None
-        if policy.cost(alternate, incoming, 1) <= budget:
-            selected = fallback_role
-        elif task != "vision":
-            # Preserve complete attachment context when both configured expert
-            # roles exceed the cap. Only already configured public text roles are
-            # eligible; no input sampling or larger cost allowance is permitted.
-            affordable_roles = [
-                candidate
-                for candidate in dict.fromkeys(policy.public_profiles.values())
-                if incoming + 1
-                <= policy.config[candidate]["capabilities"][policy.models[candidate]][
-                    "context"
+    malformed_name: MalformedToolCall | None = None
+
+    def select_affordable_model() -> None:
+        nonlocal role, model, fallback_role, fallback
+        alternate = policy.models[fallback_role]
+        if policy.cost(model, incoming, 1) > budget:
+            selected = None
+            if policy.cost(alternate, incoming, 1) <= budget:
+                selected = fallback_role
+            elif task != "vision":
+                # Preserve complete attachment context when both configured expert
+                # roles exceed the cap. Only already configured public text roles are
+                # eligible; no input sampling or larger cost allowance is permitted.
+                affordable_roles = [
+                    candidate
+                    for candidate in dict.fromkeys(policy.public_profiles.values())
+                    if incoming + 1
+                    <= policy.config[candidate]["capabilities"][
+                        policy.models[candidate]
+                    ]["context"]
+                    and policy.cost(policy.models[candidate], incoming, 1) <= budget
                 ]
-                and policy.cost(policy.models[candidate], incoming, 1) <= budget
-            ]
-            if affordable_roles:
-                selected = min(
-                    affordable_roles,
-                    key=lambda candidate: policy.cost(
-                        policy.models[candidate], incoming, request.max_tokens
-                    ),
+                if affordable_roles:
+                    selected = min(
+                        affordable_roles,
+                        key=lambda candidate: policy.cost(
+                            policy.models[candidate], incoming, request.max_tokens
+                        ),
+                    )
+                    fallback_role = policy.config[selected]["fallback"]
+            if selected is not None:
+                role, model = selected, policy.models[selected]
+                fallback = True
+                logging.getLogger(__name__).info(
+                    json.dumps(
+                        {
+                            "event": "quality_affordable_alternate",
+                            "budget_eur": str(budget),
+                        }
+                    )
                 )
-                fallback_role = policy.config[selected]["fallback"]
-        if selected is not None:
-            role, model = selected, policy.models[selected]
-            fallback = True
-            logging.getLogger(__name__).info(
-                json.dumps(
-                    {"event": "quality_affordable_alternate", "budget_eur": str(budget)}
-                )
-            )
+
+    select_affordable_model()
     # Research is optional once another selection turn plus the full-context
     # answer no longer fit. Keep all acquired evidence and the selected effort.
     # File operations are the requested deliverable, so an answer-only turn
@@ -151,16 +171,25 @@ async def stream_quality(
         and function.get("name") in {"terminal_command", "publish_document"}
         for tool in request.tools
     )
+    terminal_failed = any(
+        m.get("role") == "tool"
+        and '"terminal_operation_failed"' in str(m.get("content", ""))
+        for m in request.messages
+    )
     evidence_without_tools = not request.tools and any(
         message.get("role") == "tool" for message in request.messages
     )
-    if evidence_without_tools or (
-        request.tools
-        and not file_tools
-        and (
-            policy.cost(model, incoming, request.max_tokens)
-            + policy.cost(model, incoming, 3000)
-            > budget
+    if (
+        terminal_failed
+        or evidence_without_tools
+        or (
+            request.tools
+            and not file_tools
+            and (
+                policy.cost(model, incoming, request.max_tokens)
+                + policy.cost(model, incoming, 3000)
+                > budget
+            )
         )
     ):
         request = request.model_copy(
@@ -169,14 +198,26 @@ async def stream_quality(
                 # Research finalization presupposes acquired evidence. Before
                 # any tool result, preserve the original task and disposition.
                 "messages": [
-                    *request.messages,
+                    *(
+                        final_messages(request.messages)
+                        if terminal_failed
+                        else request.messages
+                    ),
                     *(
                         [
                             {
                                 "role": "system",
                                 "content": Path(
-                                    "prompts/budget-answer.txt"
-                                ).read_text(),
+                                    "prompts/file-failure.txt"
+                                    if any(
+                                        m.get("role") == "tool"
+                                        and '"terminal_operation_failed"'
+                                        in str(m.get("content", ""))
+                                        for m in request.messages
+                                    )
+                                    else "prompts/budget-answer.txt"
+                                ).read_text()
+                                + ("\n" + ANSWER_NOW if terminal_failed else ""),
                             }
                         ]
                         if any(m.get("role") == "tool" for m in request.messages)
@@ -190,9 +231,13 @@ async def stream_quality(
         logging.getLogger(__name__).info(
             json.dumps({"event": "quality_answer_budget", "remaining_eur": str(budget)})
         )
+    # Finalization instructions may invalidate the initial affordability check.
+    select_affordable_model()
     for index in range(2):
         remaining = request.timeout - (monotonic() - started)
         if remaining <= 0:
+            if malformed_name is not None:
+                raise MalformedToolCall(malformed_name.measured, index) from None
             raise TimeoutError("timeout")
         # Retain room for one bounded recovery, not all future tool turns.
         # Actual cost is reserved immediately before each transport call.
@@ -262,7 +307,10 @@ async def stream_quality(
             raise ContextExceeded(
                 incoming + current.max_tokens, capabilities["context"]
             )
-        visible_content = False
+        # Track the pre-validation streaming decision separately from withholding
+        # tool-enabled text. Only malformed names may undo that decision.
+        answer_started = False
+        held_content: list[dict[str, object]] = []
         buffered: list[dict[str, object]] = []
         prefix = ""
         prefix_open = True
@@ -270,21 +318,12 @@ async def stream_quality(
         result: dict[str, object] | None = None
         # Reserve time for recovery, still under the original request deadline.
         allotted = remaining * 0.8 if index == 0 else remaining
-        retry_ledger = RetryLedger()
+        full_deadline = asyncio.get_running_loop().time() + remaining
         try:
             async with (
-                asyncio.timeout(allotted),
-                aclosing(
-                    retry_stream(
-                        attempt,
-                        current,
-                        model,
-                        allotted,
-                        budget - spent,
-                        incoming,
-                        retry_ledger,
-                    )
-                ) as events,
+                response_window(remaining),
+                asyncio.timeout(allotted) as deadline,
+                aclosing(attempt(current, model, allotted)) as events,
             ):
                 async for event in events:
                     terminal = event.get("result")
@@ -296,31 +335,56 @@ async def stream_quality(
                         if isinstance(delta.get("reasoning_content"), str):
                             partial_reasoning += str(delta["reasoning_content"])
                     if isinstance(delta, dict) and delta.get("content"):
-                        if current.max_tokens < request.max_tokens:
+                        if current.max_tokens < request.max_tokens or terminal_failed:
                             buffered.append(event)
                             continue
                         if prefix_open:
                             prefix += str(delta["content"])
                             buffered.append(event)
-                            if possible_history_answer(prefix):
+                            if possible_history_answer(
+                                prefix
+                            ) or possible_promise_answer(prefix):
                                 continue
                             prefix_open = False
+                            # Visible answers cannot be retried. Let this attempt
+                            # use the original deadline instead of cancelling it
+                            # early to reserve time for an ineligible recovery.
+                            deadline.reschedule(full_deadline)
                             for pending_event in buffered:
-                                yield pending_event
+                                if current.tools:
+                                    held_content.append(pending_event)
+                                else:
+                                    yield pending_event
                             buffered.clear()
-                            visible_content = True
+                            answer_started = True
                             continue
-                        visible_content = True
+                        answer_started = True
+                        if current.tools:
+                            held_content.append(event)
+                            continue
                     yield event
             if result is None:
                 raise RuntimeError("provider_response_invalid")
         except ProviderLimitError:
+            for event in held_content:
+                yield event
             raise
-        except (RuntimeError, TimeoutError) as exc:
-            spent += retry_ledger.spent
-            prompt_tokens += retry_ledger.prompt_tokens
-            completion_tokens += retry_ledger.completion_tokens
-            retry_completion_tokens += retry_ledger.completion_tokens
+        except (RuntimeError, TimeoutError, LimitError) as exc:
+            if isinstance(exc, MalformedToolCall):
+                malformed_name = exc
+                if current.tools:
+                    answer_started = False
+            else:
+                for event in held_content:
+                    yield event
+            # Invalid provider fields are recoverable output failures. Keep the
+            # same decoder limits and charge the unknown attempt in full.
+            # Request/output budgets must never enter this recovery path.
+            if isinstance(exc, LimitError) and exc.code not in {
+                "provider_response_limit",
+                "tool_limit",
+            }:
+                raise
             failed_usage = (
                 exc.usage if isinstance(exc, TransientProviderError) else None
             )
@@ -336,11 +400,11 @@ async def stream_quality(
                 prompt_tokens += failed_usage.prompt_tokens
                 completion_tokens += failed_usage.completion_tokens
                 retry_completion_tokens += failed_usage.completion_tokens
-                estimated |= retry_ledger.estimated
             else:
                 spent += reserved
                 prompt_tokens += incoming
                 completion_tokens += current.max_tokens
+                retry_completion_tokens += current.max_tokens
                 estimated = True
             # Keep the trace actually shown before an interrupted attempt.
             # Its token count is estimated; unknown billing stays fully reserved.
@@ -350,30 +414,39 @@ async def stream_quality(
                 json.dumps(
                     {
                         "event": "quality_attempt_failed",
-                        "category": "timeout"
+                        "category": "malformed_tool_call"
+                        if isinstance(exc, MalformedToolCall)
+                        else "timeout"
                         if isinstance(exc, TimeoutError)
                         else "provider",
                         "attempt": index + 1,
                         "elapsed_seconds": round(monotonic() - started, 3),
                         "reserved_unknown_eur": str(spent),
                         "final_usage_measured": failed_usage is not None,
-                        "visible_content": visible_content,
+                        "visible_content": answer_started,
                     }
                 )
             )
-            if index or visible_content:
-                raise
+            if index or answer_started:
+                if malformed_name is not None and not isinstance(exc, LimitError):
+                    raise MalformedToolCall(malformed_name.measured, index) from None
+                if isinstance(exc, (TimeoutError, LimitError)):
+                    raise
+                raise ProviderFailure(
+                    str(exc), getattr(exc, "finish_reason", None), index
+                ) from None
             role = fallback_role
             model = policy.models[role]
             fallback = True
             retried = False
+            if isinstance(exc, MalformedToolCall):
+                # Keep the original history and its reservation; the rejected
+                # name is never sent back. No additional retry is introduced.
+                request = request.model_copy(update={"tool_choice": "none"})
             yield {"phase": "reasoning_fallback" if retried else "provider_fallback"}
             continue
-        spent += retry_ledger.spent
-        prompt_tokens += retry_ledger.prompt_tokens
-        completion_tokens += retry_ledger.completion_tokens
-        retry_completion_tokens += retry_ledger.completion_tokens
-        estimated |= retry_ledger.estimated
+        for event in held_content:
+            yield event
         usage = Usage.model_validate(result["usage"])
         if (
             usage.prompt_tokens > incoming
@@ -413,7 +486,9 @@ async def stream_quality(
             logging.getLogger(__name__).warning(
                 json.dumps({"event": "invalid_tool_arguments", "attempt": index + 1})
             )
-            if index or visible_content:
+            if index or answer_started:
+                if malformed_name is not None:
+                    raise MalformedToolCall(malformed_name.measured, index)
                 raise RuntimeError("invalid_tool_arguments")
         malformed = is_history_answer(str(result.get("text", "")))
         if malformed:
@@ -427,8 +502,74 @@ async def stream_quality(
                     }
                 )
             )
-            if index or visible_content:
+            if index or answer_started:
+                if malformed_name is not None:
+                    raise MalformedToolCall(malformed_name.measured, index)
                 raise RuntimeError("unexpected_tool_history_answer")
+        future_action = (
+            terminal_failed
+            and not calls
+            and (
+                strip_file_promises(str(result.get("text", "")))
+                != result.get("text", "")
+            )
+        )
+        if future_action and index:
+            # The single retry is exhausted. Only validated substantive content
+            # and the failure disclosure may survive; no rejected delta escapes.
+            result["text"] = strip_file_promises(str(result["text"]))
+            buffered = [{"delta": {"content": result["text"]}}]
+            future_action = False
+        invalid_content = terminal_failed and failed_terminal_content(
+            str(result.get("text", "")), request.messages
+        )
+        promise_only = not calls and (
+            is_promise_only(str(result.get("text", "")))
+            or invalid_content
+            or future_action
+        )
+        missing_failure = (
+            terminal_failed
+            and not calls
+            and missing_file_failure(str(result.get("text", "")))
+        )
+        delivery_error = (
+            "promise_only_final_answer" if promise_only else "missing_file_failure"
+        )
+        if promise_only or missing_failure:
+            logging.getLogger(__name__).warning(
+                json.dumps({"event": delivery_error, "attempt": index + 1})
+            )
+            if index or answer_started:
+                raise ProviderFailure(
+                    delivery_error, str(result.get("finish_reason")), index
+                )
+            request = request.model_copy(
+                update={
+                    "tool_choice": "none",
+                    "messages": [
+                        *request.messages,
+                        {
+                            "role": "system",
+                            "content": (
+                                str(request.messages[-1]["content"])
+                                if terminal_failed
+                                else ANSWER_NOW
+                            )
+                            + (
+                                " The last response was rejected: deliver the content itself, "
+                                "not document-generation code, intentions, or an apology. "
+                                "Keep only a brief failure disclosure before the requested content. "
+                                "Remove EVERY sentence promising a future file action or retry, "
+                                "even when the rest of the answer already contains useful content."
+                                if terminal_failed
+                                else ""
+                            ),
+                        },
+                    ],
+                }
+            )
+            incoming = input_bound(request.messages, request.tools)
         incomplete = result.get("finish_reason") == "length"
         if incomplete:
             logging.getLogger(__name__).warning(
@@ -443,19 +584,35 @@ async def stream_quality(
                     }
                 )
             )
-            if index or visible_content:
+            if index or answer_started:
+                if malformed_name is not None:
+                    raise MalformedToolCall(malformed_name.measured, index)
                 if index and (not str(result.get("text", "")).strip()):
-                    raise RuntimeError("empty_content_after_retry")
-                raise RuntimeError("incomplete_provider_answer")
+                    raise ProviderFailure(
+                        "empty_content_after_retry",
+                        str(result.get("finish_reason")),
+                        index,
+                    )
+                raise ProviderFailure(
+                    "incomplete_provider_answer",
+                    str(result.get("finish_reason")),
+                    index,
+                )
         # Empty terminal responses retain validated billing, then get one retry.
         if (
-            malformed
+            promise_only
+            or missing_failure
+            or malformed
             or malformed_arguments
             or incomplete
             or (not str(result.get("text", "")).strip() and not result.get("calls"))
         ):
             if index:
-                raise RuntimeError("empty_content_after_retry")
+                if malformed_name is not None:
+                    raise MalformedToolCall(malformed_name.measured, index)
+                raise ProviderFailure(
+                    "empty_content_after_retry", str(result.get("finish_reason")), index
+                )
             # A large evidence input may no longer fit the original provider's
             # conservative reservation. Try the configured alternate before
             # rejecting a recovery that still fits the same request ledger.
@@ -499,6 +656,7 @@ async def stream_quality(
             "answer_tokens": answer_tokens,
             "token_split_estimated": estimated,
             "reasoning_retried": retried,
+            "provider_retries": index,
         }
         if retry_completion_tokens:
             answer["retry_completion_tokens"] = retry_completion_tokens

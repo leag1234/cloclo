@@ -4,6 +4,7 @@ from packages.limits import LimitError
 from packages.validation import describe_validation
 from pydantic import ValidationError
 
+import asyncio
 import json
 import copy
 import os
@@ -149,6 +150,19 @@ class ChatTools(Runtime):
                     )
                     self.item.files = list(self.terminal.files)
                     self.item.file_strategies = list(self.terminal.strategies)
+                if call.name == "terminal_command" and (
+                    output.get("error") or output.get("exit_code", 0) != 0
+                ):
+                    self.item.erreurs.append("terminal_operation_failed")
+                    return {"error": "terminal_operation_failed", "data": output}
+                if self.model is not None and self.model.required_file_tool:
+                    if call.name == "terminal_command":
+                        self.model.required_file_tool = "publish_document"
+                    elif all(
+                        any(url.endswith("." + ext) for url in self.terminal.files)
+                        for ext in self.model.required_file_formats
+                    ):
+                        self.model.required_file_tool = None
                 return {"trust": "untrusted", "data": output}
             except LimitError as exc:
                 return {"error": exc.code, "message": exc.detail}
@@ -192,6 +206,8 @@ class ChatTools(Runtime):
                         for r in results
                         if isinstance(r, dict) and isinstance(r.get("link"), str)
                     ]
+            if call.name in {"web_search", "web_fetch"} and "error" not in output:
+                self.item.retrieved_urls.extend(urls)
             if "error" in output:
                 self.item.erreurs.append(str(output["error"]))
             sink = sink_context.get()
@@ -215,7 +231,10 @@ class ChatTools(Runtime):
                     )
             if (
                 call.name == "web_search"
-                and os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily"
+                and (
+                    os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily"
+                    or output.get("error") in {"quota_exceeded", "search_rate_limited"}
+                )
                 and (
                     "error" in output
                     or not isinstance(data, dict)
@@ -227,12 +246,22 @@ class ChatTools(Runtime):
                 reason = (
                     "quota exhausted"
                     if output.get("error") == "quota_exceeded"
+                    else "hourly limit reached"
+                    if output.get("error") == "search_rate_limited"
                     else "provider failed or returned no results"
                 )
                 raise GatewayError(
-                    "search_unavailable",
+                    str(output["error"])
+                    if output.get("error") in {"quota_exceeded", "search_rate_limited"}
+                    else "search_unavailable",
                     503,
-                    f"Web search unavailable: {reason}. No verified result was obtained "
+                    f"Web search unavailable: {reason}. "
+                    + (
+                        f"Provider HTTP {output['provider_status']}. "
+                        if type(output.get("provider_status")) is int
+                        else ""
+                    )
+                    + "No verified result was obtained "
                     "(required: at least 1). I cannot verify this answer from current sources. "
                     "Search limits: 3 calls per request and 900 local reservations per month.",
                 )
@@ -298,6 +327,8 @@ class ChatTools(Runtime):
         # Account for JSON escaping and retain half the allowance for output
         # and other context. Do not reserve ten hypothetical future calls.
         budget = max(1, int(self.model.allowance * 1000000 / (price * 2 * 2)))
+        if self.model.produces_files:
+            budget = min(budget, 8000)
         per_source = max(1, budget // len(rows))
         result = copy.deepcopy(data)
         copied = result["results"]
@@ -305,12 +336,16 @@ class ChatTools(Runtime):
         for row in copied:
             if not isinstance(row, dict) or not isinstance(row.get("content"), str):
                 continue
+            if self.model.produces_files and isinstance(row.get("snippet"), str):
+                row["snippet"] = row["snippet"][:per_source]
             text = row["content"]
             measured = len(text.encode())
             if measured <= per_source:
                 continue
             parts = select_text(text, self.question, per_source)
             selected = "\n".join(part.text for part in parts)
+            if self.model.produces_files:
+                selected = selected.encode()[:per_source].decode("utf-8", "ignore")
             row.update(
                 content=selected,
                 source_bytes=measured,
@@ -370,8 +405,39 @@ async def process(request: ChatRequest, item: Interaction) -> None:
     from services.orchestrator.narration import clean_answer
 
     await _process(request, item)
-    if item.state == "done":
-        item.reponse = clean_answer(item.reponse)
+    if item.state == "done" and any(
+        d.get("hierarchical_synthesis") for d in item.documents
+    ):
+        labels = json.loads(Path("prompts/activity-labels.json").read_text())
+        notice = labels.get(request.lang, labels["en"])["synthesized"]
+        if not item.reponse.endswith(notice):
+            item.reponse += "\n\n" + notice
+    if item.state == "done" and item.task_type not in {
+        "imagegen",
+        "vision",
+    }:
+        from services.orchestrator.source_truth import (
+            without_unretrieved,
+            source_footer,
+        )
+
+        item.reponse = without_unretrieved(
+            clean_answer(item.reponse),
+            set(item.retrieved_urls)
+            | {str(c.get("source")) for c in item.citations}
+            | set(
+                re.findall(
+                    re.escape(
+                        os.environ.get(
+                            "ATLAS_PUBLIC_URL", "http://localhost:8020"
+                        ).rstrip("/")
+                    )
+                    + r"/sources/[a-f0-9]{64}",
+                    item.reponse,
+                )
+            ),
+        )
+        item.reponse += source_footer(item.retrieved_urls, request.lang)
 
 
 async def _process(request: ChatRequest, item: Interaction) -> None:
@@ -383,9 +449,9 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         return
     from services.orchestrator.project_commands import select
 
-    if not request.documents and await select(request, item, retrieval_url()):
+    if not request.has_attachments and await select(request, item, retrieval_url()):
         return
-    if request.project_id is not None and not request.documents:
+    if request.project_id is not None and not request.has_attachments:
         from services.orchestrator.project_chat import process_project
 
         await process_project(request, item)
@@ -411,7 +477,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             request.lang,
             device_timings=os.environ.get("ATLAS_SEARCH_PROVIDER") == "tavily",
         )
-        if not followup and not request.documents
+        if not followup and not request.has_attachments
         else ()
     )
     if followup and os.environ.get("ATLAS_TERMINAL_ENABLED") != "1":
@@ -436,19 +502,31 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         ]
     model.observing = True
     model.sink = sink_context.get()
-    from packages.file_intent import produces_file
+    from packages.file_intent import produces_file, requests_file_delivery
 
     produces_files = produces_file(request.messages[-1].text)
+    deliver_files = requests_file_delivery(request.messages[-1].text)
+    if (
+        os.environ.get("ATLAS_TERMINAL_ENABLED") == "1"
+        and not produces_files
+        and not request.has_attachments
+    ):
+        model.tools = [
+            tool
+            for tool in model.tools
+            if isinstance(function := tool.get("function"), dict)
+            and function.get("name") not in {"terminal_command", "publish_document"}
+        ]
     model.configure_quality(
         request.model,
         request.max_tokens,
-        has_attachments=bool(request.documents),
+        has_attachments=request.has_attachments,
         produces_files=produces_files,
     )
     item.reasoning_effort = request.reasoning_effort
     model.local_enabled = os.environ.get("GPU_LOCAL", "0") == "1"
     item.cout_eur = (
-        0.30 if request.documents or produces_files else 0.10
+        0.30 if request.has_attachments or produces_files else 0.10
     )  # Reserved until ledger returns.
     tools = ChatTools(item, request.messages[-1].text, allow_image=not followup)
     tools.model = model
@@ -486,8 +564,10 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             Limits(
                 profile=request.model,
                 tokens=None,
-                cost=Decimal("0.30" if request.documents or produces_files else "0.10"),
-                has_attachments=bool(request.documents),
+                cost=Decimal(
+                    "0.30" if request.has_attachments or produces_files else "0.10"
+                ),
+                has_attachments=request.has_attachments,
                 produces_files=produces_files,
                 wall_clock=max(
                     0, request.timeout_seconds - (time.monotonic() - started)
@@ -502,6 +582,200 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             if not followup
             else frozenset(),
         )
+        from services.orchestrator.file_content import (
+            answer_content,
+            requested_formats,
+            presentable,
+        )
+
+        formats = requested_formats(request.messages[-1].text)
+        preserve_code = bool(
+            re.search(
+                r"\b(?:script|code|python|sql|function|fonction|programm)\b",
+                request.messages[-1].text,
+                re.I,
+            )
+        )
+        file_recovery_attempted = False
+        file_recovery_failed = False
+        if (
+            deliver_files
+            and tools.terminal is not None
+            and not tools.terminal.files
+            and tools.terminal.commands == 0
+            and "terminal_operation_failed" not in item.erreurs
+            and result.tool_calls <= 7
+        ):
+            file_recovery_attempted = True
+            first_result = result
+            remaining_seconds = max(
+                0, request.timeout_seconds - (time.monotonic() - started)
+            )
+            remaining_cost = max(Decimal(0), Decimal("0.30") - first_result.cost)
+            # A failed forced-tool call has unknown usage even when the original
+            # answer is substantive. Always leave room to finish the content.
+            content_reserve = min(Decimal("0.08"), remaining_cost / 2)
+            recovery_allowance = remaining_cost - content_reserve
+            model.delivery_reserve = content_reserve
+            if remaining_seconds > 0 and recovery_allowance > 0:
+                # The same model retains its spending ledger. Recovery only needs
+                # file tools; reopening search would reset its per-request quotas.
+                model.spent = max(model.spent, first_result.cost)
+                model.tools = [
+                    tool
+                    for tool in model.tools
+                    if isinstance(function := tool.get("function"), dict)
+                    and function.get("name") in {"terminal_command", "publish_document"}
+                ]
+                model.required_file_tool = "terminal_command"
+                model.required_file_formats = formats
+                recovery_history: list[Message] = [
+                    {"role": m.role, "content": m.text} for m in request.messages
+                ]
+                recovery_history.append(
+                    {"role": "assistant", "content": first_result.text}
+                )
+                try:
+                    result = await run(
+                        Query(
+                            question=iteration or request.messages[-1].text,
+                            lang=request.lang,
+                        ),
+                        model,
+                        tools,
+                        Path("prompts/chat.txt").read_text()
+                        + Path("prompts/chat-agent.txt").read_text()
+                        + language_instruction(request.lang)
+                        + file_context
+                        + "\n\nFile-delivery recovery: the prior answer produced no file. "
+                        "Use terminal_command to create the requested files from the "
+                        "actual answer content, then publish_document for each file. "
+                        "Follow the original request and its language for all titles "
+                        "and content. For a presentation with PDF, render the same "
+                        "substantive slide content into both formats, one PDF page per "
+                        "slide. Never add placeholder or filler pages. Do not claim a "
+                        "file or link exists unless publish_document succeeded. If "
+                        "creation fails, return the actual requested content inline "
+                        "and explain the failure in the request language.",
+                        Limits(
+                            profile=request.model,
+                            tokens=None,
+                            tool_calls=10 - first_result.tool_calls,
+                            cost=remaining_cost,
+                            has_attachments=request.has_attachments,
+                            produces_files=True,
+                            wall_clock=max(0, remaining_seconds - 90),
+                        ),
+                        history=recovery_history,
+                    )
+                    result.cost += first_result.cost
+                    result.tool_calls += first_result.tool_calls
+                except GatewayError as exc:
+                    # Unknown failed usage retains the full remaining reservation.
+                    # A delivery failure must not discard an already usable answer.
+                    item.erreurs.append(exc.code)
+                    item.provider_retries += exc.retries
+                    result = first_result
+                    result.cost += recovery_allowance
+                    file_recovery_failed = True
+                finally:
+                    model.delivery_reserve = Decimal(0)
+            # Preserve substantive first-pass evidence, never an invented recovery URL.
+            if not tools.terminal.files:
+                result.text = first_result.text.strip() or result.text.strip()
+        if deliver_files and tools.terminal is not None:
+            from services.orchestrator.file_content import render_command
+            from services.orchestrator.file_results import inline_fallback
+
+            terminal_already_failed = "terminal_operation_failed" in item.erreurs
+            missing = tuple(
+                ext
+                for ext in formats
+                if not any(url.endswith("." + ext) for url in tools.terminal.files)
+            )
+            if missing and "terminal_operation_failed" not in item.erreurs:
+                ready = not file_recovery_failed and presentable(result.text, missing)
+                if not ready and result.tool_calls + 1 + len(missing) <= 10:
+                    from services.orchestrator.content_recovery import recover_content
+
+                    ready = await recover_content(
+                        model, request, item, result, missing, started
+                    )
+                command, paths = (
+                    render_command(result.text, missing) if ready else ("", [])
+                )
+                remaining = request.timeout_seconds - (time.monotonic() - started)
+                if (
+                    command
+                    and result.tool_calls + 1 + len(paths) <= 10
+                    and remaining > 0
+                    and result.cost < Decimal("0.30")
+                ):
+                    # Deterministic rendering uses no inference; all I/O stays in
+                    # the original deadline and remaining tool allowance.
+                    result.tool_calls += 1
+                    try:
+                        async with asyncio.timeout(remaining):
+                            created = await tools.execute(
+                                Call(
+                                    "content-render",
+                                    "terminal_command",
+                                    json.dumps({"command": command}),
+                                ),
+                                min(30, remaining),
+                            )
+                            data = created.get("data")
+                            if (
+                                isinstance(data, dict)
+                                and data.get("exit_code") == 0
+                                and not created.get("error")
+                            ):
+                                for path in paths:
+                                    remaining = request.timeout_seconds - (
+                                        time.monotonic() - started
+                                    )
+                                    if remaining <= 0:
+                                        break
+                                    result.tool_calls += 1
+                                    await tools.execute(
+                                        Call(
+                                            "content-publish-" + path,
+                                            "publish_document",
+                                            json.dumps(
+                                                {"path": path, "strategy": "created"}
+                                            ),
+                                        ),
+                                        min(30, remaining),
+                                    )
+                    except TimeoutError:
+                        item.erreurs.append("file_render_timeout")
+            missing = tuple(
+                ext
+                for ext in formats
+                if not any(url.endswith("." + ext) for url in tools.terminal.files)
+            )
+            if not tools.terminal.files or missing:
+                if not terminal_already_failed or file_recovery_attempted:
+                    result.text = inline_fallback(
+                        result.text,
+                        request.lang,
+                        preserve_code=preserve_code,
+                        partial=bool(tools.terminal.files),
+                    )
+                    result.state = "done"
+                    result.reason = "file_not_produced"
+                else:
+                    result.text = answer_content(
+                        result.text, preserve_code=preserve_code
+                    )
+            else:
+                result.text = answer_content(result.text, preserve_code=preserve_code)
+        elif deliver_files:
+            from services.orchestrator.file_results import inline_fallback
+
+            result.text = inline_fallback(
+                result.text, request.lang, preserve_code=preserve_code
+            )
         item.reponse, item.state, item.cout_eur = (
             result.text,
             result.state,
@@ -511,9 +785,13 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             item.terminal_commands = tools.terminal.commands
             item.terminal_failed_commands = tools.terminal.failed_commands
             item.files = tools.terminal.files
-            if result.state == "done" and item.files:
+            if item.files:
                 from services.orchestrator.file_results import render_files
 
+                if result.state != "done":
+                    # Published files remain usable even if closing prose fails.
+                    item.erreurs.append(result.reason or "closing_answer_failed")
+                    item.state = "done"
                 item.reponse = render_files(
                     item.reponse, item.files, tools.terminal.strategies, request.lang
                 )
@@ -529,7 +807,23 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             item.reponse += (
                 "\n\n" + labels.get(request.ui_locale, labels["en"])["source_truncated"]
             )
+    except GatewayError as exc:
+        if tools.terminal is None or not tools.terminal.files:
+            raise
+        from services.orchestrator.file_results import render_files
+
+        item.files = list(tools.terminal.files)
+        item.file_strategies = list(tools.terminal.strategies)
+        item.terminal_commands = tools.terminal.commands
+        item.terminal_failed_commands = tools.terminal.failed_commands
+        item.erreurs.append(exc.code)
+        item.provider_retries += exc.retries
+        item.reponse = render_files(
+            exc.detail, item.files, item.file_strategies, request.lang
+        )
+        item.state = "done"
     finally:
+        item.provider_retries += model.provider_retries
         item.tokens = {"in": model.input_tokens, "out": model.output_tokens}
         item.provider_model = model.provider_model
         item.reasoning = model.reasoning

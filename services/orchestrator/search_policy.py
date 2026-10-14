@@ -84,7 +84,17 @@ def required_research(
             and re.search(r"\b[A-Z][A-Z0-9_]{2,}\b", question)
         )
     )
-    if temporal or explicit or technical:
+    existing_things = re.search(
+        r"\b(products?|produits?|devices?|appareils?|versions?|logiciels?|software|"
+        r"firmware|preamp\w*|preampli\w*|monnaies?|currenc\w*|wahrung\w*|"
+        r"dispositifs?|frameworks?|libraries|bibliotheques?|features?|fonctionnalites?|"
+        r"caracteristiques?|compatibil\w*)\b",
+        normalized,
+    )
+    hypothetical = re.search(
+        r"\b(ficti\w*|imaginary|hypothetical|erfunden\w*)\b", normalized
+    )
+    if temporal or explicit or technical or (existing_things and not hypothetical):
         return (
             Call(
                 "required-current",

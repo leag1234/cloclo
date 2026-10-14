@@ -187,7 +187,7 @@ class RetryTests(unittest.IsolatedAsyncioTestCase):
             req: AgentRequest, selected: str, timeout: float
         ) -> AsyncGenerator[dict[str, object], None]:
             calls.append(selected)
-            if len(calls) < 4:
+            if len(calls) < 2:
                 raise TransientProviderError("provider_error")
             yield result("Recovered complete answer", 10)
 
@@ -200,13 +200,13 @@ class RetryTests(unittest.IsolatedAsyncioTestCase):
             policy = ServerlessPolicy()
             events = [e async for e in stream_quality(AgentProvider(), original)]
             wire = WireTurn.model_validate(events[-1]["result"])
-            expected = 3 * policy.cost(
+            expected = policy.cost(
                 calls[0], input_bound(original.messages, original.tools), 100
-            ) + policy.cost(calls[0], 20, 10)
+            ) + policy.cost(calls[-1], 20, 10)
         self.assertEqual(wire.cost_eur, expected)
-        self.assertEqual(wire.retry_completion_tokens, 300)
-        self.assertEqual(wire.usage.completion_tokens, 310)
-        self.assertEqual(len(calls), 4)
+        self.assertEqual(wire.retry_completion_tokens, 100)
+        self.assertEqual(wire.usage.completion_tokens, 110)
+        self.assertEqual(len(calls), 2)
 
     async def test_persistent_transient_stops_after_three_retries(self) -> None:
         calls: list[str] = []
@@ -251,7 +251,7 @@ class ExhaustedUsageTests(unittest.IsolatedAsyncioTestCase):
             req: AgentRequest, selected: str, timeout: float
         ) -> AsyncGenerator[dict[str, object], None]:
             calls.append(selected)
-            if len(calls) <= 4:
+            if len(calls) <= 1:
                 raise TransientProviderError(
                     "empty_completion",
                     usage=Usage(prompt_tokens=20, completion_tokens=1),
@@ -272,12 +272,13 @@ class ExhaustedUsageTests(unittest.IsolatedAsyncioTestCase):
                 )
             ]
             wire = WireTurn.model_validate(events[-1]["result"])
-            expected = 4 * policy.cost(calls[0], 20, 1) + policy.cost(calls[-1], 20, 10)
-        self.assertEqual(len(calls), 5)
+            expected = policy.cost(calls[0], 20, 1) + policy.cost(calls[-1], 20, 10)
+        self.assertEqual(len(calls), 2)
         self.assertNotEqual(calls[0], calls[-1])
         self.assertEqual(wire.cost_eur, expected)
-        self.assertEqual(wire.usage.prompt_tokens, 100)
-        self.assertEqual(wire.usage.completion_tokens, 14)
+        self.assertEqual(wire.usage.prompt_tokens, 40)
+        self.assertEqual(wire.usage.completion_tokens, 11)
+        self.assertEqual(wire.retry_completion_tokens, 1)
         self.assertFalse(wire.token_split_estimated)
 
     async def test_invalid_last_usage_prevents_paid_fallback(self) -> None:
@@ -291,12 +292,10 @@ class ExhaustedUsageTests(unittest.IsolatedAsyncioTestCase):
         ) -> AsyncGenerator[dict[str, object], None]:
             nonlocal calls
             calls += 1
-            if calls <= 4:
+            if calls <= 1:
                 raise TransientProviderError(
                     "empty_completion",
-                    usage=Usage(
-                        prompt_tokens=20, completion_tokens=101 if calls == 4 else 1
-                    ),
+                    usage=Usage(prompt_tokens=20, completion_tokens=101),
                 )
             yield result("Must not pay for fallback", 10)
 
@@ -313,4 +312,4 @@ class ExhaustedUsageTests(unittest.IsolatedAsyncioTestCase):
                     request(profile="atlas-qwen", max_tokens=100, timeout=120.0),
                 )
             ]
-        self.assertEqual(calls, 4)
+        self.assertEqual(calls, 1)
