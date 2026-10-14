@@ -96,60 +96,64 @@ async def read_announced(
     item: Interaction,
     terminal: TerminalClient | None,
     terminal_error: str = "",
+    read_document_bytes: bool = False,
 ) -> list[dict[str, object]]:
     from packages.file_intent import requests_file_delivery
     from packages.language import user_prose
 
-    from services.orchestrator.documents import extract_document, DocumentError
-    from services.orchestrator.content import hierarchical_summary
     from packages.attachment_reader import INLINE_BYTES
+    from services.orchestrator.content import hierarchical_summary
+    from services.orchestrator.documents import DocumentError, extract_document
 
     sources: list[dict[str, object]] = []
-    for attachment in request.documents:
-        source: dict[str, object] = {
-            "filename": attachment.filename,
-            "text": "",
-            "errors": [],
-        }
-        try:
-            document = await asyncio.to_thread(extract_document, attachment)
-            text = document.text
-            hierarchical = len(text.encode()) > INLINE_BYTES
-            if hierarchical:
-                text, _, _ = hierarchical_summary(
-                    text, user_prose(request.messages[-1].text)
+    if read_document_bytes:
+        for attachment in request.documents:
+            source: dict[str, object] = {
+                "filename": attachment.filename,
+                "text": "",
+                "errors": [],
+            }
+            try:
+                document = await asyncio.to_thread(extract_document, attachment)
+                text = document.text
+                hierarchical = len(text.encode()) > INLINE_BYTES
+                if hierarchical:
+                    text, _, _ = hierarchical_summary(
+                        text, user_prose(request.messages[-1].text)
+                    )
+                source.update(
+                    text=text,
+                    errors=list(document.errors),
+                    pages=document.pages,
+                    size=document.size,
+                    extracted_characters=len(document.text),
+                    hierarchical_synthesis=hierarchical,
                 )
-            source.update(
-                text=text,
-                errors=list(document.errors),
-                pages=document.pages,
-                size=document.size,
-                extracted_characters=len(document.text),
-                hierarchical_synthesis=hierarchical,
-            )
-        except DocumentError as exc:
-            source["errors"] = [str(exc)]
-        sources.append(source)
-        record_source(item, source)
+            except DocumentError as exc:
+                source["errors"] = [str(exc)]
+            sources.append(source)
+            record_source(item, source)
     deadline = time.monotonic() + request.timeout_seconds
     paths = announced_paths(request)
     for index, path in enumerate(paths):
-        source = {
+        announced_source: dict[str, object] = {
             "filename": PurePosixPath(path).name,
             "text": "",
             "errors": [],
         }
         if index + len(request.documents) >= 8:
-            source["errors"] = [
+            announced_source["errors"] = [
                 "Attachment count exceeds the limit of 8; file was not read"
             ]
         elif terminal is None:
-            source["errors"] = [terminal_error or "Attachment sandbox is unavailable"]
+            announced_source["errors"] = [
+                terminal_error or "Attachment sandbox is unavailable"
+            ]
         elif not PurePosixPath(path).is_absolute() or ".." in PurePosixPath(path).parts:
-            source["errors"] = ["Invalid attachment path"]
+            announced_source["errors"] = ["Invalid attachment path"]
         else:
             try:
-                source.update(
+                announced_source.update(
                     decode_output(
                         await terminal.execute(
                             reader_command(path, user_prose(request.messages[-1].text)),
@@ -160,9 +164,9 @@ async def read_announced(
             except (ValueError, RuntimeError, OSError) as exc:
                 from packages.attachment_reader import failure_reason
 
-                source["errors"] = [failure_reason(exc)]
-        sources.append(source)
-        record_source(item, source)
+                announced_source["errors"] = [failure_reason(exc)]
+        sources.append(announced_source)
+        record_source(item, announced_source)
     if sources and not requests_file_delivery(request.messages[-1].text):
         item.task_type = "document"
     return sources

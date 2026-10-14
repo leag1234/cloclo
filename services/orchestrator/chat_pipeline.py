@@ -544,7 +544,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             from packages.attachment_reader import failure_reason
 
             terminal_error = failure_reason(exc)
-        if not terminal_error and deliver_files:
+        if not terminal_error:
             paths = [
                 await tools.terminal.upload(document, request.timeout_seconds)
                 for document in request.documents
@@ -560,7 +560,19 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
     from services.orchestrator.attachment_reading import read_announced, failure_notice
 
     attachment_sources = await read_announced(
-        request, item, tools.terminal if not terminal_error else None, terminal_error
+        request,
+        item,
+        tools.terminal if not terminal_error else None,
+        terminal_error,
+        read_document_bytes=bool(request.documents)
+        and (
+            terminal_error != ""
+            or len(paths) != len(request.documents)
+            or any(
+                Path(path).name != document.filename
+                for path, document in zip(paths, request.documents, strict=True)
+            )
+        ),
     )
     notice = failure_notice(attachment_sources, request.lang)
     if notice and model.sink:

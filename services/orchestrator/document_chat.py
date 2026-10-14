@@ -83,7 +83,9 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
     instructions = (
         Path("prompts/chat.txt").read_text()
         + Path("prompts/documents.txt").read_text()
-        + language_instruction(request.lang)
+        # Failed extraction needs a model-visible language cue for the remaining
+        # readable attachments. Successful legacy requests retain their cassette bytes.
+        + (language_instruction(request.lang) if notice else "")
     )
     history: list[dict[str, object]] = [
         {"role": m.role, "content": m.text} for m in request.messages
