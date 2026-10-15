@@ -100,11 +100,10 @@ def select_passages(
 
 
 def hierarchical_summary(
-    text: str, query: str
+    text: str, query: str, budget: int = 7900
 ) -> tuple[str, list[SelectedPassage], int]:
     """Keep ordered coverage of every document part plus query-relevant evidence."""
     sections = _document_sections(text)
-    budget = 7900
     identifiers = set(re.findall(r"\b[A-Z][A-Z0-9_]{2,}\b", query))
     # Comparisons need evidence for both subjects. A single 5000-byte window
     # otherwise consumes nearly all the passage allowance before the second entry.
@@ -124,7 +123,10 @@ def hierarchical_summary(
         )
         passages = sorted(coverage + relevant, key=lambda passage: passage.start)
         summary = "\n".join(passage.text for passage in passages)
-        if len(summary.encode()) <= budget and estimated_tokens(summary) <= 4000:
+        # The token ceiling follows the byte budget: 4000 tokens at the default 7900 bytes.
+        if len(summary.encode()) <= budget and estimated_tokens(summary) <= max(
+            4000, budget // 3
+        ):
             return summary, passages, len(sections)
         budget //= 2
 

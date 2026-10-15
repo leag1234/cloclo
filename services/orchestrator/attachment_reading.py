@@ -291,7 +291,7 @@ async def read_announced(
     from packages.file_intent import requests_file_delivery
     from packages.language import user_prose
 
-    from packages.attachment_reader import INLINE_BYTES
+    from packages.attachment_reader import DOCUMENT_CONTEXT_BYTES
     from services.orchestrator.content import hierarchical_summary
     from services.orchestrator.documents import DocumentError
 
@@ -311,10 +311,11 @@ async def read_announced(
                     remaining_cost=Decimal("0.30"),
                 )
                 text = document.text
-                hierarchical = len(text.encode()) > INLINE_BYTES
+                share = DOCUMENT_CONTEXT_BYTES // max(1, len(request.documents))
+                hierarchical = len(text.encode()) > share
                 if hierarchical:
                     text, _, _ = hierarchical_summary(
-                        text, user_prose(request.messages[-1].text)
+                        text, user_prose(request.messages[-1].text), budget=share
                     )
                 source.update(
                     text=text,

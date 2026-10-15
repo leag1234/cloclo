@@ -9,6 +9,7 @@ import time
 from packages.evidence import estimated_tokens
 from packages.language import language_instruction
 from services.orchestrator.chat_schema import ChatRequest
+from packages.attachment_reader import DOCUMENT_CONTEXT_BYTES
 from services.orchestrator.content import hierarchical_summary
 from services.orchestrator.documents import DocumentError
 from services.orchestrator.interactions import Interaction
@@ -166,7 +167,11 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
         for source, metadata in zip(model_sources, item.documents, strict=True):
             text = source["text"]
             assert isinstance(text, str)
-            source["text"], _, _ = hierarchical_summary(text, request.messages[-1].text)
+            source["text"], _, _ = hierarchical_summary(
+                text,
+                request.messages[-1].text,
+                budget=DOCUMENT_CONTEXT_BYTES // max(1, len(model_sources)),
+            )
             metadata["hierarchical_synthesis"] = True
         messages[1]["content"] = json.dumps(
             {"hierarchical_attachment_evidence": model_sources}, ensure_ascii=False

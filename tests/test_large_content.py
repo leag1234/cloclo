@@ -200,3 +200,24 @@ class LargeFetchTests(unittest.IsolatedAsyncioTestCase):
             cached = runtime.cache.get(str(output["handle"]))
             assert cached is not None
             self.assertEqual(cached["text"], text)
+
+
+class DocumentBudgetTests(unittest.TestCase):
+    def test_document_budget_gives_every_page_real_content(self) -> None:
+        from packages.attachment_reader import DOCUMENT_CONTEXT_BYTES
+        from services.orchestrator.content import hierarchical_summary
+
+        pages = [
+            f"[Page {n}]\n" + f"Fact {n}: the committee recorded decision {n}. " * 60
+            for n in range(1, 61)
+        ]
+        text = "\n".join(pages)
+        summary, _passages, _sections = hierarchical_summary(
+            text,
+            "Summarise the beginning, the middle and the end.",
+            budget=DOCUMENT_CONTEXT_BYTES,
+        )
+        self.assertLessEqual(len(summary.encode()), DOCUMENT_CONTEXT_BYTES)
+        for n in (1, 30, 60):
+            self.assertIn(f"Fact {n}: the committee recorded decision {n}.", summary)
+        self.assertGreater(len(summary.encode()), 60 * 400)

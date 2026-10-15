@@ -12,6 +12,8 @@ from xml.etree import ElementTree as ET
 MAX_BYTES = 16 * 1024 * 1024
 MAX_TEXT = 4 * 1024 * 1024
 INLINE_BYTES = 7900
+# Attached documents reach the model with about 30k tokens of context (owner decision 2026-10-15).
+DOCUMENT_CONTEXT_BYTES = 120_000
 
 
 def xml(archive: zipfile.ZipFile, name: str) -> ET.Element:
