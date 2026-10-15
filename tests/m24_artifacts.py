@@ -219,7 +219,9 @@ def validate(name: str, case: dict[str, Any], answer: dict[str, Any]) -> None:
     elif name == "J46":
         assert re.search(r"mot de passe|password|chiffr", text, re.I)
         assert re.search(
-            r"ne peux (?:donc )?pas|impossible|cannot|illisible", text, re.I
+            r"ne peux (?:donc )?pas|n'a pas pu être lu|impossible|cannot|could not be read|illisible",
+            text,
+            re.I,
         )
     elif name == "J48":
         assert "web_search" in tools
