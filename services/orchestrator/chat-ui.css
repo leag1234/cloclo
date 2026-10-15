@@ -1,25 +1,43 @@
-/* Existing Open WebUI user-message component; preserve its layout and controls. */
+/* Open WebUI user-message component: a quiet, warm neutral bubble preserves its layout. */
 .user-message {
-  background: #d9f3df !important;
-  color: #143b27 !important;
-  border: 1px solid #95d5a7;
-  border-radius: 1rem;
+  background: #eeeae4 !important;
+  color: #2f2d2a !important;
+  border: 0;
+  border-radius: 18px;
   padding: 0.75rem 1rem;
 }
-/* Preserve the M21 dark user-message palette. */
+/* Dark mode uses the same neutral hierarchy with readable normal text. */
 .dark .user-message {
-  background: #16432c !important;
-  color: #eafff0 !important;
-  border-color: #377b50;
+  background: #302e2b !important;
+  color: #f1efeb !important;
+  border: 0;
 }
-/* Existing nested utility backgrounds must inherit the green bubble. */
+/* Nested Open WebUI utility surfaces inherit the bubble instead of restoring green. */
 .user-message [class*="bg-gray-"],
 .user-message [class*="bg-white"] {
   background-color: transparent !important;
 }
-/* Existing nested text keeps the accessible green-bubble foreground. */
+/* Nested text keeps the accessible neutral-bubble foreground. */
 .user-message [class*="text-gray-"] {
   color: inherit !important;
+}
+
+/* Open WebUI attachment chips become compact file cards without altering controls. */
+:is(.file-item, .attachment, [data-testid="file-item"], [data-testid="attachment"]) {
+  background: #fff !important;
+  border: 1px solid #d8d3cb !important;
+  border-radius: 12px !important;
+  color: #2f2d2a !important;
+}
+/* File type, filename and size remain readable when the chip contains utility text. */
+:is(.file-item, .attachment, [data-testid="file-item"], [data-testid="attachment"]) :is([class*="text-"], span) {
+  color: inherit !important;
+}
+/* The same attachment card surface is used in Open WebUI's dark theme. */
+.dark :is(.file-item, .attachment, [data-testid="file-item"], [data-testid="attachment"]) {
+  background: #272624 !important;
+  border-color: #56524c !important;
+  color: #f1efeb !important;
 }
 
 /* Defaults are centralized: changing --atlas-body-font switches the reading font. */

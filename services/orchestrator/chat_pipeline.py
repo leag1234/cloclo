@@ -557,7 +557,12 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                 ensure_ascii=False,
             )
         )
-    from services.orchestrator.attachment_reading import read_announced, failure_notice
+    from services.orchestrator.attachment_reading import (
+        document_status,
+        failure_notice,
+        read_announced,
+        reading_progress,
+    )
 
     attachment_sources = await read_announced(
         request,
@@ -569,12 +574,20 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         read_document_bytes=bool(request.documents),
     )
     notice = failure_notice(attachment_sources, request.lang)
-    if notice and model.sink:
-        await model.sink({"delta": {"content": notice + "\n\n"}})
+    if attachment_sources and model.sink:
+        pages, failed_pages = reading_progress(attachment_sources)
+        await model.sink(
+            {
+                "phase": "document_read",
+                "description": document_status(pages, failed_pages, request.lang),
+            }
+        )
     if attachment_sources and not any(
         source.get("text") for source in attachment_sources
     ):
         item.reponse, item.state, item.cout_eur = notice, "done", 0.0
+        if notice and model.sink:
+            await model.sink({"delta": {"content": notice}})
         if tools.terminal is not None:
             item.terminal_commands = tools.terminal.commands
             item.terminal_failed_commands = tools.terminal.failed_commands
@@ -602,6 +615,8 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             }
         )
     try:
+        if attachment_sources and model.sink:
+            await model.sink({"phase": "synthesizing_document"})
         result = await run(
             Query(question=iteration or request.messages[-1].text, lang=request.lang),
             model,
@@ -835,10 +850,12 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                 result.text, request.lang, preserve_code=preserve_code
             )
         item.reponse, item.state, item.cout_eur = (
-            (notice + "\n\n" if notice else "") + result.text,
+            result.text + ("\n\n" + notice if notice else ""),
             result.state,
             float(result.cost),
         )
+        if notice and model.sink:
+            await model.sink({"delta": {"content": "\n\n" + notice}})
         if tools.terminal is not None:
             item.terminal_commands = tools.terminal.commands
             item.terminal_failed_commands = tools.terminal.failed_commands

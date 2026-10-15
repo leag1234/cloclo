@@ -52,6 +52,7 @@ def response(
         activity = "reading_document" if payload.has_attachments else "thinking"
         answer_started = False
         activity_urls: list[str] = []
+        activity_description = ""
         last_activity = time.monotonic()
         citation_numbers: dict[str, int] = {}
         base = {
@@ -63,7 +64,7 @@ def response(
 
         def status_event(done: bool = False) -> dict[str, object]:
             elapsed = round(time.monotonic() - started, 1)
-            description = str(
+            description = activity_description or str(
                 activity_labels.get("done" if done else activity, activity)
             )
             if activity_urls:
@@ -157,7 +158,7 @@ def response(
             )
 
         async def sink(event: dict[str, object]) -> None:
-            nonlocal pending, turn, activity, activity_urls
+            nonlocal pending, turn, activity, activity_urls, activity_description
             if "phase" in event:
                 phase = str(event["phase"])
                 raw_urls = event.get("urls")
@@ -176,8 +177,23 @@ def response(
                     "synthesized",
                     "source_truncated",
                     "reading_document",
+                    "document_read",
+                    "synthesizing_document",
                 }:
                     activity = phase
+                    description = event.get("description")
+                    activity_description = (
+                        str(description) if isinstance(description, str) else ""
+                    )
+                    if phase == "synthesizing_document":
+                        synthesis = {
+                            "fr": "Synthèse en cours…",
+                            "en": "Synthesis in progress…",
+                            "de": "Zusammenfassung läuft…",
+                            "es": "Síntesis en curso…",
+                            "it": "Sintesi in corso…",
+                        }
+                        activity_description = synthesis.get(language, synthesis["en"])
                 elif phase == "narration":
                     activity = "thinking"
                 elif phase == "generating":
@@ -187,6 +203,7 @@ def response(
                         else "answering"
                     )
                     activity_urls = []
+                    activity_description = ""
                 if event["phase"] != "generating":
                     await content(pending)
                     pending = ""

@@ -191,12 +191,177 @@ def error_text(source: dict[str, object]) -> str:
 
 
 def failure_notice(sources: list[dict[str, object]], lang: str) -> str:
-    labels = json.loads(Path("packages/attachment-messages.json").read_text())
-    return "\n\n".join(
-        labels.get(lang, labels["en"]).format(
-            filename=source["filename"],
-            reason=error_text(source),
-        )
+    """Return a short reader-facing note; extraction diagnostics remain in logs."""
+    notes = [
+        _failure_note(str(source.get("filename", "")), source.get("errors"), lang)
         for source in sources
         if source.get("errors")
+    ]
+    return "\n\n".join(note for note in notes if note)
+
+
+def _failure_note(filename: str, errors: object, lang: str) -> str:
+    values = [str(value) for value in errors] if isinstance(errors, list) else []
+    pages = _unreadable_pages(values)
+    locale = lang if lang in {"fr", "en", "de", "es", "it"} else "en"
+    if pages:
+        page_list = _page_list(pages, locale)
+        singular = len(pages) == 1
+        templates = {
+            "fr": "{page} {pages} de {filename} {verb} une image scannée : son texte n'a pas pu être lu.",
+            "en": "{page} {pages} of {filename} {verb} a scanned image, so its text could not be read.",
+            "de": "{page} {pages} von {filename} {verb} gescannte Bilder; ihr Text konnte nicht gelesen werden.",
+            "es": "{page} {pages} de {filename} {verb} imágenes escaneadas: no se pudo leer su texto.",
+            "it": "{page} {pages} di {filename} {verb}: non è stato possibile leggerne il testo.",
+        }
+        words = {
+            "fr": ("La page", "Les pages", "est", "sont"),
+            "en": ("Page", "Pages", "is", "are"),
+            "de": ("Die Seite", "Die Seiten", "ist ein", "sind"),
+            "es": ("La página", "Las páginas", "es una", "son"),
+            "it": (
+                "La pagina",
+                "Le pagine",
+                "è un'immagine scansionata",
+                "sono immagini scansionate",
+            ),
+        }[locale]
+        return templates[locale].format(
+            page=words[0] if singular else words[1],
+            pages=page_list,
+            verb=words[2] if singular else words[3],
+            filename=filename,
+        )
+    templates = {
+        "fr": "Le document {filename} n'a pas pu être lu{reason}.",
+        "en": "The document {filename} could not be read{reason}.",
+        "de": "Das Dokument {filename} konnte nicht gelesen werden{reason}.",
+        "es": "No se pudo leer el documento {filename}{reason}.",
+        "it": "Non è stato possibile leggere il documento {filename}{reason}.",
+    }
+    return templates[locale].format(filename=filename, reason=_reason(values, locale))
+
+
+# D5: the reader learns what failed, in plain words, with the short technical code.
+_CAUSES = {
+    "terminal_http_": {
+        "fr": "l'environnement de lecture a refusé la requête",
+        "en": "the reading environment refused the request",
+        "de": "die Leseumgebung hat die Anfrage abgelehnt",
+        "es": "el entorno de lectura rechazó la solicitud",
+        "it": "l'ambiente di lettura ha rifiutato la richiesta",
+    },
+    "terminal_": {
+        "fr": "l'environnement de lecture est indisponible",
+        "en": "the reading environment is unavailable",
+        "de": "die Leseumgebung ist nicht verfügbar",
+        "es": "el entorno de lectura no está disponible",
+        "it": "l'ambiente di lettura non è disponibile",
+    },
+    "Pdf": {
+        "fr": "le fichier PDF est endommagé ou mal formé",
+        "en": "the PDF file is damaged or malformed",
+        "de": "die PDF-Datei ist beschädigt oder fehlerhaft",
+        "es": "el archivo PDF está dañado o mal formado",
+        "it": "il file PDF è danneggiato o malformato",
+    },
+    "BadZipFile": {
+        "fr": "le fichier Office est endommagé",
+        "en": "the Office file is damaged",
+        "de": "die Office-Datei ist beschädigt",
+        "es": "el archivo de Office está dañado",
+        "it": "il file Office è danneggiato",
+    },
+}
+_FALLBACK = {
+    "fr": "erreur de lecture",
+    "en": "reading error",
+    "de": "Lesefehler",
+    "es": "error de lectura",
+    "it": "errore di lettura",
+}
+
+
+def _reason(errors: list[str], lang: str) -> str:
+    text = " ".join(errors)
+    match = re.search(
+        r"terminal_(?:[a-z]+_)*(?:[0-9]{3}|[a-z]+)|\b[A-Z][A-Za-z]*(?:Error|File)\b",
+        text,
     )
+    if not match:
+        return ""
+    code = match.group(0)
+    phrase = next(
+        (labels[lang] for key, labels in _CAUSES.items() if code.startswith(key)),
+        _FALLBACK[lang],
+    )
+    return f" : {phrase} ({code})" if lang == "fr" else f": {phrase} ({code})"
+
+
+def _unreadable_pages(errors: list[str]) -> list[int]:
+    pages = {
+        int(match.group(1))
+        for error in errors
+        for match in [re.search(r"PDF page (\d+)/\d+ has no text layer", error)]
+        if match
+    }
+    return sorted(pages)
+
+
+def _page_list(pages: list[int], lang: str) -> str:
+    groups: list[str] = []
+    start = previous = pages[0]
+    for page in pages[1:]:
+        if page == previous + 1:
+            previous = page
+            continue
+        groups.append(str(start) if start == previous else f"{start}–{previous}")
+        start = previous = page
+    groups.append(str(start) if start == previous else f"{start}–{previous}")
+    if len(groups) == 1:
+        return groups[0]
+    conjunction = {
+        "fr": " et ",
+        "en": " and ",
+        "de": " und ",
+        "es": " y ",
+        "it": " e ",
+    }[lang]
+    return ", ".join(groups[:-1]) + conjunction + groups[-1]
+
+
+def document_status(pages: int, failed_pages: int, lang: str) -> str:
+    """Describe completed document reading without exposing parser diagnostics."""
+    locale = lang if lang in {"fr", "en", "de", "es", "it"} else "en"
+    read = max(0, pages - failed_pages)
+    if failed_pages:
+        templates = {
+            "fr": "Document lu : {read} pages sur {pages}",
+            "en": "Document read: {read} pages out of {pages}",
+            "de": "Dokument gelesen: {read} von {pages} Seiten",
+            "es": "Documento leído: {read} páginas de {pages}",
+            "it": "Documento letto: {read} pagine su {pages}",
+        }
+        return templates[locale].format(read=read, pages=pages)
+    templates = {
+        "fr": "Document lu : {pages} pages",
+        "en": "Document read: {pages} pages",
+        "de": "Dokument gelesen: {pages} Seiten",
+        "es": "Documento leído: {pages} páginas",
+        "it": "Documento letto: {pages} pagine",
+    }
+    return templates[locale].format(pages=pages)
+
+
+def reading_progress(sources: list[dict[str, object]]) -> tuple[int, int]:
+    """Return total and unreadable PDF pages from extraction metadata."""
+    pages = 0
+    failed: set[int] = set()
+    for source in sources:
+        count = source.get("pages")
+        if isinstance(count, int):
+            pages += count
+        errors = source.get("errors")
+        if isinstance(errors, list):
+            failed.update(_unreadable_pages([str(error) for error in errors]))
+    return pages, len(failed)

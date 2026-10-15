@@ -30,10 +30,14 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
     sink = sink_context.get()
     if sink:
         await sink({"phase": "reading_document"})
-    from services.orchestrator.attachment_reading import failure_notice
+    from services.orchestrator.attachment_reading import (
+        document_status,
+        failure_notice,
+        reading_progress,
+    )
 
     failures: list[dict[str, object]] = []
-    sources = []
+    sources: list[dict[str, object]] = []
     for attachment in request.documents:
         try:
             document = await asyncio.to_thread(extract_document, attachment)
@@ -50,13 +54,27 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                 }
             )
             failures.append({"filename": attachment.filename, "errors": [str(exc)]})
-            sources.append({"filename": attachment.filename, "text": ""})
+            sources.append(
+                {
+                    "filename": attachment.filename,
+                    "text": "",
+                    "pages": exc.pages,
+                    "errors": [str(exc)],
+                }
+            )
             continue
         if document.errors:
             failures.append(
                 {"filename": document.filename, "errors": list(document.errors)}
             )
-        sources.append({"filename": document.filename, "text": document.text})
+        sources.append(
+            {
+                "filename": document.filename,
+                "text": document.text,
+                "pages": document.pages,
+                "errors": list(document.errors),
+            }
+        )
         item.documents.append(
             {
                 "filename": document.filename,
@@ -68,10 +86,19 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
             }
         )
     notice = failure_notice(failures, request.lang)
+    pages, failed_pages = reading_progress(sources)
+    if sink:
+        await sink(
+            {
+                "phase": "document_read",
+                "description": document_status(pages, failed_pages, request.lang),
+            }
+        )
     if not any(source["text"] for source in sources):
-        raise GatewayError("document_extraction_failed", 422, notice)
-    if notice and sink:
-        await sink({"delta": {"content": notice + "\n\n"}})
+        item.reponse, item.state = notice, "done"
+        if sink:
+            await sink({"delta": {"content": notice}})
+        return
     model = await GatewayModel.connect(
         os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"),
         local_enabled=False,
@@ -90,12 +117,16 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
     history: list[dict[str, object]] = [
         {"role": m.role, "content": m.text} for m in request.messages
     ]
+    model_sources: list[dict[str, object]] = [
+        {"filename": str(source["filename"]), "text": str(source["text"])}
+        for source in sources
+    ]
     messages: list[dict[str, object]] = [
         {"role": "system", "content": instructions},
         {
             "role": "user",
             "content": json.dumps(
-                {"untrusted_attachments": sources}, ensure_ascii=False
+                {"untrusted_attachments": model_sources}, ensure_ascii=False
             ),
         },
         *history,
@@ -109,15 +140,24 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
         + 256
         + request.max_tokens
     )
-    if measured > 262144 or sum(len(s["text"].encode()) for s in sources) > 524288:
-        for source, metadata in zip(sources, item.documents, strict=True):
-            source["text"], _, _ = hierarchical_summary(
-                source["text"], request.messages[-1].text
-            )
+    source_texts: list[str] = []
+    for source in sources:
+        text = source["text"]
+        assert isinstance(text, str)
+        source_texts.append(text)
+    if measured > 262144 or sum(len(text.encode()) for text in source_texts) > 524288:
+        if sink:
+            await sink({"phase": "synthesizing_document"})
+        for source, metadata in zip(model_sources, item.documents, strict=True):
+            text = source["text"]
+            assert isinstance(text, str)
+            source["text"], _, _ = hierarchical_summary(text, request.messages[-1].text)
             metadata["hierarchical_synthesis"] = True
         messages[1]["content"] = json.dumps(
-            {"hierarchical_attachment_evidence": sources}, ensure_ascii=False
+            {"hierarchical_attachment_evidence": model_sources}, ensure_ascii=False
         )
+    if sink:
+        await sink({"phase": "synthesizing_document"})
     item.cout_eur = 0.30
     try:
         if model.estimate(messages).cost > Decimal("0.30"):
@@ -134,9 +174,11 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                 "The provider returned no complete document answer",
             )
         item.reponse, item.state = (
-            (notice + "\n\n" if notice else "") + result.text,
+            result.text + ("\n\n" + notice if notice else ""),
             "done",
         )
+        if notice and sink:
+            await sink({"delta": {"content": "\n\n" + notice}})
         if any(metadata.get("hierarchical_synthesis") for metadata in item.documents):
             labels = json.loads(Path("prompts/activity-labels.json").read_text())
             synthesis_notice = (
