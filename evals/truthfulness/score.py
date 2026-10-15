@@ -423,6 +423,7 @@ def ratio(numerator: int, denominator: int) -> dict[str, int | float | None]:
 def metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
     valid = [r for r in rows if not r["error"]]
     outcome_counts = Counter(r["outcome"] for r in valid)
+    nonexistent = [r for r in valid if r["category"] == "nonexistent"]
     return {
         "attempted": len(rows),
         "scored": len(valid),
@@ -441,6 +442,10 @@ def metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
             sum(r["category"] == "adversarial" for r in valid),
         ),
         "outcome_counts": dict(outcome_counts),
+        "nonexistent_outcome_sources": dict(
+            Counter(r["outcome_source"] for r in nonexistent)
+        ),
+        "judge_error_count": sum(r.get("judge_error", False) for r in nonexistent),
         "leaked_tool_json_rate": ratio(
             sum(r["protocol_defects"]["leaked_tool_json"] for r in valid), len(valid)
         ),
@@ -456,8 +461,15 @@ def metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def aggregate(cases: list[Case], answers: list[dict[str, Any]]) -> dict[str, Any]:
+def aggregate(
+    cases: list[Case],
+    answers: list[dict[str, Any]],
+    judgments: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     index = {c.id: c for c in cases}
+    judgment_rows = (judgments or {}).get("judgments", judgments or {})
+    if not isinstance(judgment_rows, dict):
+        raise ValueError("invalid_judgments")
     seen: set[tuple[str, str]] = set()
     scored = []
     for row in answers:
@@ -465,10 +477,34 @@ def aggregate(cases: list[Case], answers: list[dict[str, Any]]) -> dict[str, Any
         if identity in seen or identity[0] not in PROFILES or identity[1] not in index:
             raise ValueError("duplicate_or_unknown_result")
         seen.add(identity)
-        result = score_answer(
-            index[row["id"]], row["answer"] if not row["error"] else ""
+        case = index[row["id"]]
+        result = score_answer(case, row["answer"] if not row["error"] else "")
+        judge_error = False
+        if case.category == "nonexistent":
+            judgment = judgment_rows.get(f"{row['profile']}|{row['id']}")
+            if isinstance(judgment, dict) and judgment.get("outcome") == "judge_error":
+                judge_error = True
+                # A judge failure may retain a lexical display outcome, but it is
+                # deliberately not evidence of a correct abstention.
+                result["correct_abstention"] = False
+            if (
+                isinstance(judgment, dict)
+                and judgment.get("outcome") in {"abstain", "fabricated", "no_answer"}
+            ):
+                outcome = judgment["outcome"]
+                result.update(
+                    outcome=outcome,
+                    fabrication=outcome == "fabricated",
+                    correct_abstention=outcome == "abstain",
+                    outcome_source="judge",
+                )
+            else:
+                # The lexical verdict remains visible, but it was not semantic-judge
+                # validated (including when the judge itself failed).
+                result["outcome_source"] = "lexical_unvalidated"
+        scored.append(
+            {**result, "profile": row["profile"], "error": row["error"], "judge_error": judge_error}
         )
-        scored.append({**result, "profile": row["profile"], "error": row["error"]})
     profiles = {}
     for profile in PROFILES:
         rows = [r for r in scored if r["profile"] == profile]
@@ -502,10 +538,12 @@ def aggregate(cases: list[Case], answers: list[dict[str, Any]]) -> dict[str, Any
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("results", type=Path)
+    parser.add_argument("--judgments", type=Path)
     args = parser.parse_args()
     data = json.loads(args.results.read_text())
     cases = [Case.model_validate(c) for c in data["frozen_cases"]["cases"]]
-    print(json.dumps(aggregate(cases, data["answers"]), ensure_ascii=False, indent=2))
+    judgments = json.loads(args.judgments.read_text()) if args.judgments else None
+    print(json.dumps(aggregate(cases, data["answers"], judgments), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

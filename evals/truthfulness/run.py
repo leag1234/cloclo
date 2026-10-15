@@ -378,6 +378,13 @@ def main() -> None:
                     stderr=subprocess.STDOUT,
                 )
         print("Evidence:", output.relative_to(ROOT), flush=True)
+        print(
+            "Judge explicitly, after reviewing the run:",
+            "python -m evals.truthfulness.judge"
+            f" {output.relative_to(ROOT) / 'results.json'}"
+            f" --out {output.relative_to(ROOT) / 'judgments.json'}",
+            flush=True,
+        )
         raise SystemExit(status if cleanup.returncode == 0 else 1)
 
 

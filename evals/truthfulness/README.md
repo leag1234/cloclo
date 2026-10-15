@@ -22,10 +22,14 @@ consultation dates and audio-product failures were excluded rather than assigned
 invented ground truth. Stable/adversarial pairs intentionally share entities;
 their scores are correlated and are not 40 independent statistical samples.
 
-## Deterministic metrics
+## Scoring and calibrated judge
 
-`score.py` uses no model judge. Every metric includes its numerator, denominator
-and value (`null` for an empty denominator). Results are grouped by profile,
+Facts, adversarial outcomes and protocol defects remain deterministic lexical
+metrics. Nonexistent-entity outcomes may be replaced by the explicit calibrated
+judge output. Without a judgment file they remain lexical and are marked
+`lexical_unvalidated`; a successful judgment is marked `judge`. A `judge_error`
+never becomes an abstention and is counted separately. Every metric includes its
+numerator, denominator and value (`null` for an empty denominator). Results are grouped by profile,
 category, language and category/language intersection, with per-case evidence.
 
 | Metric | Definition |
@@ -104,6 +108,32 @@ Concurrent search consumption by another process is outside this reservation;
 avoid simultaneous live batches. Budget/allowance exhaustion means a partial
 measurement, never a relaxed cap. The runner always invokes `infra/gpu-down.sh`
 on exit; a cleanup failure yields nonzero status.
+
+## Judge and rescore
+
+Judging is deliberately an explicit second step: the live runner never submits
+answers to the judge itself. After a completed run, use the command it prints:
+
+```bash
+python -m evals.truthfulness.judge BRAIN/truthfulness/RUN/results.json \
+  --out BRAIN/truthfulness/RUN/judgments.json
+python -m evals.truthfulness.score BRAIN/truthfulness/RUN/results.json \
+  --judgments BRAIN/truthfulness/RUN/judgments.json
+```
+
+The judge is `llama-3.3-70b-instruct` on the Scaleway Generative API (override
+only with `TRUTH_JUDGE_MODEL`). It uses temperature 0 and a 300-token completion
+limit. Its output records the SHA-256 of the calibrated prompt, the selected
+model, usage-derived cost ledger and the pricing source. The model is not yet in
+`services/model-gateway/pricing.yaml`; the judge therefore uses its documented
+fallback rate of EUR 0.60 input and EUR 3.60 output per million tokens for its
+EUR 0.50 hard invocation cap. Provider usage settles that conservative ledger.
+
+Supervisor calibration measured 35/36 agreement on baseline answers, 26/27 on
+calibration cases, and 9/9 on held-out cases. Changing either the judge model or
+the prompt requires a fresh calibration against the supervisor labels before the
+result can be used. `SCW_GENERATIVE_API_KEY` is required by the separate judge
+command and is never written to its output.
 
 Ignored results live under `BRAIN/truthfulness/`: a frozen dataset plus SHA-256,
 prompt hashes, answers, public metadata, durable attempt ledger, per-case scores,
