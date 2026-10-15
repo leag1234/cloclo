@@ -546,3 +546,10 @@ class DocumentStreamErrorTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("not a budget or deadline refusal", output.lower())
         self.assertIn("ValueError", "".join(logs.output))
         self.assertNotIn("private-input", output + "".join(logs.output))
+
+
+def setUpModule() -> None:
+    # BRAIN/ is ignored by git, so a clean checkout (CI) does not have it.
+    import pathlib
+
+    pathlib.Path("BRAIN").mkdir(exist_ok=True)
