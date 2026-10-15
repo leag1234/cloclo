@@ -25,7 +25,10 @@ def capture(name: str, input_path: Path, response_path: Path) -> None:
         )
     )
     exchanges = [row for row in source if identifier in json.dumps(row["request"])]
-    assert exchanges and any(row["request"].get("kind") == "tool" for row in exchanges)
+    assert exchanges
+    # Attached documents are read in process: only cases that produce files must use tools.
+    if name in {"J42", "J43", "J44", "formats_write"}:
+        assert any(row["request"].get("kind") == "tool" for row in exchanges)
     files = response["atlas"]["files"]
     artifacts: list[dict[str, Any]] = []
     if files:
