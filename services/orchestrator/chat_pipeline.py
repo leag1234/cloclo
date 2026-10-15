@@ -559,6 +559,8 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         )
     from services.orchestrator.attachment_reading import read_announced, failure_notice
 
+    from services.orchestrator.terminal_client import safe_filename
+
     attachment_sources = await read_announced(
         request,
         item,
@@ -569,7 +571,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             terminal_error != ""
             or len(paths) != len(request.documents)
             or any(
-                Path(path).name != document.filename
+                Path(path).name != safe_filename(document.filename)
                 for path, document in zip(paths, request.documents, strict=True)
             )
         ),
