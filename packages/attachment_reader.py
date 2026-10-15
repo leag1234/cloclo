@@ -232,3 +232,49 @@ def main(path: str, question: str) -> None:
     # Base64 bounds JSON expansion for arbitrary control characters in source text.
     result["text_base64"] = base64.b64encode(str(result.pop("text")).encode()).decode()
     print(json.dumps(result, ensure_ascii=False))
+
+
+ODF_EXTENSIONS = {".odt", ".ods", ".odp"}
+
+
+def odf_parts(raw: bytes, extension: str) -> list[str]:
+    """Text of an OpenDocument file in document order: paragraphs, table rows, slides."""
+    import xml.etree.ElementTree as ET
+
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        expanded = sum(info.file_size for info in archive.infolist())
+        if expanded > MAX_BYTES * 4:
+            raise ValueError(
+                f"Expanded document bytes: {expanded}; limit {MAX_BYTES * 4}"
+            )
+        root = ET.fromstring(archive.read("content.xml"))
+    ns = {
+        "text": "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
+        "table": "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
+        "draw": "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0",
+    }
+    flat = lambda node: "".join(node.itertext()).strip()  # noqa: E731
+    parts: list[str] = []
+    if extension == ".ods":
+        for sheet in root.iter("{%s}table" % ns["table"]):
+            parts.append(f"[Sheet: {sheet.get('{%s}name' % ns['table'], '')}]")
+            for row in sheet.iter("{%s}table-row" % ns["table"]):
+                cells = [
+                    flat(cell) for cell in row.iter("{%s}table-cell" % ns["table"])
+                ]
+                if any(cells):
+                    parts.append(" | ".join(cells).rstrip(" |"))
+    elif extension == ".odp":
+        for index, page in enumerate(root.iter("{%s}page" % ns["draw"]), 1):
+            parts.append(f"[Slide {index}]")
+            for paragraph in page.iter():
+                if paragraph.tag in (
+                    "{%s}p" % ns["text"],
+                    "{%s}h" % ns["text"],
+                ) and flat(paragraph):
+                    parts.append(flat(paragraph))
+    else:
+        for node in root.iter():
+            if node.tag in ("{%s}p" % ns["text"], "{%s}h" % ns["text"]) and flat(node):
+                parts.append(flat(node))
+    return parts

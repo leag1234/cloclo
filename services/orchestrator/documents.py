@@ -86,9 +86,13 @@ def extract_document(attachment: Attachment) -> Extracted:
             text = "\n\n".join(office_parts(raw, extension))
         elif extension in {".txt", ".md", ".csv"}:
             text = raw.decode("utf-8-sig")
+        elif extension in {".odt", ".ods", ".odp"}:
+            from packages.attachment_reader import odf_parts
+
+            text = "\n".join(odf_parts(raw, extension))
         else:
             raise DocumentError(
-                "Unsupported document type; allowed PDF, DOCX, XLSX, PPTX, TXT, MD, CSV"
+                "Unsupported document type; allowed PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP, TXT, MD, CSV"
             )
     except DocumentError as exc:
         exc.size, exc.pages, exc.characters = len(raw), pages, characters

@@ -241,3 +241,44 @@ class EditIntentTests(unittest.TestCase):
         )
         self.assertFalse(edits_attachment("Résume ce document en cinq points."))
         self.assertFalse(edits_attachment("What does page 12 say?"))
+
+
+class OpenDocumentTests(unittest.TestCase):
+    def test_odt_ods_odp_are_read_in_process(self) -> None:
+        import base64
+        import io
+        import zipfile
+
+        from services.orchestrator.documents import Attachment, extract_document
+
+        def odf(body: str) -> bytes:
+            content = (
+                '<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"'
+                ' xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"'
+                ' xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"'
+                ' xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0">'
+                "<office:body>" + body + "</office:body></office:document-content>"
+            )
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, "w") as archive:
+                archive.writestr("content.xml", content)
+            return buffer.getvalue()
+
+        cases = {
+            "lettre été.odt": ("<text:p>Article aubergine 37</text:p>", "aubergine 37"),
+            "inventaire.ods": (
+                '<table:table table:name="Stock"><table:table-row><table:table-cell><text:p>abricot</text:p>'
+                "</table:table-cell><table:table-cell><text:p>43</text:p></table:table-cell></table:table-row></table:table>",
+                "abricot | 43",
+            ),
+            "diapos.odp": (
+                "<draw:page><text:p>Cerise 59</text:p></draw:page>",
+                "[Slide 1]",
+            ),
+        }
+        for name, (body, expected) in cases.items():
+            raw = odf(body)
+            document = extract_document(
+                Attachment(filename=name, file_data=base64.b64encode(raw).decode())
+            )
+            self.assertIn(expected, document.text, name)
