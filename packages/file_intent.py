@@ -54,7 +54,7 @@ def edits_attachment(text: str) -> bool:
     plain = "".join(c for c in plain if not unicodedata.combining(c))
     return bool(
         re.search(
-            r"\b(corrig\w*|nettoi\w*|nettoy\w*|modifi\w*|revis\w*|reformat\w*|restructur\w*"
+            r"\b(cre[ea]\w*|ajout\w*|insere\w*|add\w*|erganz\w*|anad\w*|aggiung\w*|corrig\w*|nettoi\w*|nettoy\w*|modifi\w*|revis\w*|reformat\w*|restructur\w*"
             r"|mets? a jour|met a jour|complete\w*|traduis\w*|translate\w*|edit\w*|fix\w*|correct\w*"
             r"|update\w*|clean\w*|rewrite\w*|korrigier\w*|bearbeit\w*|uberarbeit\w*|aktualisier\w*"
             r"|corrig\w*|edita\w*|actualiz\w*|modific\w*|aggiorn\w*)\b",

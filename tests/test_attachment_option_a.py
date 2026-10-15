@@ -236,5 +236,8 @@ class EditIntentTests(unittest.TestCase):
         )
         self.assertTrue(edits_attachment("Nettoie la structure de ce document."))
         self.assertTrue(edits_attachment("Please fix the typos in this file."))
+        self.assertTrue(
+            edits_attachment("Dans cette feuille de calcul, crée un nouvel onglet.")
+        )
         self.assertFalse(edits_attachment("Résume ce document en cinq points."))
         self.assertFalse(edits_attachment("What does page 12 say?"))
