@@ -224,7 +224,12 @@ def run() -> None:
 
     # Open Terminal owns only user files; its loopback publisher is not a host mount.
     ports = atlas_ports()
-    binding = "127.0.0.1:" + str(ports.port("terminal"))
+    # Loopback only, never a public interface; base 0 keeps the historical binding.
+    binding = (
+        "127.0.0.1:8000"
+        if ports.base == 0
+        else "127.0.0.1:" + str(ports.port("terminal"))
+    )
     with terminal("atlas-open-terminal", binding), stack():
         os.environ["ATLAS_TERMINAL_ENABLED"] = "1"
         try:
