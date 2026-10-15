@@ -1,6 +1,5 @@
 """Attachment-only generation, sharing the gateway's request and recovery ledger."""
 
-import asyncio
 from decimal import Decimal
 import json
 import os
@@ -11,7 +10,7 @@ from packages.evidence import estimated_tokens
 from packages.language import language_instruction
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.content import hierarchical_summary
-from services.orchestrator.documents import DocumentError, extract_document
+from services.orchestrator.documents import DocumentError
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.model import GatewayError, GatewayModel
 from services.orchestrator.stream_client import sink_context
@@ -40,7 +39,16 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
     sources: list[dict[str, object]] = []
     for attachment in request.documents:
         try:
-            document = await asyncio.to_thread(extract_document, attachment)
+            from services.orchestrator.attachment_reading import (
+                extract_attachment_with_ocr,
+            )
+
+            document, ocr_cost, ocr_pages = await extract_attachment_with_ocr(
+                attachment,
+                deadline=started + request.timeout_seconds,
+                remaining_cost=Decimal("0.30") - Decimal(str(item.cout_eur)),
+            )
+            item.cout_eur += float(ocr_cost)
         except DocumentError as exc:
             item.documents.append(
                 {
@@ -73,6 +81,8 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                 "text": document.text,
                 "pages": document.pages,
                 "errors": list(document.errors),
+                "ocr_pages": ocr_pages,
+                "ocr_cost_eur": float(ocr_cost),
             }
         )
         item.documents.append(
@@ -83,15 +93,19 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                 "extracted_characters": len(document.text),
                 "hierarchical_synthesis": False,
                 "error": "; ".join(document.errors),
+                "ocr_pages": len(ocr_pages),
+                "ocr_cost_microeur": int(ocr_cost * 1000000),
             }
         )
     notice = failure_notice(failures, request.lang)
-    pages, failed_pages = reading_progress(sources)
+    pages, failed_pages, ocr_count = reading_progress(sources)
     if sink:
         await sink(
             {
                 "phase": "document_read",
-                "description": document_status(pages, failed_pages, request.lang),
+                "description": document_status(
+                    pages, failed_pages, request.lang, ocr_count
+                ),
             }
         )
     if not any(source["text"] for source in sources):
@@ -104,6 +118,7 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
         local_enabled=False,
     )
     model.configure_quality(request.model, request.max_tokens, has_attachments=True)
+    model.spent = Decimal(str(item.cout_eur))
     model.tools = []
     model.observing = True
     model.sink = sink
@@ -160,7 +175,7 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
         await sink({"phase": "synthesizing_document"})
     item.cout_eur = 0.30
     try:
-        if model.estimate(messages).cost > Decimal("0.30"):
+        if model.spent + model.estimate(messages).cost > Decimal("0.30"):
             raise GatewayError(
                 "cost_budget", 413, "Document request reservation exceeds 0.30 EUR"
             )
@@ -173,18 +188,21 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                 502,
                 "The provider returned no complete document answer",
             )
+        labels = json.loads(Path("prompts/activity-labels.json").read_text())
+        synthesis_notice = (
+            "\n\n" + labels.get(request.lang, labels["en"])["synthesized"]
+            if any(
+                metadata.get("hierarchical_synthesis") for metadata in item.documents
+            )
+            else ""
+        )
         item.reponse, item.state = (
-            result.text + ("\n\n" + notice if notice else ""),
+            result.text + synthesis_notice + ("\n\n" + notice if notice else ""),
             "done",
         )
         if notice and sink:
             await sink({"delta": {"content": "\n\n" + notice}})
-        if any(metadata.get("hierarchical_synthesis") for metadata in item.documents):
-            labels = json.loads(Path("prompts/activity-labels.json").read_text())
-            synthesis_notice = (
-                "\n\n" + labels.get(request.lang, labels["en"])["synthesized"]
-            )
-            item.reponse += synthesis_notice
+        if synthesis_notice:
             if sink:
                 await sink({"delta": {"content": synthesis_notice}})
         item.cout_eur = float(model.spent)

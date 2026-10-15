@@ -575,11 +575,13 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
     )
     notice = failure_notice(attachment_sources, request.lang)
     if attachment_sources and model.sink:
-        pages, failed_pages = reading_progress(attachment_sources)
+        pages, failed_pages, ocr_pages = reading_progress(attachment_sources)
         await model.sink(
             {
                 "phase": "document_read",
-                "description": document_status(pages, failed_pages, request.lang),
+                "description": document_status(
+                    pages, failed_pages, request.lang, ocr_pages
+                ),
             }
         )
     if attachment_sources and not any(

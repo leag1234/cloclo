@@ -116,7 +116,9 @@ def failure_reason(exc: Exception) -> str:
     )
 
 
-def extract_bytes(raw: bytes, extension: str) -> tuple[str, int, list[str]]:
+def extract_bytes(
+    raw: bytes, extension: str, ocr_pages: dict[int, str] | None = None
+) -> tuple[str, int, list[str]]:
     errors: list[str] = []
     pages = 0
     if not 0 < len(raw) <= MAX_BYTES:
@@ -142,6 +144,8 @@ def extract_bytes(raw: bytes, extension: str) -> tuple[str, int, list[str]]:
             except Exception as exc:
                 errors.append(f"Page {index}: " + failure_reason(exc))
                 continue
+            if not text.strip() and ocr_pages and ocr_pages.get(index, "").strip():
+                text = ocr_pages[index]
             if not text.strip():
                 errors.append(
                     f"PDF page {index}/{pages} has no text layer; OCR is required (not available)"

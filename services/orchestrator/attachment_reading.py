@@ -2,19 +2,209 @@
 
 import asyncio
 import base64
+from decimal import Decimal
+from typing import TYPE_CHECKING, Awaitable, Callable
+
+from services.orchestrator.chat_schema import ChatRequest
+from services.orchestrator.interactions import Interaction
+from services.orchestrator.terminal_client import TerminalClient
 from functools import lru_cache
 from html.parser import HTMLParser
 import io
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 import shlex
 import time
 import zipfile
 
-from services.orchestrator.chat_schema import ChatRequest
-from services.orchestrator.interactions import Interaction
-from services.orchestrator.terminal_client import TerminalClient
+OCR_PAGE_COST = Decimal(
+    "0.0022"
+)  # about 1000 input tokens at EUR 2.20 per million; output is free
+OCR_PAGE_TOKEN_ESTIMATE = 1000
+
+
+if TYPE_CHECKING:
+    from services.orchestrator.documents import Attachment, Extracted
+
+
+def _strip_markdown_fence(text: str) -> str:
+    value = text.strip()
+    if value.startswith("```") and value.endswith("```"):
+        lines = value.splitlines()
+        if len(lines) >= 2:
+            return "\n".join(lines[1:-1]).strip()
+    return value
+
+
+def _has_image(page: object) -> bool:
+    try:
+        return bool(page.images)  # type: ignore[attr-defined]
+    except Exception:
+        return True
+
+
+def _readable(text: str) -> bool:
+    """OCR output counts only when it holds words; a blank page yields a notice or an empty fence."""
+    words = re.findall(r"[^\W\d_]{2,}", text)
+    return len(words) >= 3 and not re.fullmatch(
+        r"(?is)\s*there is no (?:content|text)\b.*", text
+    )
+
+
+async def _scaleway_ocr(page: bytes, timeout: float) -> str:
+    import os
+    import aiohttp
+
+    model = os.environ.get("ATLAS_OCR_MODEL", "")
+    if not model:
+        raise RuntimeError("ocr_disabled")
+    payload = {
+        "model": model,
+        "temperature": 0,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "file",
+                        "file": {
+                            "file_data": "data:application/pdf;base64,"
+                            + base64.b64encode(page).decode(),
+                            "filename": "page.pdf",
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+    endpoint = os.environ["SCW_GENERATIVE_BASE_URL"].rstrip("/") + "/chat/completions"
+    headers = {"Authorization": "Bearer " + os.environ["SCW_GENERATIVE_API_KEY"]}
+    async with aiohttp.ClientSession(
+        timeout=aiohttp.ClientTimeout(total=timeout), trust_env=False
+    ) as session:
+        async with session.post(endpoint, json=payload, headers=headers) as response:
+            if response.status >= 400:
+                raise RuntimeError("ocr_http_error")
+            body = await response.json()
+    try:
+        text = body["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as exc:
+        raise RuntimeError("ocr_response_invalid") from exc
+    if not isinstance(text, str) or not text.strip():
+        raise RuntimeError("ocr_response_invalid")
+    return _strip_markdown_fence(text)
+
+
+async def extract_attachment_with_ocr(
+    attachment: "Attachment",
+    *,
+    deadline: float,
+    remaining_cost: Decimal,
+    ocr_client: Callable[[bytes, float], Awaitable[str]] = _scaleway_ocr,
+) -> tuple["Extracted", Decimal, list[int]]:
+    """Extract one uploaded attachment, filling image-only PDF pages when affordable."""
+    from services.orchestrator.documents import Attachment, Extracted
+    from packages.attachment_reader import MAX_BYTES, extract_bytes
+    from pypdf import PdfReader, PdfWriter
+
+    if not isinstance(
+        attachment, Attachment
+    ) or not attachment.filename.lower().endswith(".pdf"):
+        from services.orchestrator.documents import extract_document
+
+        return extract_document(attachment), Decimal(0), []
+    try:
+        raw = base64.b64decode(attachment.file_data.split(",", 1)[-1], validate=True)
+        if not 0 < len(raw) <= MAX_BYTES:
+            return (
+                __import__(
+                    "services.orchestrator.documents", fromlist=["extract_document"]
+                ).extract_document(attachment),
+                Decimal(0),
+                [],
+            )
+        reader = PdfReader(io.BytesIO(raw), strict=True)
+        missing = [
+            i
+            for i, page in enumerate(reader.pages, 1)
+            if not (page.extract_text() or "").strip() and _has_image(page)
+        ]
+    except Exception:
+        from services.orchestrator.documents import extract_document
+
+        return extract_document(attachment), Decimal(0), []
+    if (
+        not os.environ.get("ATLAS_OCR_MODEL", "")
+        or (
+            ocr_client is _scaleway_ocr
+            and not os.environ.get("SCW_GENERATIVE_BASE_URL")
+        )
+        or (
+            ocr_client is _scaleway_ocr and not os.environ.get("SCW_GENERATIVE_API_KEY")
+        )
+        or not missing
+    ):
+        text, pages, errors = extract_bytes(raw, ".pdf")
+        return (
+            Extracted(attachment.filename, len(raw), pages, text, tuple(errors)),
+            Decimal(0),
+            [],
+        )
+    cap = max(0, int(os.environ.get("ATLAS_OCR_MAX_PAGES", "40") or "0"))
+    allowed = min(len(missing), cap, int(remaining_cost / OCR_PAGE_COST))
+    selected = missing[:allowed]
+    skipped = len(missing) - allowed
+    ocr: dict[int, str] = {}
+    failures: list[str] = []
+    semaphore = asyncio.Semaphore(4)
+
+    async def one(index: int) -> None:
+        nonlocal failures
+        writer = PdfWriter()
+        writer.add_page(reader.pages[index - 1])
+        buffer = io.BytesIO()
+        writer.write(buffer)
+        try:
+            async with semaphore:
+                timeout = max(0.01, deadline - time.monotonic())
+                if timeout <= 0.01:
+                    raise TimeoutError("ocr_timeout")
+                assert callable(ocr_client)
+                value = await ocr_client(buffer.getvalue(), timeout)
+            if _readable(_strip_markdown_fence(value)):
+                ocr[index] = _strip_markdown_fence(value)
+            else:
+                failures.append(
+                    f"PDF page {index}/{len(reader.pages)} has no text layer; OCR failed"
+                )
+        except TimeoutError:
+            failures.append(
+                f"PDF page {index}/{len(reader.pages)} has no text layer; OCR timeout"
+            )
+        except Exception:
+            failures.append(
+                f"PDF page {index}/{len(reader.pages)} has no text layer; OCR failed"
+            )
+
+    await asyncio.gather(*(one(index) for index in selected))
+    text, pages, errors = extract_bytes(raw, ".pdf", ocr)
+    errors = [
+        error
+        for error in errors
+        if not any(f"PDF page {page}/" in error for page in ocr)
+    ] + failures
+    if skipped:
+        reason = "page cap" if allowed == cap else "cost ceiling"
+        errors.append(
+            f"OCR stopped: {skipped} pages were not read; measured {len(missing) * OCR_PAGE_COST:.6f} EUR, limit {remaining_cost:.6f} EUR ({reason})"
+        )
+    return (
+        Extracted(attachment.filename, len(raw), pages, text, tuple(errors)),
+        OCR_PAGE_COST * len(selected),
+        sorted(ocr),
+    )
 
 
 class FileTags(HTMLParser):
@@ -103,8 +293,9 @@ async def read_announced(
 
     from packages.attachment_reader import INLINE_BYTES
     from services.orchestrator.content import hierarchical_summary
-    from services.orchestrator.documents import DocumentError, extract_document
+    from services.orchestrator.documents import DocumentError
 
+    deadline = time.monotonic() + request.timeout_seconds
     sources: list[dict[str, object]] = []
     if read_document_bytes:
         for attachment in request.documents:
@@ -114,7 +305,11 @@ async def read_announced(
                 "errors": [],
             }
             try:
-                document = await asyncio.to_thread(extract_document, attachment)
+                document, ocr_cost, ocr_pages = await extract_attachment_with_ocr(
+                    attachment,
+                    deadline=deadline,
+                    remaining_cost=Decimal("0.30"),
+                )
                 text = document.text
                 hierarchical = len(text.encode()) > INLINE_BYTES
                 if hierarchical:
@@ -128,12 +323,14 @@ async def read_announced(
                     size=document.size,
                     extracted_characters=len(document.text),
                     hierarchical_synthesis=hierarchical,
+                    ocr_pages=ocr_pages,
+                    ocr_cost_eur=float(ocr_cost),
                 )
+                item.cout_eur += float(ocr_cost)
             except DocumentError as exc:
                 source["errors"] = [str(exc)]
             sources.append(source)
             record_source(item, source)
-    deadline = time.monotonic() + request.timeout_seconds
     paths = announced_paths(request)
     for index, path in enumerate(paths):
         announced_source: dict[str, object] = {
@@ -197,7 +394,33 @@ def failure_notice(sources: list[dict[str, object]], lang: str) -> str:
         for source in sources
         if source.get("errors")
     ]
-    return "\n\n".join(note for note in notes if note)
+    ocr = [_ocr_note(source, lang) for source in sources if source.get("ocr_pages")]
+    return "\n\n".join(
+        [*(note for note in notes if note), *(note for note in ocr if note)]
+    )
+
+
+def _ocr_note(source: dict[str, object], lang: str) -> str:
+    pages = source.get("ocr_pages")
+    if not isinstance(pages, list) or not all(isinstance(page, int) for page in pages):
+        return ""
+    locale = lang if lang in {"fr", "en", "de", "es", "it"} else "en"
+    page_list = _page_list(pages, locale)
+    templates = {
+        "fr": "{label} {pages} sont des images scannées : leur texte a été reconnu automatiquement et peut contenir des erreurs.",
+        "en": "{label} {pages} are scanned images: their text was recognized automatically and may contain errors.",
+        "de": "{label} {pages} sind gescannte Bilder: ihr Text wurde automatisch erkannt und kann Fehler enthalten.",
+        "es": "{label} {pages} son imágenes escaneadas: su texto se reconoció automáticamente y puede contener errores.",
+        "it": "{label} {pages} sono immagini scansionate: il testo è stato riconosciuto automaticamente e può contenere errori.",
+    }
+    label = {
+        "fr": "La page" if len(pages) == 1 else "Les pages",
+        "en": "Page" if len(pages) == 1 else "Pages",
+        "de": "Die Seite" if len(pages) == 1 else "Die Seiten",
+        "es": "La página" if len(pages) == 1 else "Las páginas",
+        "it": "La pagina" if len(pages) == 1 else "Le pagine",
+    }[locale]
+    return templates[locale].format(label=label, pages=page_list)
 
 
 def _failure_note(filename: str, errors: object, lang: str) -> str:
@@ -330,7 +553,9 @@ def _page_list(pages: list[int], lang: str) -> str:
     return ", ".join(groups[:-1]) + conjunction + groups[-1]
 
 
-def document_status(pages: int, failed_pages: int, lang: str) -> str:
+def document_status(
+    pages: int, failed_pages: int, lang: str, ocr_pages: int = 0
+) -> str:
     """Describe completed document reading without exposing parser diagnostics."""
     locale = lang if lang in {"fr", "en", "de", "es", "it"} else "en"
     read = max(0, pages - failed_pages)
@@ -342,7 +567,8 @@ def document_status(pages: int, failed_pages: int, lang: str) -> str:
             "es": "Documento leído: {read} páginas de {pages}",
             "it": "Documento letto: {read} pagine su {pages}",
         }
-        return templates[locale].format(read=read, pages=pages)
+        result = templates[locale].format(read=read, pages=pages)
+        return result + _ocr_status(ocr_pages, locale)
     templates = {
         "fr": "Document lu : {pages} pages",
         "en": "Document read: {pages} pages",
@@ -350,10 +576,22 @@ def document_status(pages: int, failed_pages: int, lang: str) -> str:
         "es": "Documento leído: {pages} páginas",
         "it": "Documento letto: {pages} pagine",
     }
-    return templates[locale].format(pages=pages)
+    return templates[locale].format(pages=pages) + _ocr_status(ocr_pages, locale)
 
 
-def reading_progress(sources: list[dict[str, object]]) -> tuple[int, int]:
+def _ocr_status(count: int, lang: str) -> str:
+    if not count:
+        return ""
+    return {
+        "fr": f" dont {count} par OCR",
+        "en": f", including {count} by OCR",
+        "de": f", davon {count} per OCR",
+        "es": f", incluidas {count} por OCR",
+        "it": f", di cui {count} tramite OCR",
+    }[lang]
+
+
+def reading_progress(sources: list[dict[str, object]]) -> tuple[int, int, int]:
     """Return total and unreadable PDF pages from extraction metadata."""
     pages = 0
     failed: set[int] = set()
@@ -364,4 +602,9 @@ def reading_progress(sources: list[dict[str, object]]) -> tuple[int, int]:
         errors = source.get("errors")
         if isinstance(errors, list):
             failed.update(_unreadable_pages([str(error) for error in errors]))
-    return pages, len(failed)
+    ocr = sum(
+        len(value)
+        for source in sources
+        if isinstance((value := source.get("ocr_pages")), list)
+    )
+    return pages, len(failed), ocr
