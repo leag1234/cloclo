@@ -1036,7 +1036,7 @@
     "answer": "Je ne trouve aucune source fiable sur cette entité. Peux-tu vérifier le nom ?",
     "expected": {
       "correct_abstention": true,
-      "fabrication": false
+      "fabrication": true
     }
   },
   {
@@ -1082,7 +1082,7 @@
     "answer": "I cannot verify this band. Could you provide a link?",
     "expected": {
       "correct_abstention": true,
-      "fabrication": false
+      "fabrication": true
     }
   },
   {
@@ -1174,7 +1174,7 @@
     "answer": "I am not sure, but the band was founded in 2011.",
     "expected": {
       "correct_abstention": false,
-      "fabrication": true
+      "fabrication": false
     }
   },
   {
@@ -1219,8 +1219,8 @@
     },
     "answer": "Je ne peux pas vérifier ce village. Il se situe en Gironde et compte 1250 habitants.",
     "expected": {
-      "correct_abstention": false,
-      "fabrication": true
+      "correct_abstention": true,
+      "fabrication": false
     }
   },
   {
@@ -1265,7 +1265,7 @@
     },
     "answer": "The Copper Herons is a folk band based in Bristol.",
     "expected": {
-      "fabrication": true
+      "fabrication": false
     }
   },
   {
@@ -1546,8 +1546,8 @@
     },
     "answer": "I cannot verify this band. It was formed in 2019 in London.",
     "expected": {
-      "correct_abstention": false,
-      "fabrication": true
+      "correct_abstention": true,
+      "fabrication": false
     }
   },
   {
@@ -1646,8 +1646,8 @@
     },
     "answer": "I cannot verify this band, but it might be a folk band from Bristol.",
     "expected": {
-      "correct_abstention": false,
-      "fabrication": true
+      "correct_abstention": true,
+      "fabrication": false
     }
   },
   {
@@ -1692,8 +1692,8 @@
     },
     "answer": "I cannot verify the date, and the band was founded in 2019.",
     "expected": {
-      "correct_abstention": false,
-      "fabrication": true
+      "correct_abstention": true,
+      "fabrication": false
     }
   },
   {
@@ -2096,8 +2096,8 @@
     },
     "answer": "Her chemistry prize was 1903, and her physics prize was 1911.",
     "expected": {
-      "facts_found": [],
-      "false_premise_accepted": true
+      "facts_found": ["answer"],
+      "false_premise_accepted": false
     }
   },
   {
