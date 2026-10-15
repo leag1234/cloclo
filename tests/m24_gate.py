@@ -83,6 +83,18 @@ def main() -> None:
                         for row in case["exchanges"]
                         if row["request"].get("kind") == "tool"
                     ]
+                    # A complete call wraps its own stream attempt: the refresh records both,
+                    # in that order, and replay serves the complete row, so that stream is
+                    # never requested again.
+                    kinds = [
+                        row["request"].get("kind", "stream")
+                        for row in case["exchanges"]
+                    ]
+                    nested_streams = sum(
+                        1
+                        for first, second in zip(kinds, kinds[1:])
+                        if first == "stream" and second == "complete"
+                    )
                     stream_position = tool_position = complete_position = 0
                     uploads: list[dict[str, Any]] = []
                     for message in case["request"]["messages"]:
@@ -217,7 +229,7 @@ def main() -> None:
                         )
                         answer = response.json()
                     assert (
-                        stream_position == len(streams)
+                        stream_position in {len(streams), len(streams) - nested_streams}
                         and tool_position == len(tools)
                         and complete_position == len(completes)
                     )

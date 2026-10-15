@@ -6,6 +6,16 @@
   border-radius: 18px;
   padding: 0.75rem 1rem;
 }
+/* Option A: a compact bubble aligned to the right instead of a full-width band. */
+.user-message {
+  width: auto !important;
+  max-width: min(75%, 40rem) !important;
+  align-self: flex-end !important;
+}
+.user-message > div {
+  flex: 0 1 auto !important;
+  width: auto !important;
+}
 /* Dark mode uses the same neutral hierarchy with readable normal text. */
 .dark .user-message {
   background: #302e2b !important;
