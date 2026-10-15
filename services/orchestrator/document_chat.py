@@ -193,16 +193,17 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                 502,
                 "The provider returned no complete document answer",
             )
-        labels = json.loads(Path("prompts/activity-labels.json").read_text())
+        from services.orchestrator.attachment_reading import reduced_document_note
+
         synthesis_notice = (
-            "\n\n" + labels.get(request.lang, labels["en"])["synthesized"]
+            "\n\n" + reduced_document_note(request.lang)
             if any(
                 metadata.get("hierarchical_synthesis") for metadata in item.documents
             )
             else ""
         )
         item.reponse, item.state = (
-            result.text + synthesis_notice + ("\n\n" + notice if notice else ""),
+            result.text + ("\n\n" + notice if notice else "") + synthesis_notice,
             "done",
         )
         if notice and sink:

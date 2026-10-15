@@ -407,13 +407,24 @@ def _ocr_note(source: dict[str, object], lang: str) -> str:
         return ""
     locale = lang if lang in {"fr", "en", "de", "es", "it"} else "en"
     page_list = _page_list(pages, locale)
-    templates = {
-        "fr": "{label} {pages} sont des images scannées : leur texte a été reconnu automatiquement et peut contenir des erreurs.",
-        "en": "{label} {pages} are scanned images: their text was recognized automatically and may contain errors.",
-        "de": "{label} {pages} sind gescannte Bilder: ihr Text wurde automatisch erkannt und kann Fehler enthalten.",
-        "es": "{label} {pages} son imágenes escaneadas: su texto se reconoció automáticamente y puede contener errores.",
-        "it": "{label} {pages} sono immagini scansionate: il testo è stato riconosciuto automaticamente e può contenere errori.",
-    }
+    single = len(pages) == 1
+    templates = (
+        {
+            "fr": "{label} {pages} est une image scannée : son texte a été reconnu automatiquement et peut contenir des erreurs.",
+            "en": "{label} {pages} is a scanned image: its text was recognized automatically and may contain errors.",
+            "de": "{label} {pages} ist ein gescanntes Bild: ihr Text wurde automatisch erkannt und kann Fehler enthalten.",
+            "es": "{label} {pages} es una imagen escaneada: su texto se reconoció automáticamente y puede contener errores.",
+            "it": "{label} {pages} è un'immagine scansionata: il testo è stato riconosciuto automaticamente e può contenere errori.",
+        }
+        if single
+        else {
+            "fr": "{label} {pages} sont des images scannées : leur texte a été reconnu automatiquement et peut contenir des erreurs.",
+            "en": "{label} {pages} are scanned images: their text was recognized automatically and may contain errors.",
+            "de": "{label} {pages} sind gescannte Bilder: ihr Text wurde automatisch erkannt und kann Fehler enthalten.",
+            "es": "{label} {pages} son imágenes escaneadas: su texto se reconoció automáticamente y puede contener errores.",
+            "it": "{label} {pages} sono immagini scansionate: il testo è stato riconosciuto automaticamente e può contenere errori.",
+        }
+    )
     label = {
         "fr": "La page" if len(pages) == 1 else "Les pages",
         "en": "Page" if len(pages) == 1 else "Pages",
@@ -609,3 +620,15 @@ def reading_progress(sources: list[dict[str, object]]) -> tuple[int, int, int]:
         if isinstance((value := source.get("ocr_pages")), list)
     )
     return pages, len(failed), ocr
+
+
+def reduced_document_note(lang: str) -> str:
+    """Plain note for a document too long to send whole; replaces the raw activity label."""
+    locale = lang if lang in {"fr", "en", "de", "es", "it"} else "en"
+    return {
+        "fr": "Ce document est long : la réponse s'appuie sur des extraits couvrant toutes ses pages.",
+        "en": "This document is long: the answer relies on excerpts covering all its pages.",
+        "de": "Dieses Dokument ist lang: die Antwort stützt sich auf Auszüge aus allen Seiten.",
+        "es": "Este documento es largo: la respuesta se basa en extractos de todas sus páginas.",
+        "it": "Questo documento è lungo: la risposta si basa su estratti di tutte le pagine.",
+    }[locale]

@@ -411,8 +411,9 @@ async def process(request: ChatRequest, item: Interaction) -> None:
     if item.state == "done" and any(
         d.get("hierarchical_synthesis") for d in item.documents
     ):
-        labels = json.loads(Path("prompts/activity-labels.json").read_text())
-        notice = labels.get(request.lang, labels["en"])["synthesized"]
+        from services.orchestrator.attachment_reading import reduced_document_note
+
+        notice = reduced_document_note(request.lang)
         if not item.reponse.endswith(notice):
             item.reponse += "\n\n" + notice
             if sink := sink_context.get():
