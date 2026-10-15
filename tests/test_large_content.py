@@ -50,6 +50,44 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(text[passage.start : passage.end], passage.text)
         self.assertEqual([p.start for p in result], sorted(p.start for p in result))
 
+    def test_hierarchical_document_keeps_ordered_page_coverage_and_relevance(
+        self,
+    ) -> None:
+        pages = []
+        for page in range(1, 61):
+            fact = "routine status"
+            if page == 30:
+                fact = "MIDDLE_FACT budget is 730"
+            if page == 60:
+                fact = "FINAL_FACT report is postponed"
+            pages.append(f"[Page {page}]\n{fact}.\n" + "background " * 20)
+        text = "\n".join(pages)
+
+        summary, passages, sections = hierarchical_summary(
+            text, "summarise the beginning, middle and end"
+        )
+
+        self.assertEqual(sections, 60)
+        self.assertIn("MIDDLE_FACT budget is 730", summary)
+        self.assertIn("FINAL_FACT report is postponed", summary)
+        self.assertIn("[Page 1]", summary)
+        self.assertIn("[Page 30]", summary)
+        self.assertIn("[Page 60]", summary)
+        self.assertLessEqual(len(summary.encode()), 7900)
+        self.assertEqual([p.start for p in passages], sorted(p.start for p in passages))
+        for passage in passages:
+            self.assertEqual(text[passage.start : passage.end], passage.text)
+
+        targeted, targeted_passages, _ = hierarchical_summary(
+            text, "What does page 12 say about routine status?"
+        )
+        self.assertIn("[Page 12]", targeted)
+        self.assertIn("routine status", targeted)
+        self.assertLessEqual(len(targeted.encode()), 7900)
+        self.assertTrue(
+            any("[Page 12]" in passage.text for passage in targeted_passages)
+        )
+
     def test_unicode_and_small_budgets(self) -> None:
         text = "预算🙂 été " * 300 + "Garantie spéciale 73 mois."
         for budget in (4, 31, 700, 2000):
