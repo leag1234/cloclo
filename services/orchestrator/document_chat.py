@@ -171,6 +171,7 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                 text,
                 request.messages[-1].text,
                 budget=DOCUMENT_CONTEXT_BYTES // max(1, len(model_sources)),
+                coverage=True,
             )
             metadata["hierarchical_synthesis"] = True
         messages[1]["content"] = json.dumps(

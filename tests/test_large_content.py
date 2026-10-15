@@ -64,7 +64,7 @@ class SelectionTests(unittest.TestCase):
         text = "\n".join(pages)
 
         summary, passages, sections = hierarchical_summary(
-            text, "summarise the beginning, middle and end"
+            text, "summarise the beginning, middle and end", coverage=True
         )
 
         self.assertEqual(sections, 60)
@@ -79,7 +79,7 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(text[passage.start : passage.end], passage.text)
 
         targeted, targeted_passages, _ = hierarchical_summary(
-            text, "What does page 12 say about routine status?"
+            text, "What does page 12 say about routine status?", coverage=True
         )
         self.assertIn("[Page 12]", targeted)
         self.assertIn("routine status", targeted)
@@ -216,6 +216,7 @@ class DocumentBudgetTests(unittest.TestCase):
             text,
             "Summarise the beginning, the middle and the end.",
             budget=DOCUMENT_CONTEXT_BYTES,
+            coverage=True,
         )
         self.assertLessEqual(len(summary.encode()), DOCUMENT_CONTEXT_BYTES)
         for n in (1, 30, 60):

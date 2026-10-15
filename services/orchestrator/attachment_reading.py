@@ -315,7 +315,10 @@ async def read_announced(
                 hierarchical = len(text.encode()) > share
                 if hierarchical:
                     text, _, _ = hierarchical_summary(
-                        text, user_prose(request.messages[-1].text), budget=share
+                        text,
+                        user_prose(request.messages[-1].text),
+                        budget=share,
+                        coverage=True,
                     )
                 source.update(
                     text=text,

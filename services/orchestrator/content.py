@@ -100,7 +100,40 @@ def select_passages(
 
 
 def hierarchical_summary(
-    text: str, query: str, budget: int = 7900
+    text: str, query: str, budget: int = 7900, *, coverage: bool = False
+) -> tuple[str, list[SelectedPassage], int]:
+    """Reduce a long text: attached documents keep every page in order (coverage);
+    web pages and tool output keep the original relevance-first selection."""
+    if coverage:
+        return _document_summary(text, query, budget)
+    return _web_summary(text, query)
+
+
+def _web_summary(text: str, query: str) -> tuple[str, list[SelectedPassage], int]:
+    """Extract section evidence, then synthesize an extractive overview and key passage."""
+    sections = [text[i : i + 8192] for i in range(0, len(text), 8192)]
+    representatives = [
+        p.text for section in sections for p in select_passages(section, query, 160)
+    ]
+    budget = 7900
+    identifiers = set(re.findall(r"\b[A-Z][A-Z0-9_]{2,}\b", query))
+    # Comparisons need evidence for both subjects. A single 5000-byte window
+    # otherwise consumes nearly all the passage allowance before the second entry.
+    window = 2400 if len(identifiers) > 1 else 5000
+    while True:
+        overview = "\n".join(
+            p.text
+            for p in select_passages("\n".join(representatives), query, budget // 4)
+        )
+        relevant = select_passages(text, query, budget * 3 // 4, window_bytes=window)
+        summary = overview + "\n" + "\n".join(p.text for p in relevant)
+        if estimated_tokens(summary) <= 4000:
+            return summary, relevant, len(sections)
+        budget //= 2
+
+
+def _document_summary(
+    text: str, query: str, budget: int
 ) -> tuple[str, list[SelectedPassage], int]:
     """Keep ordered coverage of every document part plus query-relevant evidence."""
     sections = _document_sections(text)
