@@ -559,22 +559,14 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         )
     from services.orchestrator.attachment_reading import read_announced, failure_notice
 
-    from services.orchestrator.terminal_client import safe_filename
-
     attachment_sources = await read_announced(
         request,
         item,
         tools.terminal if not terminal_error else None,
         terminal_error,
-        read_document_bytes=bool(request.documents)
-        and (
-            terminal_error != ""
-            or len(paths) != len(request.documents)
-            or any(
-                Path(path).name != safe_filename(document.filename)
-                for path, document in zip(paths, request.documents, strict=True)
-            )
-        ),
+        # Attached documents are always read in process: the sandbox may lack the
+        # model's preferred PDF library, and an unread document invites invention.
+        read_document_bytes=bool(request.documents),
     )
     notice = failure_notice(attachment_sources, request.lang)
     if notice and model.sink:
