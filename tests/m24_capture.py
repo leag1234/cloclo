@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 from typing import Any
 from urllib.request import Request, urlopen
+from packages.ports import atlas_ports
 
 
 ARCHIVE = Path("tests/cassettes/m24.json.gz")
@@ -43,7 +44,7 @@ def capture(
     if files:
         with urlopen(
             Request(
-                "http://127.0.0.1:3000/api/v1/auths/signin",
+                atlas_ports().url("chat_ui") + "/api/v1/auths/signin",
                 data=json.dumps({"email": "admin@localhost", "password": ""}).encode(),
                 headers={"Content-Type": "application/json"},
             ),
@@ -54,7 +55,7 @@ def capture(
             assert url.startswith("/api/v1/terminals/atlas-files/files/serve/")
             with urlopen(
                 Request(
-                    "http://127.0.0.1:3000" + url,
+                    atlas_ports().url("chat_ui") + url,
                     headers={"Authorization": "Bearer " + token},
                 ),
                 timeout=10,

@@ -6,6 +6,7 @@ import fcntl
 import hashlib
 import json
 import os
+from packages.ports import atlas_ports
 import re
 from pathlib import Path
 from uuid import uuid4
@@ -35,7 +36,9 @@ def store(url: str) -> str:
         os.fchmod(output.fileno(), 0o600)
         output.write(base64.b64decode(url.split(",", 1)[1], validate=True))
     return (
-        os.environ.get("ATLAS_PUBLIC_URL", "http://localhost:8020").rstrip("/")
+        os.environ.get(
+            "ATLAS_PUBLIC_URL", atlas_ports().url("adapter", "localhost")
+        ).rstrip("/")
         + "/images/"
         + key
     )
@@ -64,7 +67,9 @@ def generated_image(key: str) -> Response:
 
 def reference(key: str) -> str:
     return (
-        os.environ.get("ATLAS_PUBLIC_URL", "http://localhost:8020").rstrip("/")
+        os.environ.get(
+            "ATLAS_PUBLIC_URL", atlas_ports().url("adapter", "localhost")
+        ).rstrip("/")
         + "/images/"
         + key
     )

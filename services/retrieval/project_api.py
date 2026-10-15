@@ -5,6 +5,7 @@ from packages.validation import describe_validation
 
 import logging
 import os
+from packages.ports import atlas_ports
 import sqlite3
 from pathlib import Path
 from typing import Annotated, Literal
@@ -122,7 +123,8 @@ def dispatch(method: str, path: str, body: bytes) -> object:
             return {"ok": True}
     if tail in (["documents"], ["search"]) or (len(tail) == 2 and tail[0] == "sources"):
         documents = ProjectDocuments(
-            store, Gateway(os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"))
+            store,
+            Gateway(os.environ.get("ATLAS_GATEWAY_URL", atlas_ports().url("gateway"))),
         )
         if tail == ["documents"] and method == "POST":
             document = DocumentInput.model_validate_json(body)

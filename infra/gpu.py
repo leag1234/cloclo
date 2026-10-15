@@ -5,6 +5,7 @@ import ipaddress
 import json
 import os
 from pathlib import Path
+from packages.ports import atlas_ports
 import re
 import shlex
 import subprocess
@@ -71,6 +72,7 @@ def create(service: str, resource: str, *args: str) -> Any:
 
 
 def bootstrap(volume: str, model: str, fresh: bool) -> str:
+    port = atlas_ports().port("terminal")
     device = shlex.quote("/dev/disk/by-id/scsi-0SCW_sbs_volume-" + volume)
     public_key = os.environ.get("GPU_SSH_PUBLIC_KEY", "")
     if public_key and not re.fullmatch(
@@ -94,9 +96,9 @@ mount "$DEV" /mnt/weights
 systemctl enable --now docker
 nvidia-smi
 docker run -d --restart unless-stopped --gpus all --ipc=host --name vllm \\
- -p 8000:8000 -v /mnt/weights:/root/.cache/huggingface \\
+ -p {port}:{port} -v /mnt/weights:/root/.cache/huggingface \\
  vllm/vllm-openai:v0.10.2 --model {shlex.quote(model)} --revision {shlex.quote(revision)} --served-model-name local \\
- --enable-prefix-caching --max-model-len 8192
+ --enable-prefix-caching --max-model-len 8192 --port {port}
 """
     return (
         script.split("docker run -d", 1)[0]
@@ -208,7 +210,7 @@ def up() -> None:
     group = create(
         "instance", "security-group", "name=atlas-gpu", "inbound-default-policy=drop"
     )
-    for port in (22, 8000):
+    for port in (22, atlas_ports().port("terminal")):
         call(
             "instance",
             "security-group",
@@ -243,7 +245,9 @@ def up() -> None:
         )
     )
     Path("BRAIN/gpu_ip.txt").write_text(address + "\n")
-    Path("BRAIN/gateway.env").write_text(f"LOCAL_API_BASE=http://{address}:8000/v1\n")
+    Path("BRAIN/gateway.env").write_text(
+        atlas_ports().url("terminal", address) + "/v1\n"
+    )
     print(
         f"[gpu-up] instance {server['id']} created at {address}; worker readiness pending",
         flush=True,

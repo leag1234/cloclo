@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+from packages.ports import atlas_ports
 from pathlib import Path
 from collections import defaultdict
 import yaml
@@ -76,7 +77,7 @@ def main() -> None:
     report = evaluate(
         cases,
         Store(os.environ["ATLAS_RETRIEVAL_DSN"]),
-        Gateway(os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010")),
+        Gateway(os.environ.get("ATLAS_GATEWAY_URL", atlas_ports().url("gateway"))),
     )
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")

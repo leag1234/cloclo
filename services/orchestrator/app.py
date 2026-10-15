@@ -16,6 +16,7 @@ from services.orchestrator.cache import Cache
 from services.orchestrator.loop import Limits, Query, run
 from services.orchestrator.model import GatewayModel
 from services.orchestrator.tools import Runtime
+from packages.ports import atlas_ports
 
 app = FastAPI(title="ATLAS-0 harness", version="0.1.0")
 
@@ -37,7 +38,7 @@ async def query(request: Query) -> dict[str, object]:
     started = time.monotonic()
     try:
         model = await GatewayModel.connect(
-            os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010")
+            os.environ.get("ATLAS_GATEWAY_URL", atlas_ports().url("gateway"))
         )
     except (ValueError, RuntimeError, OSError):
         raise HTTPException(503, "gateway_unavailable") from None

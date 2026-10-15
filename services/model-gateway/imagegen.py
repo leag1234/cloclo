@@ -5,6 +5,7 @@ from packages.limits import LimitError, ProviderLimitError
 import ipaddress
 import json
 import os
+from packages.ports import atlas_ports
 from decimal import Decimal
 from time import monotonic
 from pathlib import Path
@@ -76,7 +77,7 @@ async def generate(request: object) -> dict[str, object]:
         timeout=aiohttp.ClientTimeout(total=timeout), trust_env=False
     ) as client:
         async with client.post(
-            f"http://{address}:8000/generate",
+            atlas_ports().url("terminal", address) + "/generate",
             json={"prompt": rewritten, "seed": prompt.seed},
             allow_redirects=False,
         ) as response:

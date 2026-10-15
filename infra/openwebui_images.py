@@ -12,6 +12,7 @@ import os
 from typing import Any
 
 import aiohttp
+from packages.ports import atlas_ports
 
 
 class Filter:
@@ -23,7 +24,7 @@ class Filter:
             timeout=aiohttp.ClientTimeout(total=15), trust_env=False
         ) as client:
             async with client.post(
-                os.environ.get("ATLAS_ADAPTER_URL", "http://127.0.0.1:8020")
+                os.environ.get("ATLAS_ADAPTER_URL", atlas_ports().url("adapter"))
                 + "/images/upload",
                 json={"url": url},
                 allow_redirects=False,

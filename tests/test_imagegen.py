@@ -15,6 +15,7 @@ from PIL import Image
 import imagegen
 import aiohttp
 from packages.imagegen import ImagePrompt, image_request
+from packages.ports import atlas_ports
 from services.orchestrator.imagegen import process_image
 from services.orchestrator.interactions import Interaction, write_interaction
 from services.orchestrator.model import GatewayModel
@@ -72,7 +73,9 @@ class ImageTests(unittest.IsolatedAsyncioTestCase):
                 self.wfile.write(json.dumps(payload).encode())
 
         # Real local HTTP exercises bounded reads and PNG decoding.
-        with ThreadingHTTPServer(("127.0.0.2", 8000), Handler) as server:
+        with ThreadingHTTPServer(
+            ("127.0.0.2", atlas_ports().port("terminal")), Handler
+        ) as server:
             thread = Thread(target=server.serve_forever, daemon=True)
             thread.start()
             try:

@@ -30,6 +30,14 @@ can take up to 15 minutes; inference retains its own time and cost allowance.
 The worker launcher shuts down the GPU automatically. See [the architecture](docs/02-architecture-cible.md) and
 [developer API runbook](runbooks/devapi.md) for component contracts and endpoints.
 
+## Parallel worktrees
+
+`ATLAS_PORT_BASE` offsets every local listener and Docker resource name. It defaults
+to `0`, preserving the standard ports. Before starting a stack, each parallel
+worktree exports a distinct value, for example `export ATLAS_PORT_BASE=100`; its UI,
+terminal, gateway, adapter, and PostgreSQL ports then use `3100`, `8100`, `8110`,
+`8120`, and `5532` respectively.
+
 ## Quickstart
 
 Use a Linux host with Python 3.12, Docker, and sufficient disk space for the CPU
