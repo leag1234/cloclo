@@ -187,6 +187,8 @@ def stack(name: str = "atlas-chat", persistent: bool = True) -> Iterator[None]:
 def run() -> None:
     require_env(CHAT_REQUIRED_ENV)
     os.environ.setdefault("ATLAS_SEARCH_PROVIDER", "tavily")
+    # Scanned PDF pages are read by LightOn OCR (owner decision 2026-10-15).
+    os.environ.setdefault("ATLAS_OCR_MODEL", "lightonocr-3-0.8b")
     require_env(
         ("TAVILY_API_KEY",)
         if os.environ["ATLAS_SEARCH_PROVIDER"] == "tavily"

@@ -21,6 +21,7 @@ from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 from services.orchestrator.chat_api import app
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.chat_stream import response
+from services.orchestrator.document_chat import process_documents
 from services.orchestrator.documents import Attachment, DocumentError, extract_document
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.loop import Turn
@@ -79,6 +80,72 @@ def file_part(name: str, raw: bytes) -> dict[str, Any]:
 
 
 class DocumentTests(unittest.TestCase):
+    def test_recorded_document_messages_match_m26_base(self) -> None:
+        """Keep the terminal-disabled documents route byte-for-byte replayable."""
+
+        async def check() -> None:
+            model = GatewayModel(
+                "http://unused",
+                Configuration(
+                    input_eur_per_mtok=Decimal("0.1"),
+                    output_eur_per_mtok=Decimal("0.1"),
+                    max_tokens=1000,
+                ),
+            )
+            captured: list[list[dict[str, object]]] = []
+
+            async def generate(
+                messages: list[dict[str, object]], timeout: float
+            ) -> Turn:
+                captured.append(messages)
+                return Turn("The attachment is summarized.")
+
+            request = ChatRequest.model_validate(
+                {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": "fais-moi une synthèse d'une page",
+                        }
+                    ],
+                    "documents": [
+                        file_part("approval.txt", b"Seven reviewers must sign.")["file"]
+                    ],
+                }
+            )
+            with (
+                patch.object(GatewayModel, "connect", AsyncMock(return_value=model)),
+                patch.object(model, "complete", generate),
+            ):
+                await process_documents(request, Interaction())
+
+            # Exact construction from 8211a8c, the base of the recorded M23 replay.
+            expected = [
+                {
+                    "role": "system",
+                    "content": Path("prompts/chat.txt").read_text()
+                    + Path("prompts/documents.txt").read_text(),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "untrusted_attachments": [
+                                {
+                                    "filename": "approval.txt",
+                                    "text": "Seven reviewers must sign.",
+                                }
+                            ]
+                        },
+                        ensure_ascii=False,
+                    ),
+                },
+                {"role": "user", "content": "fais-moi une synthèse d'une page"},
+            ]
+            self.assertEqual(captured, [expected])
+
+        asyncio.run(check())
+
     def test_pdf_all_sixty_pages_and_all_text_formats(self) -> None:
         result = extract_document(
             Attachment.model_validate(file_part("report.pdf", pdf())["file"])

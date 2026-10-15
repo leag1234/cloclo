@@ -7,6 +7,8 @@ import base64
 import json
 import os
 from pathlib import PurePosixPath
+import re
+import unicodedata
 from typing import Literal
 from urllib.parse import quote
 
@@ -55,6 +57,23 @@ def output_path(root: str, path: str) -> str:
     ):
         raise ValueError("output_must_be_document_in_request_directory")
     return str(target)
+
+
+def safe_filename(name: str) -> str:
+    """ASCII name the terminal stores unchanged (multipart encodes spaces and accents)."""
+    base = PurePosixPath(name.replace("\\", "/")).name
+    stem, dot, ext = base.rpartition(".")
+    if not dot:
+        stem, ext = base, ""
+
+    def clean(part: str) -> str:
+        part = unicodedata.normalize("NFKD", part).encode("ascii", "ignore").decode()
+        part = re.sub(r"[^A-Za-z0-9._-]+", "_", part)
+        return re.sub(r"_+", "_", part).strip("._-")
+
+    stem, ext = clean(stem)[:120], clean(ext)[:16]
+    stem = stem or "attachment"
+    return f"{stem}.{ext}" if ext else stem
 
 
 class TerminalClient:
@@ -122,13 +141,13 @@ class TerminalClient:
         data.add_field(
             "file",
             raw,
-            filename=attachment.filename,
+            filename=safe_filename(attachment.filename),
             content_type="application/octet-stream",
         )
         result = await self.request(
             "POST", "/files/upload", timeout, params={"directory": self.root}, data=data
         )
-        expected = self.root + "/" + attachment.filename
+        expected = self.root + "/" + safe_filename(attachment.filename)
         if result.get("path") != expected or result.get("size") != len(raw):
             raise ValueError("terminal_upload_integrity_failed")
         return expected

@@ -100,8 +100,16 @@ def select_passages(
 
 
 def hierarchical_summary(
-    text: str, query: str
+    text: str, query: str, budget: int = 7900, *, coverage: bool = False
 ) -> tuple[str, list[SelectedPassage], int]:
+    """Reduce a long text: attached documents keep every page in order (coverage);
+    web pages and tool output keep the original relevance-first selection."""
+    if coverage:
+        return _document_summary(text, query, budget)
+    return _web_summary(text, query)
+
+
+def _web_summary(text: str, query: str) -> tuple[str, list[SelectedPassage], int]:
     """Extract section evidence, then synthesize an extractive overview and key passage."""
     sections = [text[i : i + 8192] for i in range(0, len(text), 8192)]
     representatives = [
@@ -122,3 +130,68 @@ def hierarchical_summary(
         if estimated_tokens(summary) <= 4000:
             return summary, relevant, len(sections)
         budget //= 2
+
+
+def _document_summary(
+    text: str, query: str, budget: int
+) -> tuple[str, list[SelectedPassage], int]:
+    """Keep ordered coverage of every document part plus query-relevant evidence."""
+    sections = _document_sections(text)
+    identifiers = set(re.findall(r"\b[A-Z][A-Z0-9_]{2,}\b", query))
+    # Comparisons need evidence for both subjects. A single 5000-byte window
+    # otherwise consumes nearly all the passage allowance before the second entry.
+    window = 2400 if len(identifiers) > 1 else 5000
+    while True:
+        # Newlines separating excerpts count against the same byte limit as evidence.
+        # The relevance selector can emit no more than one window per budget slice.
+        separator_reserve = len(sections) + budget // window + 1
+        evidence_budget = max(0, budget - separator_reserve)
+        coverage_budget = evidence_budget // 3
+        coverage = _coverage_passages(text, sections, coverage_budget)
+        relevant = select_passages(
+            text,
+            query,
+            evidence_budget - coverage_budget,
+            window_bytes=window,
+        )
+        passages = sorted(coverage + relevant, key=lambda passage: passage.start)
+        summary = "\n".join(passage.text for passage in passages)
+        # The token ceiling follows the byte budget: 4000 tokens at the default 7900 bytes.
+        if len(summary.encode()) <= budget and estimated_tokens(summary) <= max(
+            4000, budget // 3
+        ):
+            return summary, passages, len(sections)
+        budget //= 2
+
+
+def _document_sections(text: str) -> list[tuple[int, int]]:
+    """Split page-marked documents by page, otherwise retain M10-sized sections."""
+    markers = list(
+        re.finditer(r"^\[(?:Page|Slide) \d+\]|^\[Sheet: [^\]]+\]", text, re.M)
+    )
+    if markers:
+        starts = [marker.start() for marker in markers]
+        if starts[0]:
+            starts.insert(0, 0)
+        return list(zip(starts, starts[1:] + [len(text)], strict=True))
+    return [
+        (start, min(len(text), start + 8192)) for start in range(0, len(text), 8192)
+    ]
+
+
+def _coverage_passages(
+    text: str, sections: list[tuple[int, int]], budget: int
+) -> list[SelectedPassage]:
+    """Reserve one ordered, page-marked excerpt for every source section."""
+    if not sections or budget <= 0:
+        return []
+    share, remainder = divmod(budget, len(sections))
+    passages: list[SelectedPassage] = []
+    for index, (start, end) in enumerate(sections):
+        allowance = share + (1 if index < remainder else 0)
+        excerpt = text[start:end].encode()[:allowance].decode("utf-8", "ignore")
+        if excerpt:
+            passages.append(
+                SelectedPassage(excerpt, start, start + len(excerpt), len(sections))
+            )
+    return passages

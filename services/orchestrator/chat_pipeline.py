@@ -404,14 +404,20 @@ class ChatTools(Runtime):
 async def process(request: ChatRequest, item: Interaction) -> None:
     from services.orchestrator.narration import clean_answer
 
+    request = request.model_copy(
+        update={"lang": conversation_language(request.messages, request.ui_locale)}
+    )
     await _process(request, item)
     if item.state == "done" and any(
         d.get("hierarchical_synthesis") for d in item.documents
     ):
-        labels = json.loads(Path("prompts/activity-labels.json").read_text())
-        notice = labels.get(request.lang, labels["en"])["synthesized"]
+        from services.orchestrator.attachment_reading import reduced_document_note
+
+        notice = reduced_document_note(request.lang)
         if not item.reponse.endswith(notice):
             item.reponse += "\n\n" + notice
+            if sink := sink_context.get():
+                await sink({"delta": {"content": "\n\n" + notice}})
     if item.state == "done" and item.task_type not in {
         "imagegen",
         "vision",
@@ -456,14 +462,11 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
 
         await process_project(request, item)
         return
-    request = request.model_copy(
-        update={"lang": conversation_language(request.messages, request.ui_locale)}
-    )
     followup = is_followup(request.messages)
     if followup:
         item.task_type = "followup"
     iteration = image_iteration(request.messages)
-    if not followup and request.messages[-1].images and not request.documents:
+    if not followup and request.messages[-1].images and not request.has_attachments:
         await process_vision(request, item)
         return
     started = time.monotonic()
@@ -486,7 +489,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         model.tools.append(declaration())
     if os.environ.get("ATLAS_TERMINAL_ENABLED") == "1":
         model.tools.extend(json.loads(Path("prompts/file-tools.json").read_text()))
-        if request.documents:
+        if request.has_attachments:
             model.tools = [
                 t
                 for t in model.tools
@@ -505,7 +508,12 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
     from packages.file_intent import produces_file, requests_file_delivery
 
     produces_files = produces_file(request.messages[-1].text)
-    deliver_files = requests_file_delivery(request.messages[-1].text)
+    from packages.file_intent import edits_attachment
+
+    # Editing an attached file means returning it: keep the file tools (J43).
+    deliver_files = requests_file_delivery(request.messages[-1].text) or (
+        bool(request.documents) and edits_attachment(request.messages[-1].text)
+    )
     if (
         os.environ.get("ATLAS_TERMINAL_ENABLED") == "1"
         and not produces_files
@@ -531,12 +539,22 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
     tools = ChatTools(item, request.messages[-1].text, allow_image=not followup)
     tools.model = model
     file_context = ""
+    terminal_error = ""
     if tools.terminal is not None:
-        await tools.terminal.initialize()
-        paths = [
-            await tools.terminal.upload(document, request.timeout_seconds)
-            for document in request.documents
-        ]
+        paths = []
+        try:
+            await tools.terminal.initialize()
+        except (RuntimeError, OSError) as exc:
+            if not request.has_attachments:
+                raise
+            from packages.attachment_reader import failure_reason
+
+            terminal_error = failure_reason(exc)
+        if not terminal_error:
+            paths = [
+                await tools.terminal.upload(document, request.timeout_seconds)
+                for document in request.documents
+            ]
         file_context = (
             Path("prompts/files.txt").read_text()
             + "\n"
@@ -545,7 +563,68 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                 ensure_ascii=False,
             )
         )
+    from services.orchestrator.attachment_reading import (
+        document_status,
+        failure_notice,
+        read_announced,
+        reading_progress,
+    )
+
+    attachment_sources = await read_announced(
+        request,
+        item,
+        tools.terminal if not terminal_error else None,
+        terminal_error,
+        # Attached documents are always read in process: the sandbox may lack the
+        # model's preferred PDF library, and an unread document invites invention.
+        read_document_bytes=bool(request.documents),
+    )
+    notice = failure_notice(attachment_sources, request.lang)
+    if attachment_sources and model.sink:
+        pages, failed_pages, ocr_pages = reading_progress(attachment_sources)
+        await model.sink(
+            {
+                "phase": "document_read",
+                "description": document_status(
+                    pages, failed_pages, request.lang, ocr_pages
+                ),
+            }
+        )
+    if attachment_sources and not any(
+        source.get("text") for source in attachment_sources
+    ):
+        item.reponse, item.state, item.cout_eur = notice, "done", 0.0
+        if notice and model.sink:
+            await model.sink({"delta": {"content": notice}})
+        if tools.terminal is not None:
+            item.terminal_commands = tools.terminal.commands
+            item.terminal_failed_commands = tools.terminal.failed_commands
+        return
+    if attachment_sources and not deliver_files:
+        model.tools = [
+            tool
+            for tool in model.tools
+            if isinstance(function := tool.get("function"), dict)
+            and function.get("name") not in {"terminal_command", "publish_document"}
+        ]
+    attachment_history: list[dict[str, object]] = [
+        {"role": m.role, "content": m.text} for m in request.messages[:-1]
+    ]
+    if attachment_sources:
+        file_context = (file_context if deliver_files else "") + Path(
+            "prompts/documents.txt"
+        ).read_text()
+        attachment_history.append(
+            {
+                "role": "user",
+                "content": json.dumps(
+                    {"untrusted_attachments": attachment_sources}, ensure_ascii=False
+                ),
+            }
+        )
     try:
+        if attachment_sources and model.sink:
+            await model.sink({"phase": "synthesizing_document"})
         result = await run(
             Query(question=iteration or request.messages[-1].text, lang=request.lang),
             model,
@@ -563,6 +642,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             + file_context,
             Limits(
                 profile=request.model,
+                tool_calls=max(0, 10 - len(attachment_sources)),
                 tokens=None,
                 cost=Decimal(
                     "0.30" if request.has_attachments or produces_files else "0.10"
@@ -573,9 +653,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                     0, request.timeout_seconds - (time.monotonic() - started)
                 ),
             ),
-            history=[
-                {"role": m.role, "content": m.text} for m in request.messages[:-1]
-            ],
+            history=attachment_history,
             retry_web=True,
             initial_calls=discovery,
             terminal_tools=frozenset({"generate_image"})
@@ -660,7 +738,10 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                         Limits(
                             profile=request.model,
                             tokens=None,
-                            tool_calls=10 - first_result.tool_calls,
+                            tool_calls=max(
+                                0,
+                                10 - len(attachment_sources) - first_result.tool_calls,
+                            ),
                             cost=remaining_cost,
                             has_attachments=request.has_attachments,
                             produces_files=True,
@@ -777,10 +858,12 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                 result.text, request.lang, preserve_code=preserve_code
             )
         item.reponse, item.state, item.cout_eur = (
-            result.text,
+            result.text + ("\n\n" + notice if notice else ""),
             result.state,
             float(result.cost),
         )
+        if notice and model.sink:
+            await model.sink({"delta": {"content": "\n\n" + notice}})
         if tools.terminal is not None:
             item.terminal_commands = tools.terminal.commands
             item.terminal_failed_commands = tools.terminal.failed_commands

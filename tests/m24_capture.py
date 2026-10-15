@@ -13,19 +13,31 @@ from urllib.request import Request, urlopen
 ARCHIVE = Path("tests/cassettes/m24.json.gz")
 
 
-def capture(name: str, input_path: Path, response_path: Path) -> None:
+def capture(
+    name: str,
+    input_path: Path,
+    response_path: Path,
+    exchanges: list[dict[str, Any]] | None = None,
+) -> None:
     request = json.loads(input_path.read_text())
     response = json.loads(response_path.read_text())
     identifier = response["id"]
-    source = json.loads(
-        gzip.decompress(
-            Path(
-                os.environ.get("M24_STREAM_ARCHIVE", "/tmp/m24-session-streams.json.gz")
-            ).read_bytes()
+    if exchanges is None:
+        source = json.loads(
+            gzip.decompress(
+                Path(
+                    os.environ.get(
+                        "M24_STREAM_ARCHIVE", "/tmp/m24-session-streams.json.gz"
+                    )
+                ).read_bytes()
+            )
         )
-    )
-    exchanges = [row for row in source if identifier in json.dumps(row["request"])]
-    assert exchanges and any(row["request"].get("kind") == "tool" for row in exchanges)
+        exchanges = [row for row in source if identifier in json.dumps(row["request"])]
+    # A document that cannot be read at all is answered by its reading note, without a model call.
+    assert exchanges or name == "J46"
+    # Attached documents are read in process: only cases that produce files must use tools.
+    if name in {"J42", "J43", "J44", "formats_write"}:
+        assert any(row["request"].get("kind") == "tool" for row in exchanges)
     files = response["atlas"]["files"]
     artifacts: list[dict[str, Any]] = []
     if files:

@@ -1,6 +1,5 @@
 """Attachment-only generation, sharing the gateway's request and recovery ledger."""
 
-import asyncio
 from decimal import Decimal
 import json
 import os
@@ -8,9 +7,11 @@ from pathlib import Path
 import time
 
 from packages.evidence import estimated_tokens
+from packages.language import language_instruction
 from services.orchestrator.chat_schema import ChatRequest
+from packages.attachment_reader import DOCUMENT_CONTEXT_BYTES
 from services.orchestrator.content import hierarchical_summary
-from services.orchestrator.documents import DocumentError, extract_document
+from services.orchestrator.documents import DocumentError
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.model import GatewayError, GatewayModel
 from services.orchestrator.stream_client import sink_context
@@ -29,10 +30,26 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
     sink = sink_context.get()
     if sink:
         await sink({"phase": "reading_document"})
-    sources = []
+    from services.orchestrator.attachment_reading import (
+        document_status,
+        failure_notice,
+        reading_progress,
+    )
+
+    failures: list[dict[str, object]] = []
+    sources: list[dict[str, object]] = []
     for attachment in request.documents:
         try:
-            document = await asyncio.to_thread(extract_document, attachment)
+            from services.orchestrator.attachment_reading import (
+                extract_attachment_with_ocr,
+            )
+
+            document, ocr_cost, ocr_pages = await extract_attachment_with_ocr(
+                attachment,
+                deadline=started + request.timeout_seconds,
+                remaining_cost=Decimal("0.30") - Decimal(str(item.cout_eur)),
+            )
+            item.cout_eur += float(ocr_cost)
         except DocumentError as exc:
             item.documents.append(
                 {
@@ -45,10 +62,30 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                     "error": str(exc),
                 }
             )
-            raise GatewayError(
-                "document_extraction_failed", 422, attachment.filename + ": " + str(exc)
-            ) from None
-        sources.append({"filename": document.filename, "text": document.text})
+            failures.append({"filename": attachment.filename, "errors": [str(exc)]})
+            sources.append(
+                {
+                    "filename": attachment.filename,
+                    "text": "",
+                    "pages": exc.pages,
+                    "errors": [str(exc)],
+                }
+            )
+            continue
+        if document.errors:
+            failures.append(
+                {"filename": document.filename, "errors": list(document.errors)}
+            )
+        sources.append(
+            {
+                "filename": document.filename,
+                "text": document.text,
+                "pages": document.pages,
+                "errors": list(document.errors),
+                "ocr_pages": ocr_pages,
+                "ocr_cost_eur": float(ocr_cost),
+            }
+        )
         item.documents.append(
             {
                 "filename": document.filename,
@@ -56,28 +93,56 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                 "pages": document.pages,
                 "extracted_characters": len(document.text),
                 "hierarchical_synthesis": False,
+                "error": "; ".join(document.errors),
+                "ocr_pages": len(ocr_pages),
+                "ocr_cost_microeur": int(ocr_cost * 1000000),
             }
         )
+    notice = failure_notice(failures, request.lang)
+    pages, failed_pages, ocr_count = reading_progress(sources)
+    if sink:
+        await sink(
+            {
+                "phase": "document_read",
+                "description": document_status(
+                    pages, failed_pages, request.lang, ocr_count
+                ),
+            }
+        )
+    if not any(source["text"] for source in sources):
+        item.reponse, item.state = notice, "done"
+        if sink:
+            await sink({"delta": {"content": notice}})
+        return
     model = await GatewayModel.connect(
         os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"),
         local_enabled=False,
     )
     model.configure_quality(request.model, request.max_tokens, has_attachments=True)
+    model.spent = Decimal(str(item.cout_eur))
     model.tools = []
     model.observing = True
     model.sink = sink
     instructions = (
-        Path("prompts/chat.txt").read_text() + Path("prompts/documents.txt").read_text()
+        Path("prompts/chat.txt").read_text()
+        + Path("prompts/documents.txt").read_text()
+        # Failed extraction needs a model-visible language cue for the remaining
+        # readable attachments. Successful legacy requests retain their cassette bytes.
+        + (language_instruction(request.lang) if notice else "")
     )
     history: list[dict[str, object]] = [
         {"role": m.role, "content": m.text} for m in request.messages
+    ]
+    model_sources: list[dict[str, object]] = [
+        {"filename": str(source["filename"]), "text": str(source["text"])}
+        for source in sources
     ]
     messages: list[dict[str, object]] = [
         {"role": "system", "content": instructions},
         {
             "role": "user",
             "content": json.dumps(
-                {"untrusted_attachments": sources}, ensure_ascii=False
+                {"untrusted_attachments": model_sources}, ensure_ascii=False
             ),
         },
         *history,
@@ -91,18 +156,32 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
         + 256
         + request.max_tokens
     )
-    if measured > 262144 or sum(len(s["text"].encode()) for s in sources) > 524288:
-        for source, metadata in zip(sources, item.documents, strict=True):
+    source_texts: list[str] = []
+    for source in sources:
+        text = source["text"]
+        assert isinstance(text, str)
+        source_texts.append(text)
+    if measured > 262144 or sum(len(text.encode()) for text in source_texts) > 524288:
+        if sink:
+            await sink({"phase": "synthesizing_document"})
+        for source, metadata in zip(model_sources, item.documents, strict=True):
+            text = source["text"]
+            assert isinstance(text, str)
             source["text"], _, _ = hierarchical_summary(
-                source["text"], request.messages[-1].text
+                text,
+                request.messages[-1].text,
+                budget=DOCUMENT_CONTEXT_BYTES // max(1, len(model_sources)),
+                coverage=True,
             )
             metadata["hierarchical_synthesis"] = True
         messages[1]["content"] = json.dumps(
-            {"hierarchical_attachment_evidence": sources}, ensure_ascii=False
+            {"hierarchical_attachment_evidence": model_sources}, ensure_ascii=False
         )
+    if sink:
+        await sink({"phase": "synthesizing_document"})
     item.cout_eur = 0.30
     try:
-        if model.estimate(messages).cost > Decimal("0.30"):
+        if model.spent + model.estimate(messages).cost > Decimal("0.30"):
             raise GatewayError(
                 "cost_budget", 413, "Document request reservation exceeds 0.30 EUR"
             )
@@ -115,24 +194,25 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
                 502,
                 "The provider returned no complete document answer",
             )
-        item.reponse, item.state = result.text, "done"
-        if any(metadata.get("hierarchical_synthesis") for metadata in item.documents):
-            labels = json.loads(Path("prompts/activity-labels.json").read_text())
-            item.reponse += (
-                "\n\n" + labels.get(request.lang, labels["en"])["synthesized"]
+        from services.orchestrator.attachment_reading import reduced_document_note
+
+        synthesis_notice = (
+            "\n\n" + reduced_document_note(request.lang)
+            if any(
+                metadata.get("hierarchical_synthesis") for metadata in item.documents
             )
+            else ""
+        )
+        item.reponse, item.state = (
+            result.text + ("\n\n" + notice if notice else "") + synthesis_notice,
+            "done",
+        )
+        if notice and sink:
+            await sink({"delta": {"content": "\n\n" + notice}})
+        if synthesis_notice:
+            if sink:
+                await sink({"delta": {"content": synthesis_notice}})
         item.cout_eur = float(model.spent)
-    except GatewayError:
-        raise
-    except (RuntimeError, ValueError) as exc:
-        raise GatewayError(
-            "document_generation_failed",
-            502,
-            f"Document generation failed: {measured} estimated input/output tokens; "
-            f"context limit 262144 tokens, request cost limit 0.30 EUR, "
-            f"elapsed {time.monotonic() - started:.1f}s of {request.timeout_seconds:.0f}s. "
-            "The full attachment was extracted; no corpus retrieval was used.",
-        ) from exc
     finally:
         item.tokens = {"in": model.input_tokens, "out": model.output_tokens}
         item.provider_model = model.provider_model

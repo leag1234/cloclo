@@ -23,6 +23,7 @@ from services.orchestrator.chat_api import app
 from services.orchestrator.chat_pipeline import ChatTools
 from services.orchestrator.documents import Attachment
 from services.orchestrator.loop import Call, Message
+from services.orchestrator.model import GatewayModel
 from services.orchestrator.terminal_client import TerminalClient
 import stream_transport
 
@@ -40,6 +41,7 @@ def main() -> None:
         "formats_write",
     }
     report: dict[str, Any] = {}
+    original_post = GatewayModel.post
     with (
         tempfile.TemporaryDirectory() as root,
         patch.dict(
@@ -69,14 +71,31 @@ def main() -> None:
                     streams = [
                         row
                         for row in case["exchanges"]
-                        if row["request"].get("kind") != "tool"
+                        if row["request"].get("kind", "stream") == "stream"
+                    ]
+                    completes = [
+                        row
+                        for row in case["exchanges"]
+                        if row["request"].get("kind") == "complete"
                     ]
                     tools = [
                         row
                         for row in case["exchanges"]
                         if row["request"].get("kind") == "tool"
                     ]
-                    stream_position = tool_position = 0
+                    # A complete call wraps its own stream attempt: the refresh records both,
+                    # in that order, and replay serves the complete row, so that stream is
+                    # never requested again.
+                    kinds = [
+                        row["request"].get("kind", "stream")
+                        for row in case["exchanges"]
+                    ]
+                    nested_streams = sum(
+                        1
+                        for first, second in zip(kinds, kinds[1:])
+                        if first == "stream" and second == "complete"
+                    )
+                    stream_position = tool_position = complete_position = 0
                     uploads: list[dict[str, Any]] = []
                     for message in case["request"]["messages"]:
                         if isinstance(message["content"], list):
@@ -120,6 +139,33 @@ def main() -> None:
                                     raise TimeoutError("recorded_timeout")
                                 raise RuntimeError("recorded_provider_error")
                             yield event["event"]
+
+                    async def post(
+                        url: str, payload: Message, timeout: float
+                    ) -> Message:
+                        nonlocal complete_position
+                        if not url.endswith("/agent/complete"):
+                            return await original_post(url, payload, timeout)
+                        assert complete_position < len(completes), (
+                            f"unrecorded_m24_provider_request:{name}:{complete_position + 1}"
+                        )
+                        row = completes[complete_position]
+                        complete_position += 1
+                        actual = {
+                            "kind": "complete",
+                            "request": {
+                                key: value
+                                for key, value in payload.items()
+                                if key != "timeout"
+                            },
+                        }
+                        expected = substitute(row["request"], old_id, current_id)
+                        assert actual == expected, (
+                            f"unrecorded_m24_provider_request:{name}:{complete_position}"
+                        )
+                        return copy.deepcopy(
+                            substitute(row["response"], old_id, current_id)
+                        )
 
                     async def execute(
                         runtime: ChatTools, call: Call, timeout: float
@@ -170,6 +216,7 @@ def main() -> None:
                         ),
                         patch.object(ChatTools, "execute", execute),
                         patch.object(stream_transport, "attempt", stream),
+                        patch.object(GatewayModel, "post", staticmethod(post)),
                         TestClient(app) as client,
                     ):
                         response = client.post(
@@ -181,8 +228,10 @@ def main() -> None:
                             response.json(),
                         )
                         answer = response.json()
-                    assert stream_position == len(streams) and tool_position == len(
-                        tools
+                    assert (
+                        stream_position in {len(streams), len(streams) - nested_streams}
+                        and tool_position == len(tools)
+                        and complete_position == len(completes)
                     )
                     validate(name, case, answer)
                     assert Decimal(str(answer["atlas"]["cost_eur"])) == Decimal(

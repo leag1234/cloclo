@@ -12,13 +12,22 @@ from packages.images import VisionMessage
 LANGUAGES = ("fr", "de", "es", "it", "en")
 
 
+def user_prose(text: str) -> str:
+    text = re.sub(r"<attached_files>.*?</attached_files>", "", text, flags=re.S)
+    return re.sub(r"^\[Attachment: [^\n]*\]$", "", text, flags=re.M).strip()
+
+
 def detected_language(text: str) -> str | None:
+    text = user_prose(text)
     normalized = "".join(
         c
         for c in unicodedata.normalize("NFKD", text.lower())
         if not unicodedata.combining(c)
     )
-    if re.search(r"\b(decris|genere|dessine|voudrais|bonjour|francais)\b", normalized):
+    if re.search(
+        r"\b(decris|genere|dessine|voudrais|bonjour|francais|resume|synthese)\b",
+        normalized,
+    ):
         return "fr"
     if re.match(r"\s*i would like\b", normalized):
         return "en"
@@ -51,7 +60,7 @@ def conversation_language(messages: Sequence[VisionMessage], locale: str) -> str
         for message in messages[:-1]:
             if message.role == "assistant":
                 history = detected_language(message.text) or history
-    current = messages[-1].text
+    current = user_prose(messages[-1].text)
     if len(re.findall(r"\b[\w'-]+\b", current)) < 5:
         if history is not None:
             return history
@@ -63,7 +72,8 @@ def conversation_language(messages: Sequence[VisionMessage], locale: str) -> str
             if not unicodedata.combining(c)
         )
         if re.search(
-            r"\b(decris|genere|dessine|voudrais|bonjour|francais)\b", normalized
+            r"\b(decris|genere|dessine|voudrais|bonjour|francais|resume|synthese)\b",
+            normalized,
         ):
             return "fr"
         return locale

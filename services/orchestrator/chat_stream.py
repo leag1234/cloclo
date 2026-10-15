@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import time
+import traceback
 
 from fastapi.responses import StreamingResponse
 from packages.file_intent import produces_file, requests_file_delivery
@@ -48,9 +49,10 @@ def response(
         queue: asyncio.Queue[dict[str, object] | None] = asyncio.Queue(maxsize=8)
         pending = ""
         turn = 0
-        activity = "reading_document" if payload.documents else "thinking"
+        activity = "reading_document" if payload.has_attachments else "thinking"
         answer_started = False
         activity_urls: list[str] = []
+        activity_description = ""
         last_activity = time.monotonic()
         citation_numbers: dict[str, int] = {}
         base = {
@@ -62,7 +64,7 @@ def response(
 
         def status_event(done: bool = False) -> dict[str, object]:
             elapsed = round(time.monotonic() - started, 1)
-            description = str(
+            description = activity_description or str(
                 activity_labels.get("done" if done else activity, activity)
             )
             if activity_urls:
@@ -156,7 +158,7 @@ def response(
             )
 
         async def sink(event: dict[str, object]) -> None:
-            nonlocal pending, turn, activity, activity_urls
+            nonlocal pending, turn, activity, activity_urls, activity_description
             if "phase" in event:
                 phase = str(event["phase"])
                 raw_urls = event.get("urls")
@@ -175,8 +177,23 @@ def response(
                     "synthesized",
                     "source_truncated",
                     "reading_document",
+                    "document_read",
+                    "synthesizing_document",
                 }:
                     activity = phase
+                    description = event.get("description")
+                    activity_description = (
+                        str(description) if isinstance(description, str) else ""
+                    )
+                    if phase == "synthesizing_document":
+                        synthesis = {
+                            "fr": "Synthèse en cours…",
+                            "en": "Synthesis in progress…",
+                            "de": "Zusammenfassung läuft…",
+                            "es": "Síntesis en curso…",
+                            "it": "Sintesi in corso…",
+                        }
+                        activity_description = synthesis.get(language, synthesis["en"])
                 elif phase == "narration":
                     activity = "thinking"
                 elif phase == "generating":
@@ -186,6 +203,7 @@ def response(
                         else "answering"
                     )
                     activity_urls = []
+                    activity_description = ""
                 if event["phase"] != "generating":
                     await content(pending)
                     pending = ""
@@ -352,17 +370,26 @@ def response(
                         }
                     }
                 )
-            except Exception:
+            except Exception as exc:
                 item.state = "error"
                 item.erreurs.append("stream_error")
                 detail = (
-                    "The provider did not complete a valid answer. "
+                    "The request did not complete because of an unexpected failure "
+                    f"({type(exc).__name__}), which is not a budget or deadline refusal. "
                     f"Elapsed {time.monotonic() - started:.3f}s "
                     f"(limit {payload.timeout_seconds:.0f}s); "
                     f"reserved cost {item.cout_eur:.6f} EUR (limit {ceiling} EUR)."
                 )
                 item.rejection = {"code": "stream_error", "message": detail}
-                logging.getLogger(__name__).warning(json.dumps(item.rejection))
+                frames = traceback.extract_tb(exc.__traceback__)
+                logging.getLogger(__name__).error(
+                    "Unexpected stream exception %s; traceback:\n%s",
+                    type(exc).__name__,
+                    "\n".join(
+                        f"  {frame.filename}:{frame.lineno} in {frame.name}"
+                        for frame in frames
+                    ),
+                )
                 await queue.put(
                     {
                         "error": {

@@ -3,6 +3,9 @@
 # The /models API does not expose prices; values come from the Scaleway pricing page.
 # Prices in euros per million tokens (excluding tax).
 models:
+  lightonocr-3-0.8b:
+    input_eur_per_mtok: 2.20
+    output_eur_per_mtok: 0.00
   qwen3.5-397b-a17b:      # ESCALATION_MODEL
     input_eur_per_mtok: 0.60
     output_eur_per_mtok: 3.60

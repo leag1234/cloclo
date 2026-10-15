@@ -1,5 +1,6 @@
 """Task F: attachment input names must not trigger file-output recovery."""
 
+import base64
 from decimal import Decimal
 import asyncio
 import json
@@ -9,6 +10,7 @@ import time
 import unittest
 from unittest.mock import AsyncMock, patch
 
+from test_m23_documents import pdf
 from services.orchestrator.chat_pipeline import ChatTools, process
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.image_store import prepare_uploads
@@ -29,7 +31,12 @@ def synthesis_request(question: str) -> ChatRequest:
                         *(
                             {
                                 "type": "file",
-                                "file": {"filename": name, "file_data": "dGVzdA=="},
+                                "file": {
+                                    "filename": name,
+                                    "file_data": base64.b64encode(
+                                        pdf(1) if name.endswith(".pdf") else b"test"
+                                    ).decode(),
+                                },
                             }
                             for name in ("report.pdf", "notes.txt")
                         ),
