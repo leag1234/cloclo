@@ -33,7 +33,8 @@ def capture(
             )
         )
         exchanges = [row for row in source if identifier in json.dumps(row["request"])]
-    assert exchanges
+    # A document that cannot be read at all is answered by its reading note, without a model call.
+    assert exchanges or name == "J46"
     # Attached documents are read in process: only cases that produce files must use tools.
     if name in {"J42", "J43", "J44", "formats_write"}:
         assert any(row["request"].get("kind") == "tool" for row in exchanges)

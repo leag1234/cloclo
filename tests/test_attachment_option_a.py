@@ -208,3 +208,20 @@ class DocumentActivityTests(unittest.IsolatedAsyncioTestCase):
         buffer = __import__("io").BytesIO()
         writer.write(buffer)
         return cast(bytes, buffer.getvalue())
+
+
+class PasswordNoteTests(unittest.TestCase):
+    def test_password_protected_pdf_names_the_cause(self) -> None:
+        note = failure_notice(
+            [
+                {
+                    "filename": "protected.pdf",
+                    "errors": [
+                        "Password-protected PDF: provide an unencrypted document"
+                    ],
+                }
+            ],
+            "fr",
+        )
+        self.assertIn("mot de passe", note)
+        self.assertIn("protected.pdf", note)

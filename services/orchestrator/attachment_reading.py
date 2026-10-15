@@ -517,8 +517,19 @@ _FALLBACK = {
 }
 
 
+_PASSWORD = {
+    "fr": "il est protégé par un mot de passe ; envoyez une version non chiffrée",
+    "en": "it is password-protected; send an unencrypted copy",
+    "de": "es ist passwortgeschützt; senden Sie eine unverschlüsselte Kopie",
+    "es": "está protegido con contraseña; envíe una copia sin cifrar",
+    "it": "è protetto da password; invia una copia non cifrata",
+}
+
+
 def _reason(errors: list[str], lang: str) -> str:
     text = " ".join(errors)
+    if re.search(r"password-protected|encrypted pdf", text, re.I):
+        return (" : " if lang == "fr" else ": ") + _PASSWORD[lang]
     match = re.search(
         r"terminal_(?:[a-z]+_)*(?:[0-9]{3}|[a-z]+)|\b[A-Z][A-Za-z]*(?:Error|File)\b",
         text,
