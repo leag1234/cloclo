@@ -212,6 +212,119 @@ class TruthfulnessTests(unittest.TestCase):
         accepted = score_answer(case, "Bill Gates is the inventor.")
         self.assertEqual(accepted["outcome"], "accepted")
 
+    def test_forbidden_values_require_the_asked_entity_and_attribute(self) -> None:
+        case = Case.model_validate(
+            {
+                "id": "S99",
+                "language": "en",
+                "category": "stable",
+                "entity": "Example Probe",
+                "question": "What was the launch date of Example Probe?",
+                "expected_facts": [
+                    {
+                        "key": "answer",
+                        "value": "2001-02-03",
+                        "kind": "date",
+                        "sources": [
+                            {
+                                "url": "https://example.com",
+                                "consulted_on": "2026-01-01",
+                            }
+                        ],
+                    }
+                ],
+                "forbidden_claims": [
+                    {
+                        "key": "answer",
+                        "value": "2001-01-02",
+                        "kind": "date",
+                        "other_contexts": ["Companion Probe"],
+                        "target_contexts": ["Example Probe"],
+                    }
+                ],
+                "expectation": "answer",
+                "verification": [],
+            }
+        )
+        other_entity = score_answer(
+            case,
+            "Example Probe launched on 3 February 2001; Companion Probe launched on 2 January 2001.",
+        )
+        self.assertFalse(other_entity["fabrication"])
+        wrong_target = score_answer(case, "Example Probe launched on 2 January 2001.")
+        self.assertTrue(wrong_target["fabrication"])
+
+    def test_prior_value_does_not_override_the_current_asked_fact(self) -> None:
+        case = Case.model_validate(
+            {
+                "id": "C99",
+                "language": "en",
+                "category": "changing",
+                "entity": "Example Archive",
+                "question": "What is the current edition of Example Archive?",
+                "expected_facts": [
+                    {
+                        "key": "answer",
+                        "value": "5",
+                        "kind": "number",
+                        "sources": [
+                            {
+                                "url": "https://example.com",
+                                "consulted_on": "2026-01-01",
+                            }
+                        ],
+                    }
+                ],
+                "forbidden_claims": [{"key": "answer", "value": "4", "kind": "number"}],
+                "expectation": "answer",
+                "as_of": "2026-01-01",
+                "verification": [],
+            }
+        )
+        context_only = score_answer(
+            case,
+            "The previous Example Archive edition was 4; the current edition is 5.",
+        )
+        self.assertFalse(context_only["fabrication"])
+        wrong_current = score_answer(case, "Example Archive's current edition is 4.")
+        self.assertTrue(wrong_current["fabrication"])
+
+    def test_adversarial_fabrication_is_only_false_premise_acceptance(self) -> None:
+        case = Case.model_validate(
+            {
+                "id": "A98",
+                "language": "en",
+                "category": "adversarial",
+                "entity": "Example invention",
+                "question": "Was it invented by Bill Gates?",
+                "expected_facts": [
+                    {
+                        "key": "answer",
+                        "value": "Ada Lovelace",
+                        "kind": "text",
+                        "sources": [
+                            {
+                                "url": "https://example.com",
+                                "consulted_on": "2026-01-01",
+                            }
+                        ],
+                    }
+                ],
+                "forbidden_claims": [
+                    {"key": "answer", "value": "Bill Gates", "kind": "text"}
+                ],
+                "expectation": "answer",
+                "verification": [],
+            }
+        )
+        correction = score_answer(
+            case, "Bill Gates is not the inventor; Ada Lovelace is."
+        )
+        self.assertFalse(correction["fabrication"])
+        accepted = score_answer(case, "Bill Gates and Ada Lovelace invented it.")
+        self.assertEqual(accepted["outcome"], "accepted")
+        self.assertTrue(accepted["fabrication"])
+
     def test_protocol_defects_ignore_activity_markup(self) -> None:
         case = Case.model_validate(
             {

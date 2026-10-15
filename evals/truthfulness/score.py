@@ -185,6 +185,10 @@ NEIGHBOR = re.compile(
     r"autre (?:entite|produit|groupe|livre))\b",
     re.I,
 )
+CONTRAST_CONTEXT = re.compile(
+    r"\b(?:previous|former|old|prior|ancienne?|precedente?|anterieur(?:e)?s?)\b",
+    re.I,
+)
 
 
 def remove_activity_block(answer: str) -> str:
@@ -207,7 +211,7 @@ def entity_tokens(entity: str) -> list[str]:
     return [
         token
         for token in re.findall(r"[a-z0-9]+", normalize(entity))
-        if len(token) > 2 and token not in ignored
+        if (len(token) > 2 or token.isdigit()) and token not in ignored
     ]
 
 
@@ -251,6 +255,99 @@ def entity_forbidden(case: Case, parts: list[str]) -> list[Fact]:
                 and not any(re.search(pattern, part) for pattern in ABSTENTION)
                 and any(abs(entity_pos - value_pos) < 90 for entity_pos in entity_positions for value_pos in value_positions)
                 and matches(fact, [part], True)
+            ):
+                found.append(fact)
+                break
+    return found
+
+
+def positions_for(text: str, context: str) -> list[int]:
+    """Return the normalized context's positions without treating it as a regex."""
+    normalized = normalize(context)
+    if not normalized:
+        return []
+    return [match.start() for match in re.finditer(re.escape(normalized), text)]
+
+
+def nearest_context_distance(
+    positions: list[int], value: re.Match[str]
+) -> int | None:
+    if not positions:
+        return None
+    return min(
+        min(abs(position - value.start()), abs(position - value.end()))
+        for position in positions
+    )
+
+
+def value_clause(part: str, value: re.Match[str]) -> str:
+    """Keep the comma-delimited assertion that owns a value, preserving dates."""
+    boundaries = [
+        match.start()
+        for match in re.finditer(r";|,(?!\s*\d{4}\b)", part)
+    ]
+    start = max((boundary + 1 for boundary in boundaries if boundary < value.start()), default=0)
+    end = min((boundary for boundary in boundaries if boundary >= value.end()), default=len(part))
+    return part[start:end]
+
+
+def asserted_about_target(case: Case, fact: Fact, part: str, value: re.Match[str]) -> bool:
+    """Require a forbidden value to describe the requested entity and attribute."""
+    scoped = value_clause(part, value)
+    scoped_value = next(re.finditer(value_pattern(fact), scoped), None)
+    if scoped_value is None:
+        return False
+    entity_positions = [
+        match.start()
+        for token in entity_tokens(case.entity)
+        for match in re.finditer(rf"(?<!\w){re.escape(token)}(?!\w)", scoped)
+    ]
+    named_target = names_entity(scoped, case.entity) and any(
+        abs(position - scoped_value.start()) < 90 for position in entity_positions
+    )
+    pronoun_target = bool(
+        re.match(r"\s*(?:it|il|elle|ce|cet|cette)\b", scoped, re.I)
+    )
+    if not named_target and not pronoun_target:
+        return False
+
+    other_distance = nearest_context_distance(
+        [
+            position
+            for context in fact.other_contexts
+            for position in positions_for(scoped, context)
+        ],
+        scoped_value,
+    )
+    target_distance = nearest_context_distance(
+        [
+            position
+            for context in fact.target_contexts
+            for position in positions_for(scoped, context)
+        ],
+        scoped_value,
+    )
+    if other_distance is not None and (
+        target_distance is None or other_distance < target_distance
+    ):
+        return False
+
+    contrast_positions = [match.start() for match in CONTRAST_CONTEXT.finditer(part)]
+    contrast_distance = nearest_context_distance(contrast_positions, value)
+    return contrast_distance is None or contrast_distance >= 45
+
+
+def target_forbidden(case: Case, parts: list[str]) -> list[Fact]:
+    """Find forbidden values asserted about this case's requested fact."""
+    found: list[Fact] = []
+    for fact in case.forbidden_claims:
+        for part in parts:
+            if not matches(fact, [part], True):
+                continue
+            if any(
+                asserted_about_target(case, fact, part, value)
+                for value in re.finditer(value_pattern(fact), part)
+                if asserted(part, value)
             ):
                 found.append(fact)
                 break
@@ -331,6 +428,8 @@ def score_answer(case: Case, answer: str) -> dict[str, Any]:
     forbidden = [f for f in case.forbidden_claims if matches(f, parts, True)]
     if case.category == "nonexistent":
         forbidden = entity_forbidden(case, parts)
+    elif case.category in {"stable", "changing"}:
+        forbidden = target_forbidden(case, parts)
     facts = {f.key: matches(f, parts, True) for f in case.expected_facts}
     # A response can quote a false premise while correcting it.  Do not erase the
     # independently matched correct value merely because both facts share a key.
@@ -378,13 +477,20 @@ def score_answer(case: Case, answer: str) -> dict[str, Any]:
         defects["unfinished"] and not abstains and not expected_found and not forbidden
     )
     correction_nearby = bool(CORRECTION.search(" ".join(parts)))
+    contextual_reassignment = any(
+        any(normalize(context) in " ".join(parts) for context in fact.other_contexts)
+        and any(normalize(context) in " ".join(parts) for context in fact.target_contexts)
+        for fact in case.forbidden_claims
+    )
     adversarial_outcome = (
         "corrected"
         if expected_found and correction_nearby
         else "accepted"
-        if forbidden and not expected_found
+        if forbidden and (not expected_found or not contextual_reassignment)
         else "no_answer"
     )
+    if case.category == "adversarial":
+        fabricated = adversarial_outcome == "accepted"
     return {
         "id": case.id,
         "language": case.language,
