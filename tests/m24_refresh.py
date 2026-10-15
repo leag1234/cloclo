@@ -22,6 +22,7 @@ from provider_recording import capture_stream
 from services.orchestrator.chat_api import app
 from services.orchestrator.chat_pipeline import ChatTools
 from services.orchestrator.loop import Call, Message
+from services.orchestrator.model import GatewayModel
 import stream_transport
 
 
@@ -30,6 +31,7 @@ def main() -> None:
     cases = json.loads(gzip.decompress(archive.read_bytes()))
     rows: list[dict[str, Any]] = []
     original_stream = stream_transport.attempt
+    original_post = GatewayModel.post
     original_tool = ChatTools.execute
 
     def record(request: Any, response: Any) -> None:
@@ -46,7 +48,11 @@ def main() -> None:
         )
 
     async def stream(request: Any, model: str, timeout: float) -> Any:
-        value = {**request.model_dump(exclude={"timeout"}), "provider_model": model}
+        value = {
+            "kind": "stream",
+            **request.model_dump(exclude={"timeout"}),
+            "provider_model": model,
+        }
         async with aclosing(
             capture_stream(
                 original_stream(request, model, timeout),
@@ -55,6 +61,20 @@ def main() -> None:
         ) as events:
             async for event in events:
                 yield event
+
+    async def post(url: str, payload: Message, timeout: float) -> Message:
+        response = await original_post(url, payload, timeout)
+        if url.endswith("/agent/complete"):
+            record(
+                {
+                    "kind": "complete",
+                    "request": {
+                        key: value for key, value in payload.items() if key != "timeout"
+                    },
+                },
+                response,
+            )
+        return response
 
     async def execute(runtime: ChatTools, call: Call, timeout: float) -> Message:
         output = await original_tool(runtime, call, timeout)
@@ -102,6 +122,7 @@ def main() -> None:
                     {"ATLAS_GATEWAY_URL": f"http://127.0.0.1:{gateway.server_port}"},
                 ),
                 patch.object(stream_transport, "attempt", stream),
+                patch.object(GatewayModel, "post", staticmethod(post)),
                 patch.object(ChatTools, "execute", execute),
                 TestClient(app) as client,
             ):
@@ -110,6 +131,7 @@ def main() -> None:
                         "M24_CASE"
                     ].split(","):
                         continue
+                    rows.clear()
                     started = time.monotonic()
                     response = client.post("/v1/chat/completions", json=case["request"])
                     print(name, response.status_code, flush=True)
@@ -122,7 +144,7 @@ def main() -> None:
                     )
                     request_path.write_text(json.dumps(case["request"]))
                     response_path.write_text(json.dumps(answer))
-                    capture(name, request_path, response_path)
+                    capture(name, request_path, response_path, rows)
                     updated = json.loads(gzip.decompress(archive.read_bytes()))[name]
                     validate(name, updated, answer)
                     print(name, "useful artifacts validated", flush=True)
