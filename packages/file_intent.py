@@ -46,3 +46,18 @@ def produces_file(text: str, *, include_images: bool = True) -> bool:
             )
         )
     )
+
+
+def edits_attachment(text: str) -> bool:
+    """A request to change an attached file expects that file back (J43: "corrige ce fichier word")."""
+    plain = unicodedata.normalize("NFKD", text.casefold())
+    plain = "".join(c for c in plain if not unicodedata.combining(c))
+    return bool(
+        re.search(
+            r"\b(corrig\w*|nettoi\w*|nettoy\w*|modifi\w*|revis\w*|reformat\w*|restructur\w*"
+            r"|mets? a jour|met a jour|complete\w*|traduis\w*|translate\w*|edit\w*|fix\w*|correct\w*"
+            r"|update\w*|clean\w*|rewrite\w*|korrigier\w*|bearbeit\w*|uberarbeit\w*|aktualisier\w*"
+            r"|corrig\w*|edita\w*|actualiz\w*|modific\w*|aggiorn\w*)\b",
+            plain,
+        )
+    )

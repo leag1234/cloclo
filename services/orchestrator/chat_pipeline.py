@@ -508,7 +508,12 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
     from packages.file_intent import produces_file, requests_file_delivery
 
     produces_files = produces_file(request.messages[-1].text)
-    deliver_files = requests_file_delivery(request.messages[-1].text)
+    from packages.file_intent import edits_attachment
+
+    # Editing an attached file means returning it: keep the file tools (J43).
+    deliver_files = requests_file_delivery(request.messages[-1].text) or (
+        bool(request.documents) and edits_attachment(request.messages[-1].text)
+    )
     if (
         os.environ.get("ATLAS_TERMINAL_ENABLED") == "1"
         and not produces_files

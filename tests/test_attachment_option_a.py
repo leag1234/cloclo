@@ -225,3 +225,16 @@ class PasswordNoteTests(unittest.TestCase):
         )
         self.assertIn("mot de passe", note)
         self.assertIn("protected.pdf", note)
+
+
+class EditIntentTests(unittest.TestCase):
+    def test_editing_an_attached_file_is_file_delivery(self) -> None:
+        from packages.file_intent import edits_attachment
+
+        self.assertTrue(
+            edits_attachment("Prends ce fichier word et corrige les fautes.")
+        )
+        self.assertTrue(edits_attachment("Nettoie la structure de ce document."))
+        self.assertTrue(edits_attachment("Please fix the typos in this file."))
+        self.assertFalse(edits_attachment("Résume ce document en cinq points."))
+        self.assertFalse(edits_attachment("What does page 12 say?"))
