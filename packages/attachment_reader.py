@@ -239,8 +239,6 @@ ODF_EXTENSIONS = {".odt", ".ods", ".odp"}
 
 def odf_parts(raw: bytes, extension: str) -> list[str]:
     """Text of an OpenDocument file in document order: paragraphs, table rows, slides."""
-    import xml.etree.ElementTree as ET
-
     with zipfile.ZipFile(io.BytesIO(raw)) as archive:
         expanded = sum(info.file_size for info in archive.infolist())
         if expanded > MAX_BYTES * 4:
@@ -253,7 +251,10 @@ def odf_parts(raw: bytes, extension: str) -> list[str]:
         "table": "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
         "draw": "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0",
     }
-    flat = lambda node: "".join(node.itertext()).strip()  # noqa: E731
+
+    def flat(node: ET.Element) -> str:
+        return "".join(node.itertext()).strip()
+
     parts: list[str] = []
     if extension == ".ods":
         for sheet in root.iter("{%s}table" % ns["table"]):
