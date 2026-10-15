@@ -136,7 +136,9 @@ def stack(name: str = "atlas-chat", persistent: bool = True) -> Iterator[None]:
                 "-e",
                 "POSTGRES_HOST_AUTH_METHOD=trust",
                 "-p",
-                f"127.0.0.1:{ports.port('postgres')}:5432",
+                # A random loopback port: already safe for parallel stacks, and
+                # 5432 is often taken (host Postgres, CI services).
+                "127.0.0.1::5432",
                 *volume,
             ],
         )
