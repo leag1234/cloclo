@@ -127,11 +127,12 @@ def validate(name: str, case: dict[str, Any], answer: dict[str, Any]) -> None:
     )
     # Owner ruling 2026-09-21: file production shares the attachment ceiling.
     produces_files = bool(case["artifacts"])
-    assert (
-        0
-        < answer["atlas"]["cost_eur"]
-        <= (0.30 if attached or produces_files else 0.10)
-    )
+    ceiling = 0.30 if attached or produces_files else 0.10
+    if name == "J46":
+        # An unreadable document is answered by its reading note, without a model call.
+        assert 0 <= answer["atlas"]["cost_eur"] <= ceiling
+    else:
+        assert 0 < answer["atlas"]["cost_eur"] <= ceiling
     artifacts = {
         artifact["url"].rsplit(".", 1)[-1]: base64.b64decode(
             artifact["bytes"], validate=True
