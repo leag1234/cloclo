@@ -25,6 +25,25 @@ def without_unretrieved(text: str, retrieved: set[str]) -> str:
     return text
 
 
+def inline_source_markers(text: str, retrieved: list[str]) -> str:
+    """Turn retrieved web URLs into compact Markdown links Open WebUI renders."""
+    numbers = {url: index for index, url in enumerate(dict.fromkeys(retrieved), 1)}
+
+    def markdown(match: re.Match[str]) -> str:
+        url = match.group(1).rstrip(".,;:)]}>'\"")
+        return f"[{numbers[url]}]({url})" if url in numbers else match.group(0)
+
+    text = re.sub(r"\[[^\]]+\]\((https?://[^\s)]+)\)", markdown, text)
+
+    def bare(match: re.Match[str]) -> str:
+        url = match[0].rstrip(".,;:)]}>'\"")
+        tail = match[0][len(url) :]
+        return f"[{numbers[url]}]({url}){tail}" if url in numbers else match[0]
+
+    rendered = re.sub(r"(?<!\]\()https?://[^\s<>\"'()\]]+", bare, text)
+    return rendered
+
+
 def source_footer(retrieved: list[str], language: str) -> str:
     """Expose the actual retrieval trail separately from the model's citations."""
     import json
