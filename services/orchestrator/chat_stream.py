@@ -6,6 +6,7 @@ import json
 import logging
 import html
 import os
+from packages.ports import atlas_ports
 from pathlib import Path
 import re
 import time
@@ -121,7 +122,8 @@ def response(
                         for u in re.findall(
                             re.escape(
                                 os.environ.get(
-                                    "ATLAS_PUBLIC_URL", "http://localhost:8020"
+                                    "ATLAS_PUBLIC_URL",
+                                    atlas_ports().url("adapter", "localhost"),
                                 ).rstrip("/")
                             )
                             + r"/sources/[a-f0-9]{64}",

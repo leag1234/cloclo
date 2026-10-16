@@ -8,6 +8,7 @@ import asyncio
 import json
 import copy
 import os
+from packages.ports import atlas_ports
 import re
 import time
 from decimal import Decimal
@@ -92,7 +93,9 @@ async def render_citations(item: Interaction) -> None:
         ):
             raise ValueError("citation_changed")
         item.citations.append(resolved)
-        url = os.environ.get("ATLAS_PUBLIC_URL", "http://localhost:8020").rstrip("/")
+        url = os.environ.get(
+            "ATLAS_PUBLIC_URL", atlas_ports().url("adapter", "localhost")
+        ).rstrip("/")
         item.reponse = re.sub(
             r"[`\[]?" + key + r"[`\]]?",
             f"[Source {number}]({url}/sources/{key})",
@@ -435,7 +438,8 @@ async def process(request: ChatRequest, item: Interaction) -> None:
                 re.findall(
                     re.escape(
                         os.environ.get(
-                            "ATLAS_PUBLIC_URL", "http://localhost:8020"
+                            "ATLAS_PUBLIC_URL",
+                            atlas_ports().url("adapter", "localhost"),
                         ).rstrip("/")
                     )
                     + r"/sources/[a-f0-9]{64}",
@@ -471,7 +475,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         return
     started = time.monotonic()
     model = await GatewayModel.connect(
-        os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"),
+        os.environ.get("ATLAS_GATEWAY_URL", atlas_ports().url("gateway")),
         local_enabled=os.environ.get("GPU_LOCAL", "0") == "1",
     )
     discovery = (

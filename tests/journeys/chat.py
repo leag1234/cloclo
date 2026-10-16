@@ -3,13 +3,14 @@
 import base64
 import json
 import os
+from packages.ports import atlas_ports
 from pathlib import Path
 import re
 from urllib.request import Request, urlopen
 
 from journey_language import matches
 
-API = os.environ.get("ATLAS_CHAT_API", "http://127.0.0.1:8020")
+API = os.environ.get("ATLAS_CHAT_API", atlas_ports().url("adapter"))
 
 
 def ask(

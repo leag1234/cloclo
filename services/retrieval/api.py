@@ -1,6 +1,7 @@
 """Retrieval-owned HTTP boundary for M7; no cross-service database access."""
 
 import os
+from packages.ports import atlas_ports
 
 from fastapi import FastAPI, HTTPException
 from psycopg import Error as DatabaseError
@@ -29,7 +30,7 @@ def search(request: Request) -> dict[str, object]:
         ranked = rank_scored(
             request.query,
             store().read(),
-            Gateway(os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010")),
+            Gateway(os.environ.get("ATLAS_GATEWAY_URL", atlas_ports().url("gateway"))),
         )
         return {
             "passages": [{**public(chunk), "score": score} for chunk, score in ranked]

@@ -3,6 +3,7 @@
 from decimal import Decimal
 import json
 import os
+from packages.ports import atlas_ports
 from pathlib import Path
 import time
 
@@ -115,7 +116,7 @@ async def process_documents(request: ChatRequest, item: Interaction) -> None:
             await sink({"delta": {"content": notice}})
         return
     model = await GatewayModel.connect(
-        os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"),
+        os.environ.get("ATLAS_GATEWAY_URL", atlas_ports().url("gateway")),
         local_enabled=False,
     )
     model.configure_quality(request.model, request.max_tokens, has_attachments=True)

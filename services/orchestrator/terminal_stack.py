@@ -11,6 +11,7 @@ import socketserver
 import threading
 
 import uvicorn
+from packages.ports import atlas_ports
 
 NETWORK = "atlas-files"
 IMAGE = "ghcr.io/open-webui/open-terminal@sha256:3d52176700f2442e20556ef129ae980613389be773e269cf7fa0118f3b55669d"
@@ -66,7 +67,8 @@ def command(*args: str) -> str:
 
 
 def network_gateway() -> str:
-    value = json.loads(command("docker", "network", "inspect", NETWORK))[0]
+    network = atlas_ports().name(NETWORK)
+    value = json.loads(command("docker", "network", "inspect", network))[0]
     if (
         not value.get("Internal")
         or value.get("Labels", {}).get("atlas.owner") != "files"
@@ -119,6 +121,9 @@ def adapter_socket(port: int) -> socket.socket:
 def terminal(name: str, binding: str) -> Iterator[None]:
     from services.orchestrator.serving import wait_http
 
+    ports = atlas_ports()
+    network = ports.name(NETWORK)
+    name = ports.name(name)
     if not os.environ.get("OPEN_TERMINAL_API_KEY", "").strip():
         raise RuntimeError("missing_configuration: OPEN_TERMINAL_API_KEY")
     exists = command(
@@ -126,7 +131,7 @@ def terminal(name: str, binding: str) -> Iterator[None]:
         "network",
         "ls",
         "--filter",
-        "name=^" + NETWORK + "$",
+        "name=^" + network + "$",
         "--format",
         "{{.Name}}",
     )
@@ -138,7 +143,7 @@ def terminal(name: str, binding: str) -> Iterator[None]:
             "--internal",
             "--label",
             "atlas.owner=files",
-            NETWORK,
+            network,
         )
     network_gateway()
     existing = command(
@@ -166,7 +171,7 @@ def terminal(name: str, binding: str) -> Iterator[None]:
             "--label",
             "atlas.owner=files",
             "--network",
-            NETWORK,
+            network,
             "--network-alias",
             "open-terminal",
             "--cap-drop",
@@ -183,7 +188,7 @@ def terminal(name: str, binding: str) -> Iterator[None]:
             "--tmpfs",
             "/tmp:rw,nosuid,nodev,size=128m,uid=1000,gid=1000",
             "-v",
-            "atlas-terminal-files:/home/user",
+            ports.name("atlas-terminal-files") + ":/home/user",
             "-e",
             "OPEN_TERMINAL_API_KEY",
             "-e",
@@ -192,13 +197,15 @@ def terminal(name: str, binding: str) -> Iterator[None]:
             "/bin/sh",
             IMAGE,
             "-c",
-            "while ! test -f /tmp/atlas-network-ready; do sleep 0.1; done; exec python3 -m open_terminal run --host 0.0.0.0 --port 8000",
+            "while ! test -f /tmp/atlas-network-ready; do sleep 0.1; done; "
+            "exec python3 -m open_terminal run --host 0.0.0.0 --port "
+            + str(ports.port("terminal")),
         )
         started = True
         contain(name)
         details = json.loads(command("docker", "inspect", name))[0]
-        address = details["NetworkSettings"]["Networks"][NETWORK]["IPAddress"]
-        with loopback_forward(binding, (address, 8000)):
+        address = details["NetworkSettings"]["Networks"][network]["IPAddress"]
+        with loopback_forward(binding, (address, ports.port("terminal"))):
             try:
                 wait_http("http://" + binding + "/docs", 30)
             except RuntimeError:
@@ -229,7 +236,10 @@ def user_interface(name: str, persistent: bool) -> Iterator[None]:
     """Expose the native UI and adapter on the contained user-file network."""
     from services.orchestrator.serving import docker, wait_http, webui
 
-    listener = adapter_socket(8020)
+    ports = atlas_ports()
+    network = ports.name(NETWORK)
+    name = ports.name(name)
+    listener = adapter_socket(ports.port("adapter"))
     adapter = uvicorn.Server(
         uvicorn.Config(
             "services.orchestrator.chat_api:app", log_level="error", access_log=False
@@ -244,9 +254,10 @@ def user_interface(name: str, persistent: bool) -> Iterator[None]:
         webui(name, persistent)
         started = True
         details = json.loads(docker("inspect", name))[0]
-        address = details["NetworkSettings"]["Networks"][NETWORK]["IPAddress"]
-        with loopback_forward("127.0.0.1:3000", (address, 3000)):
-            wait_http("http://127.0.0.1:3000")
+        address = details["NetworkSettings"]["Networks"][network]["IPAddress"]
+        binding = "127.0.0.1:" + str(ports.port("chat_ui"))
+        with loopback_forward(binding, (address, ports.port("chat_ui"))):
+            wait_http(ports.url("chat_ui"))
             yield
     finally:
         if started:

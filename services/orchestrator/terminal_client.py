@@ -13,6 +13,7 @@ from typing import Literal
 from urllib.parse import quote
 
 import aiohttp
+from packages.ports import atlas_ports
 from pydantic import BaseModel, ConfigDict, Field
 
 from services.orchestrator.documents import Attachment, MAX_BYTES
@@ -108,7 +109,7 @@ class TerminalClient:
         ) as client:
             async with client.request(
                 method,
-                "http://127.0.0.1:8000" + path,
+                atlas_ports().url("terminal") + path,
                 json=payload,
                 data=data,
                 params=params,

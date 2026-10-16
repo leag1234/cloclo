@@ -2,6 +2,7 @@
 
 import json
 import os
+from packages.ports import atlas_ports
 import sys
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -25,7 +26,7 @@ def main() -> None:
     chunks = rank(
         request.query,
         store.read(),
-        Gateway(os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010")),
+        Gateway(os.environ.get("ATLAS_GATEWAY_URL", atlas_ports().url("gateway"))),
     )
     print(
         json.dumps(

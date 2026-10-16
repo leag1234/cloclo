@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from packages.ports import atlas_ports
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -13,7 +14,7 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 def configure() -> None:
-    base = "http://127.0.0.1:3000/api/v1"
+    base = atlas_ports().url("chat_ui") + "/api/v1"
     token = ""
     opener = build_opener(NoRedirect)
 

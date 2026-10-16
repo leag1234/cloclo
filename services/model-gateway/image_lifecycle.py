@@ -12,6 +12,7 @@ import urllib.error
 import urllib.request
 
 from packages.configuration import IMAGE_REQUIRED_ENV, require_env
+from packages.ports import atlas_ports
 from packages.limits import ProviderLimitError
 
 
@@ -23,7 +24,7 @@ def ready() -> bool:
         )
         ipaddress.IPv4Address(address)
         with urllib.request.urlopen(
-            f"http://{address}:8000/health", timeout=1
+            atlas_ports().url("terminal", address) + "/health", timeout=1
         ) as response:
             return bool(response.status == 200)
     except (OSError, ValueError, urllib.error.URLError):

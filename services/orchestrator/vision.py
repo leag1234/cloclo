@@ -1,6 +1,7 @@
 """Vision branch materializes owned image references only for the current request."""
 
 import os
+from packages.ports import atlas_ports
 import json
 import re
 from pathlib import Path
@@ -69,7 +70,9 @@ async def process_vision(request: ChatRequest, item: Interaction) -> None:
     try:
         result = VisionReply.model_validate(
             await GatewayModel.post(
-                os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010").rstrip("/")
+                os.environ.get(
+                    "ATLAS_GATEWAY_URL", atlas_ports().url("gateway")
+                ).rstrip("/")
                 + "/vision/complete",
                 {
                     "messages": [m.model_dump() for m in request.messages],

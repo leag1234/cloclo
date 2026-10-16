@@ -3,6 +3,7 @@
 import json
 from decimal import Decimal
 import os
+from packages.ports import atlas_ports
 import re
 import time
 from pathlib import Path
@@ -148,7 +149,7 @@ async def process_project(request: ChatRequest, item: Interaction) -> None:
             )
         return
     model = await GatewayModel.connect(
-        os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"),
+        os.environ.get("ATLAS_GATEWAY_URL", atlas_ports().url("gateway")),
         local_enabled=False,
     )
     model.local_enabled, model.observing = False, True

@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import os
+from packages.ports import atlas_ports
 import time
 from decimal import Decimal
 from packages.images import ImageURL
@@ -44,7 +45,7 @@ async def process_image(
         if os.environ.get("ATLAS_IMAGE_ON_DEMAND") == "1":
             # Provision through the gateway; M13 accounts for loading separately.
             gateway = os.environ.get(
-                "ATLAS_GATEWAY_URL", "http://127.0.0.1:8010"
+                "ATLAS_GATEWAY_URL", atlas_ports().url("gateway")
             ).rstrip("/")
             health = await GatewayModel.post(
                 gateway + "/images/ready", {}, min(3, timeout)
@@ -66,7 +67,7 @@ async def process_image(
             if timeout <= 0:
                 raise TimeoutError("image_worker_start_timeout")
         response = await GatewayModel.post(
-            os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010")
+            os.environ.get("ATLAS_GATEWAY_URL", atlas_ports().url("gateway"))
             + "/images/generate",
             {
                 "prompt": prompt,

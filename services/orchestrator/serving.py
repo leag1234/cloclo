@@ -13,6 +13,7 @@ from urllib.request import urlopen
 from urllib.error import URLError
 
 from packages.configuration import CHAT_REQUIRED_ENV, require_env
+from packages.ports import atlas_ports
 from services.orchestrator.webui import configure
 
 import uvicorn
@@ -59,11 +60,13 @@ def webui(name: str, persistent: bool) -> None:
     from services.orchestrator.terminal_stack import NETWORK, network_gateway
 
     gateway = network_gateway()
+    ports = atlas_ports()
+    name = ports.name(name)
     os.environ["TERMINAL_SERVER_CONNECTIONS"] = json.dumps(
         [
             {
                 "id": "atlas-files",
-                "url": "http://open-terminal:8000",
+                "url": "http://open-terminal:" + str(ports.port("terminal")),
                 "key": os.environ["OPEN_TERMINAL_API_KEY"],
                 "auth_type": "bearer",
                 "config": {"chat_uploads": "filesystem"},
@@ -73,17 +76,19 @@ def webui(name: str, persistent: bool) -> None:
     )
     options = [
         "--network",
-        NETWORK,
+        ports.name(NETWORK),
         "--env-file",
         "infra/chat-ui.env",
         "-e",
         "HOST=0.0.0.0",
         "-e",
+        "PORT=" + str(ports.port("chat_ui")),
+        "-e",
         "TERMINAL_SERVER_CONNECTIONS",
         "-e",
-        f"OPENAI_API_BASE_URL=http://{gateway}:8020/v1",
+        f"OPENAI_API_BASE_URL=http://{gateway}:{ports.port('adapter')}/v1",
         "-e",
-        f"ATLAS_ADAPTER_URL=http://{gateway}:8020",
+        f"ATLAS_ADAPTER_URL=http://{gateway}:{ports.port('adapter')}",
     ]
     options.extend(
         [
@@ -93,7 +98,7 @@ def webui(name: str, persistent: bool) -> None:
         ]
     )
     if persistent:
-        options.extend(["-v", "atlas-chat-ui:/app/backend/data"])
+        options.extend(["-v", ports.name("atlas-chat-ui") + ":/app/backend/data"])
     docker_run(name, WEBUI_IMAGE, options)
 
 
@@ -111,6 +116,8 @@ def wait_http(url: str, timeout: float = 120) -> None:
 
 @contextmanager
 def stack(name: str = "atlas-chat", persistent: bool = True) -> Iterator[None]:
+    ports = atlas_ports()
+    name = ports.name(name)
     servers: list[uvicorn.Server] = []
     threads: list[threading.Thread] = []
     database = name + "-db"
@@ -118,12 +125,22 @@ def stack(name: str = "atlas-chat", persistent: bool = True) -> Iterator[None]:
     gateway = None
     try:
         volume = (
-            ["-v", "atlas-chat-index:/var/lib/postgresql/data"] if persistent else []
+            ["-v", ports.name("atlas-chat-index") + ":/var/lib/postgresql/data"]
+            if persistent
+            else []
         )
         docker_run(
             database,
             "pgvector/pgvector:pg16",
-            ["-e", "POSTGRES_HOST_AUTH_METHOD=trust", "-p", "127.0.0.1::5432", *volume],
+            [
+                "-e",
+                "POSTGRES_HOST_AUTH_METHOD=trust",
+                "-p",
+                # A random loopback port: already safe for parallel stacks, and
+                # 5432 is often taken (host Postgres, CI services).
+                "127.0.0.1::5432",
+                *volume,
+            ],
         )
         started = True
         port = docker("port", database, "5432").rsplit(":", 1)[1]
@@ -142,17 +159,17 @@ def stack(name: str = "atlas-chat", persistent: bool = True) -> Iterator[None]:
             time.sleep(0.5)
         else:
             raise RuntimeError("database_start_timeout")
-        gateway = serve(CPUModels(), 8010)
+        gateway = serve(CPUModels(), ports.port("gateway"))
         thread = threading.Thread(target=gateway.serve_forever, daemon=True)
         thread.start()
         threads.append(thread)
-        os.environ["ATLAS_GATEWAY_URL"] = "http://127.0.0.1:8010"
+        os.environ["ATLAS_GATEWAY_URL"] = ports.url("gateway")
         store = Store(os.environ["ATLAS_RETRIEVAL_DSN"])
         store.initialize()
         ingest(Path("corpus"), store, Gateway(os.environ["ATLAS_GATEWAY_URL"]))
         for app, port_number in (
-            ("services.retrieval.api:app", 8011),
-            ("services.orchestrator.chat_api:app", 8020),
+            ("services.retrieval.api:app", ports.port("retrieval")),
+            ("services.orchestrator.chat_api:app", ports.port("adapter")),
         ):
             server = uvicorn.Server(
                 uvicorn.Config(
@@ -167,8 +184,8 @@ def stack(name: str = "atlas-chat", persistent: bool = True) -> Iterator[None]:
             thread = threading.Thread(target=server.run, daemon=True)
             thread.start()
             threads.append(thread)
-        wait_http("http://127.0.0.1:8011/openapi.json")
-        wait_http("http://127.0.0.1:8020/v1/models")
+        wait_http(ports.url("retrieval") + "/openapi.json")
+        wait_http(ports.url("adapter") + "/v1/models")
         if not all(server.started for server in servers):
             raise RuntimeError("service_bind_failed")
         yield
@@ -206,13 +223,22 @@ def run() -> None:
     from services.orchestrator.terminal_stack import terminal, user_interface
 
     # Open Terminal owns only user files; its loopback publisher is not a host mount.
-    with terminal("atlas-open-terminal", "127.0.0.1:8000"), stack():
+    ports = atlas_ports()
+    # Loopback only, never a public interface; base 0 keeps the historical binding.
+    binding = (
+        "127.0.0.1:8000"
+        if ports.base == 0
+        else "127.0.0.1:" + str(ports.port("terminal"))
+    )
+    with terminal("atlas-open-terminal", binding), stack():
         os.environ["ATLAS_TERMINAL_ENABLED"] = "1"
         try:
             with user_interface("atlas-chat-ui", True):
                 configure()
                 print(
-                    "ATLAS ready: http://localhost:3000 (SSH tunnel), GPU_LOCAL="
+                    "ATLAS ready: "
+                    + ports.url("chat_ui", "localhost")
+                    + " (SSH tunnel), GPU_LOCAL="
                     + os.environ.get("GPU_LOCAL", "0"),
                     flush=True,
                 )

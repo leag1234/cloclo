@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import os
+from packages.ports import atlas_ports
 import re
 from pathlib import Path
 
@@ -101,7 +102,7 @@ def main() -> None:
     ingest(
         args.corpus,
         store,
-        Gateway(os.environ.get("ATLAS_GATEWAY_URL", "http://127.0.0.1:8010")),
+        Gateway(os.environ.get("ATLAS_GATEWAY_URL", atlas_ports().url("gateway"))),
     )
 
 

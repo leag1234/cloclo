@@ -1,6 +1,7 @@
 """Local human confirmation, bound to immutable arguments and configuration."""
 
 from packages.limits import LimitError
+from packages.ports import atlas_ports
 
 import asyncio
 from dataclasses import dataclass
@@ -55,7 +56,9 @@ def prepare(call: mcp.MCPCall) -> dict[str, object]:
         )
     return {
         "error": "confirmation_required",
-        "confirmation_url": "http://localhost:8020/mcp/confirm/" + key,
+        "confirmation_url": atlas_ports().url("adapter", "localhost")
+        + "/mcp/confirm/"
+        + key,
     }
 
 
