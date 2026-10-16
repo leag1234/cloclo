@@ -5,7 +5,17 @@ import unittest
 from collections.abc import AsyncGenerator
 
 from m21_gate import assert_derivation, assert_guitar_geometry
-from provider_recording import ExactHistory, capture_stream, capture_tool, replay_stream
+from provider_recording import (
+    ExactHistory,
+    canonical_json,
+    capture_stream,
+    capture_tool,
+    match_request,
+    mismatch_report,
+    plan_refresh,
+    replay_stream,
+    request_manifest,
+)
 
 
 class RecordingTests(unittest.IsolatedAsyncioTestCase):
@@ -105,6 +115,90 @@ class RecordingTests(unittest.IsolatedAsyncioTestCase):
         replayed = [event async for event in replay_stream(saved[0])]
         self.assertEqual(len(saved), 1)
         self.assertEqual(replayed, original)
+
+
+class ManifestMatcherTests(unittest.TestCase):
+    def test_canonical_json_retains_unicode_and_sorts_nested_tools(self) -> None:
+        left = {
+            "tools": [{"function": {"name": "cherche", "parameters": {"é": 1}}}],
+            "messages": [{"content": "Bonjour 🌍", "role": "user"}],
+        }
+        right = {
+            "messages": [{"role": "user", "content": "Bonjour 🌍"}],
+            "tools": [{"function": {"parameters": {"é": 1}, "name": "cherche"}}],
+        }
+        self.assertEqual(canonical_json(left), canonical_json(right))
+
+    def test_nested_message_and_tool_difference_has_exact_json_path(self) -> None:
+        recorded = {
+            "messages": [{"role": "system", "content": "rule"}],
+            "tools": [{"function": {"name": "search", "parameters": {"n": 3}}}],
+        }
+        current = {
+            "messages": [{"role": "system", "content": "changed"}],
+            "tools": [{"function": {"name": "search", "parameters": {"n": 4}}}],
+        }
+        result = match_request("stream", recorded, current)
+        self.assertEqual(result["matched"], "none")
+        diffs = result["diffs"]
+        assert isinstance(diffs, list)
+        self.assertTrue(
+            any(str(diff).startswith("messages[0].content:") for diff in diffs)
+        )
+        self.assertIn("tools[0].function.parameters.n: 3 -> 4", diffs)
+
+    def test_timeout_is_the_only_default_normalisation(self) -> None:
+        result = match_request(
+            "stream",
+            {"timeout": 10, "budget_eur": 0.10},
+            {"timeout": 20, "budget_eur": 0.50},
+        )
+        self.assertEqual(result["matched"], "none")
+        diffs = result["diffs"]
+        assert isinstance(diffs, list)
+        self.assertIn("budget_eur: 0.1 -> 0.5", diffs)
+        with self.assertRaisesRegex(ValueError, "unsafe_manifest_exclusion:budget_eur"):
+            request_manifest("stream", {"budget_eur": 0.10}, ("budget_eur",))
+
+    def test_mismatch_report_hashes_prompt_and_keeps_budget_delta(self) -> None:
+        match = match_request(
+            "stream",
+            {"messages": [{"content": "old", "role": "system"}], "budget_eur": 0.10},
+            {"messages": [{"content": "new", "role": "system"}], "budget_eur": 0.50},
+        )
+        self.assertEqual(
+            mismatch_report(match),
+            ["budget_eur: 0.1 -> 0.5", "messages[0].content: prompt hash changed"],
+        )
+
+    def test_duplicate_rows_are_each_reused_once_and_planned(self) -> None:
+        rows = [
+            {"kind": "search", "request": {"query": "same"}, "response": 1},
+            {"kind": "search", "request": {"query": "same"}, "response": 2},
+        ]
+        history = ExactHistory(rows)
+        self.assertEqual(history.take("search", {"query": "same"}), 1)
+        self.assertEqual(history.take("search", {"query": "same"}), 2)
+        self.assertIsNone(history.take("search", {"query": "same"}))
+        plan = plan_refresh(
+            rows,
+            [
+                {"kind": "search", "request": {"query": "same"}},
+                {"kind": "search", "request": {"query": "changed"}},
+            ],
+        )
+        self.assertEqual(plan["reusable"], 1)
+        self.assertEqual(plan["live_capture"], 1)
+        planned_rows = plan["rows"]
+        assert isinstance(planned_rows, list)
+        first, second = planned_rows
+        assert isinstance(first, dict)
+        assert isinstance(second, dict)
+        self.assertEqual(first["action"], "reuse")
+        self.assertEqual(second["action"], "live_capture")
+        reason = second["reason"]
+        assert isinstance(reason, list)
+        self.assertIn('query: "same" -> "changed"', reason)
 
 
 class AnswerQualityTests(unittest.TestCase):

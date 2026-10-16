@@ -20,7 +20,15 @@ from vision import VisionProvider
 import imagegen
 import stream_transport
 from serverless_support import environment
-from provider_recording import ExactHistory, capture_stream, capture_tool, replay_stream
+from provider_recording import (
+    ExactHistory,
+    capture_stream,
+    capture_tool,
+    match_request,
+    mismatch_report,
+    request_manifest,
+    replay_stream,
+)
 from services.orchestrator.serving import stack
 from services.orchestrator.tools import Runtime
 
@@ -59,6 +67,7 @@ def main() -> None:
     rows: list[dict[str, Any]] = previous if resume or not (live or refresh) else []
     prefix_count = len(previous) if resume else 0
     position = 0
+    replay_summary: list[dict[str, object]] = []
     generating = False
     injected_timeout = False
 
@@ -70,17 +79,45 @@ def main() -> None:
 
     def replay(kind: str, request: object) -> Any:
         nonlocal position
+        if position >= len(rows):
+            raise AssertionError(
+                f"unrecorded_journey_exchange:{position + 1}:{kind}: no recorded row"
+            )
         row = rows[position]
         position += 1
-        if row["kind"] != kind or cassette_request(row["request"]) != cassette_request(
-            request
-        ):
-            raise AssertionError(f"unrecorded_journey_exchange:{position}:{kind}")
+        if row["kind"] != kind:
+            raise AssertionError(
+                f"unrecorded_journey_exchange:{position}:{kind}: kind: {row['kind']} -> {kind}"
+            )
+        match = match_request(
+            kind, cassette_request(row["request"]), cassette_request(request)
+        )
+        if match["matched"] == "none":
+            raise AssertionError(
+                f"unrecorded_journey_exchange:{position}:{kind}: "
+                + "; ".join(mismatch_report(match))
+            )
+        replay_summary.append(
+            {
+                "row": position,
+                "kind": kind,
+                "matched": match["matched"],
+                "excluded_paths": match["excluded_paths"],
+                "prompt_hashes": match["prompt_hashes"],
+            }
+        )
         return copy.deepcopy(row["response"])
 
     def record(kind: str, request: object, response: object) -> None:
         rows.append(
-            copy.deepcopy({"kind": kind, "request": request, "response": response})
+            copy.deepcopy(
+                {
+                    "kind": kind,
+                    "request": request,
+                    "response": response,
+                    "manifest": request_manifest(kind, request),
+                }
+            )
         )
         encoded = json.dumps(rows, ensure_ascii=False).encode()
         assert not any(
@@ -234,6 +271,10 @@ def main() -> None:
         )
         if completed.returncode:
             raise SystemExit(completed.returncode)
+        if not live and not refresh:
+            summary_path = Path("BRAIN/eval/journey-replay-summary.json")
+            summary_path.parent.mkdir(parents=True, exist_ok=True)
+            summary_path.write_text(json.dumps(replay_summary, indent=2))
         if not live and not refresh and position != len(rows):
             raise AssertionError("unused_journey_exchanges")
 
