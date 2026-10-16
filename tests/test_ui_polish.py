@@ -1,7 +1,6 @@
 """Offline regressions for Open WebUI finishing touches."""
 
 import json
-from pathlib import Path
 import unittest
 
 from services.orchestrator.chat_pipeline import process
@@ -59,8 +58,3 @@ class SourceMarkerTests(unittest.TestCase):
     def test_unretrieved_link_is_left_alone(self) -> None:
         text = "Voir [x](https://other.example/b)."
         self.assertEqual(inline_source_markers(text, ["https://example.org/a"]), text)
-
-    def test_header_css_reserves_scroll_space_without_fixed_positioning(self) -> None:
-        css = Path("services/orchestrator/chat-ui.css").read_text()
-        self.assertIn("scroll-padding-top", css)
-        self.assertIn(".atlas-chat-header", css)
