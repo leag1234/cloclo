@@ -15,6 +15,7 @@ from typing import Any
 from unittest.mock import patch
 from urllib.request import Request, urlopen
 
+from packages.ports import atlas_ports
 import stream_transport
 from serverless_support import environment
 from provider_recording import capture_stream, capture_tool, replay_stream
@@ -126,7 +127,7 @@ def main() -> None:
         events: list[Any] = []
         with urlopen(
             Request(
-                "http://127.0.0.1:8020/v1/chat/completions",
+                atlas_ports().url("adapter") + "/v1/chat/completions",
                 data=json.dumps(payload).encode(),
                 headers={"Content-Type": "application/json"},
             ),
@@ -186,7 +187,7 @@ def main() -> None:
                 "ATLAS_SEARCH_PROVIDER": "tavily",
                 "ATLAS_INTERACTION_DIR": directory + "/logs",
                 "ATLAS_PROJECT_DB": directory + "/projects.sqlite",
-                "ATLAS_PUBLIC_URL": "http://localhost:8020",
+                "ATLAS_PUBLIC_URL": atlas_ports().url("adapter", "localhost"),
             },
         ),
         patch.object(stream_transport, "attempt", stream),

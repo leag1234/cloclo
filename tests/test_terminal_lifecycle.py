@@ -5,6 +5,7 @@ import os
 import unittest
 from unittest.mock import patch
 
+from packages.ports import atlas_ports
 from services.orchestrator import serving
 
 
@@ -24,7 +25,12 @@ class TerminalLifecycleTests(unittest.TestCase):
         self.assertEqual(options[options.index("--network") + 1], "atlas-files")
         self.assertNotIn("-p", options)
         self.assertIn("HOST=0.0.0.0", options)
-        self.assertIn("OPENAI_API_BASE_URL=http://172.30.0.1:8020/v1", options)
+        self.assertIn(
+            "OPENAI_API_BASE_URL=http://172.30.0.1:"
+            + str(atlas_ports().port("adapter"))
+            + "/v1",
+            options,
+        )
         self.assertIn("TERMINAL_SERVER_CONNECTIONS", options)
         self.assertEqual(connection["url"], "http://open-terminal:8000")
         self.assertEqual(connection["config"]["chat_uploads"], "filesystem")

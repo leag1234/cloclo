@@ -9,10 +9,16 @@ import time
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from packages.ports import atlas_ports
+
 
 def ready() -> bool:
     try:
-        for port, path in ((3000, "/"), (8020, "/v1/models")):
+        ports = atlas_ports()
+        for port, path in (
+            (ports.port("chat_ui"), "/"),
+            (ports.port("adapter"), "/v1/models"),
+        ):
             with urlopen(f"http://127.0.0.1:{port}{path}", timeout=2) as response:
                 if response.status != 200:
                     return False

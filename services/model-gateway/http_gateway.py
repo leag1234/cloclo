@@ -18,12 +18,15 @@ from vision import VisionProvider
 from packages.context_limit import ContextExceeded
 from packages.image_upload import UploadError
 from packages.configuration import MissingConfiguration
+from packages.ports import atlas_ports
 
 import imagegen
 import image_lifecycle
 
 
-def serve(backend: CPUModels, port: int = 8010) -> HTTPServer:
+def serve(backend: CPUModels, port: int | None = None) -> HTTPServer:
+    port = atlas_ports().port("gateway") if port is None else port
+
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: object) -> None:
             pass  # Request bodies and URLs must not enter infrastructure logs.

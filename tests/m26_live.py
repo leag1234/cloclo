@@ -18,6 +18,7 @@ from typing import Any
 from urllib.parse import unquote
 from unittest.mock import patch
 
+from packages.ports import atlas_ports
 from fastapi.testclient import TestClient
 from gateway_cpu import CPUModels
 from http_gateway import serve
@@ -54,25 +55,32 @@ def preserve_files(root: Path, name: str, files: list[str]) -> list[dict[str, An
 def terminal_connection() -> Iterator[None]:
     from services.orchestrator.terminal_stack import loopback_forward
 
+    ports = atlas_ports()
     with socket.socket() as check:
-        if check.connect_ex(("127.0.0.1", 8000)) == 0:
+        if check.connect_ex(("127.0.0.1", ports.port("terminal"))) == 0:
             yield
             return
     inspected = subprocess.run(
-        ["docker", "inspect", "atlas-open-terminal"], capture_output=True, text=True
+        ["docker", "inspect", ports.name("atlas-open-terminal")],
+        capture_output=True,
+        text=True,
     )
     if inspected.returncode == 0:
         details = json.loads(inspected.stdout)[0]
         if details["Config"].get("Labels", {}).get("atlas.owner") != "files":
             raise RuntimeError("terminal_container_owner_mismatch")
         if details["State"]["Running"]:
-            address = details["NetworkSettings"]["Networks"]["atlas-files"]["IPAddress"]
-            with loopback_forward("127.0.0.1:8000", (address, 8000)):
+            address = details["NetworkSettings"]["Networks"][ports.name("atlas-files")][
+                "IPAddress"
+            ]
+            with loopback_forward(
+                "127.0.0.1:" + str(ports.port("terminal")), (address, 8000)
+            ):
                 yield
             return
     from services.orchestrator.terminal_stack import terminal
 
-    with terminal("atlas-m26-terminal", "127.0.0.1:8000"):
+    with terminal("atlas-m26-terminal", "127.0.0.1:" + str(ports.port("terminal"))):
         yield
 
 

@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 
+from packages.ports import atlas_ports
 from services.retrieval.search import Gateway, rank, tokens
 from services.retrieval.store import Chunk
 
@@ -29,7 +30,7 @@ class SearchTests(unittest.TestCase):
                 ("c", "database incident", [0.0, 1.0]),
             ]
         ]
-        gateway = Gateway("http://127.0.0.1:8010")
+        gateway = Gateway(atlas_ports().url("gateway"))
         with (
             patch.object(gateway, "embed", return_value=([[1.0, 0.0]], "rev")),
             patch.object(
@@ -49,7 +50,7 @@ class SearchTests(unittest.TestCase):
                 rank("q", chunks, gateway)
 
     def test_invalid_provider_vectors(self) -> None:
-        gateway = Gateway("http://127.0.0.1:8010")
+        gateway = Gateway(atlas_ports().url("gateway"))
         for vectors in [[[0.0]], [[float("nan")]], [[1.0], [2.0]]]:
             with patch.object(
                 gateway, "post", return_value={"vectors": vectors, "revision": "rev"}
@@ -66,7 +67,7 @@ class SearchTests(unittest.TestCase):
         from email.message import Message
         from urllib.error import HTTPError, URLError
 
-        gateway = Gateway("http://127.0.0.1:8010/")
+        gateway = Gateway(atlas_ports().url("gateway") + "/")
         with patch(
             "services.retrieval.search.urlopen", return_value=io.BytesIO(b'{"ok":true}')
         ):

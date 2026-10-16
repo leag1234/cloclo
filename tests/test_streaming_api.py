@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 from starlette.types import Message
 
+from packages.ports import atlas_ports
 from services.orchestrator.chat_api import app
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.interactions import Interaction
@@ -50,7 +51,7 @@ class StreamingAPITests(unittest.IsolatedAsyncioTestCase):
             "query_string": b"",
             "root_path": "",
             "headers": [(b"content-type", b"application/json")],
-            "server": ("127.0.0.1", 8020),
+            "server": ("127.0.0.1", atlas_ports().port("adapter")),
             "client": ("127.0.0.1", 42000),
         }
         with (

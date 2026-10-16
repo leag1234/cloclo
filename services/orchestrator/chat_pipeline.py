@@ -61,7 +61,9 @@ def select_passages(
 
 
 def retrieval_url() -> str:
-    return os.environ.get("ATLAS_RETRIEVAL_URL", "http://127.0.0.1:8011").rstrip("/")
+    return os.environ.get("ATLAS_RETRIEVAL_URL", atlas_ports().url("retrieval")).rstrip(
+        "/"
+    )
 
 
 async def source(key: str) -> dict[str, object]:

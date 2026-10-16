@@ -11,6 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
+from packages.ports import atlas_ports
 from services.orchestrator.chat_api import app
 from services.orchestrator import mcp_client as mcp
 from services.orchestrator import mcp_confirmation as confirmation
@@ -54,9 +55,11 @@ class ConfirmationTests(unittest.TestCase):
         self.addCleanup(env.stop)
         confirmation.pending.clear()
         self.addCleanup(confirmation.pending.clear)
-        self.client = TestClient(app, base_url="http://localhost:8020")
+        self.client = TestClient(
+            app, base_url=atlas_ports().url("adapter", "localhost")
+        )
         self.addCleanup(self.client.close)
-        self.origin = {"origin": "http://localhost:8020"}
+        self.origin = {"origin": atlas_ports().url("adapter", "localhost")}
 
     def prepare(self) -> tuple[str, str]:
         result = asyncio.run(
