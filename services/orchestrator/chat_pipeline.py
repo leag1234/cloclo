@@ -706,9 +706,19 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             )
             if delivered is None:
                 # D5: no second file-generation route can replace an honest failure.
+                from services.orchestrator.presentation_delivery import (
+                    outline_markdown,
+                )
+
                 file_recovery_failed = True
+                result.text = outline_markdown(result.text)
             else:
+                from services.orchestrator.presentation_delivery import (
+                    outline_markdown,
+                )
+
                 result = delivered
+                result.text = outline_markdown(result.text)
         if (
             deliver_files
             and tools.terminal is not None

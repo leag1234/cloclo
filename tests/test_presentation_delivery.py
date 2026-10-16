@@ -132,3 +132,18 @@ class PresentationDeliveryTests(unittest.IsolatedAsyncioTestCase):
             parse_outline(
                 self.outline("Different", "different"), "Create a PPTX about recycling"
             )
+
+    def test_owner_phrasing_with_filler_words_is_accepted(self) -> None:
+        question = (
+            "fais-moi une présentation de /e/OS et Murena, pptx téléchargeable et pdf"
+        )
+        outline = parse_outline(self.outline("Murena", "Murena"), question)
+        self.assertTrue(outline.slides)
+
+    def test_failed_outline_reaches_the_user_as_readable_text(self) -> None:
+        from services.orchestrator.presentation_delivery import outline_markdown
+
+        text = outline_markdown(self.outline("Recycling", "recycling"))
+        self.assertTrue(text.startswith("# "))
+        self.assertIn("## recycling overview", text)
+        self.assertNotIn("{", text)

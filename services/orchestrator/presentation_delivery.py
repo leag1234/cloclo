@@ -56,16 +56,33 @@ def requested_topic_words(question: str) -> set[str]:
     }
 
 
+def outline_markdown(text: str) -> str:
+    """Readable fallback for an outline that could not become a file (D4)."""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return text
+    if not isinstance(data, dict) or not isinstance(data.get("slides"), list):
+        return text
+    lines = ["# " + str(data.get("title", "")).strip()]
+    for slide in data["slides"]:
+        if not isinstance(slide, dict):
+            continue
+        lines += ["", "## " + str(slide.get("title", "")).strip()]
+        lines += ["- " + str(b).strip() for b in slide.get("bullets", []) or []]
+    return "\n".join(lines).strip()
+
+
 def parse_outline(text: str, question: str) -> PresentationOutline:
     """Validate untrusted model JSON and require the requested subject in the deck."""
     data = json.loads(text)
     outline = PresentationOutline.model_validate(data)
     deck_text = " ".join(outline.content().texts()).casefold()
-    missing = sorted(
-        word for word in requested_topic_words(question) if word not in deck_text
-    )
-    if missing:
-        raise ValueError("requested_topic_words_missing:" + ",".join(missing))
+    # Requests carry filler words (pronouns, "downloadable"); the deck only has
+    # to be about the subject, so one requested topic word is enough.
+    words = requested_topic_words(question)
+    if words and not any(word in deck_text for word in words):
+        raise ValueError("requested_topic_words_missing:" + ",".join(sorted(words)))
     return outline
 
 
