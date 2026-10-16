@@ -9,9 +9,11 @@ import subprocess
 import select
 import socketserver
 import threading
+import re
 
 import uvicorn
 from packages.ports import atlas_ports
+from services.orchestrator.ui_injection import inject_atlas_ui
 
 NETWORK = "atlas-files"
 IMAGE = "ghcr.io/open-webui/open-terminal@sha256:3d52176700f2442e20556ef129ae980613389be773e269cf7fa0118f3b55669d"
@@ -42,6 +44,83 @@ def loopback_forward(
                                 peers.pop(source).shutdown(socket.SHUT_WR)
             except OSError:
                 # Closing both sockets exposes a transport failure to the caller.
+                self.request.close()
+
+    class Server(socketserver.ThreadingTCPServer):
+        daemon_threads = True
+        allow_reuse_address = True
+
+    with Server((host, int(port)), Handler) as server:
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            yield str(server.server_address[0]), int(server.server_address[1])
+        finally:
+            stopping.set()
+            server.shutdown()
+            worker.join(timeout=5)
+
+
+@contextmanager
+def loopback_html_injector(
+    binding: str, target: tuple[str, int]
+) -> Iterator[tuple[str, int]]:
+    """TCP relay that rewrites only the initial uncompressed HTML response.
+
+    Upgrade connections and every non-HTML response are byte relays, preserving the
+    WebUI API and websocket behaviour while avoiding a fork of its application.
+    """
+    host, port = binding.rsplit(":", 1)
+    if host != "127.0.0.1":
+        raise ValueError("ui_injector_requires_loopback")
+    stopping = threading.Event()
+
+    class Handler(socketserver.BaseRequestHandler):
+        def handle(self) -> None:
+            try:
+                with socket.create_connection(target, timeout=5) as remote:
+                    request = self.request.recv(65536)
+                    if not request:
+                        return
+                    # Browsers request a compressed shell; ask WebUI for identity so
+                    # the byte-preserving HTML injection can safely update its length.
+                    request = re.sub(
+                        rb"(?im)^accept-encoding:[^\r\n]*\r\n",
+                        b"Accept-Encoding: identity\r\n",
+                        request,
+                    )
+                    remote.sendall(request)
+                    response = remote.recv(65536)
+                    header, marker, body = response.partition(b"\r\n\r\n")
+                    html = b"content-type: text/html" in header.lower()
+                    length = re.search(rb"\r\ncontent-length: (\d+)", header, re.I)
+                    if html and marker and length:
+                        expected = int(length.group(1))
+                        while len(body) < expected:
+                            chunk = remote.recv(min(65536, expected - len(body)))
+                            if not chunk:
+                                break
+                            body += chunk
+                        updated = inject_atlas_ui(body)
+                        header = re.sub(
+                            rb"(\r\ncontent-length: )\d+",
+                            lambda match: match.group(1) + str(len(updated)).encode(),
+                            header,
+                            flags=re.I,
+                        )
+                        self.request.sendall(header + marker + updated)
+                    else:
+                        self.request.sendall(response)
+                    peers = {self.request: remote, remote: self.request}
+                    while peers and not stopping.is_set():
+                        readable, _, _ = select.select(list(peers), [], [], 0.2)
+                        for source in readable:
+                            data = source.recv(65536)
+                            if data:
+                                peers[source].sendall(data)
+                            else:
+                                peers.pop(source).shutdown(socket.SHUT_WR)
+            except OSError:
                 self.request.close()
 
     class Server(socketserver.ThreadingTCPServer):
@@ -256,7 +335,7 @@ def user_interface(name: str, persistent: bool) -> Iterator[None]:
         details = json.loads(docker("inspect", container))[0]
         address = details["NetworkSettings"]["Networks"][network]["IPAddress"]
         binding = "127.0.0.1:" + str(ports.port("chat_ui"))
-        with loopback_forward(binding, (address, ports.port("chat_ui"))):
+        with loopback_html_injector(binding, (address, ports.port("chat_ui"))):
             wait_http(ports.url("chat_ui"))
             yield
     finally:

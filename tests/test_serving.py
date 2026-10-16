@@ -34,7 +34,7 @@ class ServingTests(unittest.TestCase):
                 return_value=nullcontext(),
             ),
             patch(
-                "services.orchestrator.terminal_stack.loopback_forward",
+                "services.orchestrator.terminal_stack.loopback_html_injector",
                 return_value=nullcontext(),
             ),
             patch("services.orchestrator.terminal_stack.adapter_socket"),
