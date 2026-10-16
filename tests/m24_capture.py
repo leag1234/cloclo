@@ -38,7 +38,12 @@ def capture(
     assert exchanges or name == "J46"
     # Attached documents are read in process: only cases that produce files must use tools.
     if name in {"J42", "J43", "J44", "formats_write"}:
-        assert any(row["request"].get("kind") == "tool" for row in exchanges)
+        # J42 decks are built by trusted code: their file evidence is the recorded
+        # terminal publication instead of a model-authored tool call.
+        assert any(
+            row["request"].get("kind") in {"tool", "terminal_publish"}
+            for row in exchanges
+        )
     files = response["atlas"]["files"]
     artifacts: list[dict[str, Any]] = []
     if files:

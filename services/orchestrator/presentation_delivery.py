@@ -190,7 +190,11 @@ async def deliver_presentation(
                 uploaded = await terminal.upload_generated(
                     path.name, path.read_bytes(), min(30, remaining)
                 )
-                await terminal.publish(uploaded, "created", min(30, remaining))
+                published = await terminal.publish(
+                    uploaded, "created", min(30, remaining)
+                )
+                if "error" in published:
+                    raise ValueError("presentation_publish_failed")
     except (OSError, ValueError, TimeoutError):
         item.erreurs.append("presentation_build_or_publish_failed")
         return None

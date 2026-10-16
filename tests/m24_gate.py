@@ -83,6 +83,12 @@ def main() -> None:
                         for row in case["exchanges"]
                         if row["request"].get("kind") == "tool"
                     ]
+                    terminal_rows = [
+                        row
+                        for row in case["exchanges"]
+                        if row["request"].get("kind")
+                        in {"terminal_upload", "terminal_publish"}
+                    ]
                     # A complete call wraps its own stream attempt: the refresh records both,
                     # in that order, and replay serves the complete row, so that stream is
                     # never requested again.
@@ -95,7 +101,9 @@ def main() -> None:
                         for first, second in zip(kinds, kinds[1:])
                         if first == "stream" and second == "complete"
                     )
-                    stream_position = tool_position = complete_position = 0
+                    stream_position = tool_position = complete_position = (
+                        terminal_position
+                    ) = 0
                     uploads: list[dict[str, Any]] = []
                     for message in case["request"]["messages"]:
                         if isinstance(message["content"], list):
@@ -167,6 +175,55 @@ def main() -> None:
                             substitute(row["response"], old_id, current_id)
                         )
 
+                    def terminal_row(kind: str) -> dict[str, Any]:
+                        nonlocal terminal_position
+                        assert terminal_position < len(terminal_rows), (
+                            f"unrecorded_m24_terminal_io:{name}:{kind}"
+                        )
+                        row = substitute(
+                            terminal_rows[terminal_position], old_id, current_id
+                        )
+                        terminal_position += 1
+                        assert row["request"]["kind"] == kind, (
+                            f"unrecorded_m24_terminal_io:{name}:{kind}"
+                        )
+                        return row
+
+                    async def upload_generated(
+                        client: TerminalClient,
+                        filename: str,
+                        content: bytes,
+                        timeout: float,
+                    ) -> str:
+                        row = terminal_row("terminal_upload")
+                        # Trusted local bytes must be identical to the recorded file.
+                        assert row["request"] == {
+                            "kind": "terminal_upload",
+                            "filename": filename,
+                            "sha256": hashlib.sha256(content).hexdigest(),
+                            "size": len(content),
+                        }, f"unrecorded_m24_generated_file:{name}:{filename}"
+                        return str(row["response"]["path"])
+
+                    async def publish(
+                        client: TerminalClient,
+                        path: str,
+                        strategy: str,
+                        timeout: float,
+                    ) -> dict[str, object]:
+                        row = terminal_row("terminal_publish")
+                        assert row["request"] == {
+                            "kind": "terminal_publish",
+                            "path": path,
+                            "strategy": strategy,
+                        }, f"unrecorded_m24_publish:{name}:{path}"
+                        recorded = row["response"]
+                        client.commands = recorded["commands"]
+                        client.failed_commands = recorded["failed_commands"]
+                        client.files = recorded["files"]
+                        client.strategies = recorded["strategies"]
+                        return dict(recorded["output"])
+
                     async def execute(
                         runtime: ChatTools, call: Call, timeout: float
                     ) -> Message:
@@ -208,6 +265,10 @@ def main() -> None:
                         patch.object(TerminalClient, "initialize", initialize),
                         patch.object(TerminalClient, "upload", upload),
                         patch.object(
+                            TerminalClient, "upload_generated", upload_generated
+                        ),
+                        patch.object(TerminalClient, "publish", publish),
+                        patch.object(
                             TerminalClient,
                             "request",
                             AsyncMock(
@@ -232,6 +293,7 @@ def main() -> None:
                         stream_position in {len(streams), len(streams) - nested_streams}
                         and tool_position == len(tools)
                         and complete_position == len(completes)
+                        and terminal_position == len(terminal_rows)
                     )
                     validate(name, case, answer)
                     assert Decimal(str(answer["atlas"]["cost_eur"])) == Decimal(
