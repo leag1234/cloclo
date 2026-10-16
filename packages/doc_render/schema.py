@@ -58,3 +58,33 @@ class Content(ContentModel):
                 for row in table.rows:
                     result.extend(row)
         return tuple(result)
+
+
+class PresentationSlide(ContentModel):
+    """The bounded model-facing contract for a single presentation slide."""
+
+    title: Text
+    bullets: tuple[Text, ...] = Field(min_length=1, max_length=8)
+    notes: Text | None = None
+    table: Table | None = None
+
+
+class PresentationOutline(ContentModel):
+    """Trusted code maps this concise outline to the generic render contract."""
+
+    title: Text
+    slides: tuple[PresentationSlide, ...] = Field(min_length=1, max_length=30)
+
+    def content(self) -> Content:
+        return Content(
+            title=self.title,
+            sections=tuple(
+                Section(
+                    heading=slide.title,
+                    paragraphs=(slide.notes,) if slide.notes else (),
+                    bullets=slide.bullets,
+                    tables=(slide.table,) if slide.table else (),
+                )
+                for slide in self.slides
+            ),
+        )

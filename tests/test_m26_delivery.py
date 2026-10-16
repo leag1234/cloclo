@@ -40,7 +40,7 @@ class PublicationTests(unittest.TestCase):
 
 
 class PublishedFileTests(unittest.IsolatedAsyncioTestCase):
-    async def test_file_request_recovers_after_inline_answer_without_terminal_call(
+    async def test_presentation_inline_answer_fails_honestly_without_terminal_code(
         self,
     ) -> None:
         """J54: an inline answer cannot silently satisfy a requested download."""
@@ -102,9 +102,7 @@ class PublishedFileTests(unittest.IsolatedAsyncioTestCase):
             item = Interaction()
             await process(request, item)
 
-        self.assertEqual(run.await_count, 2)
-        self.assertIn("terminal_command", run.await_args_list[1].args[3])
-        self.assertFalse(run.await_args_list[1].kwargs.get("initial_calls"))
+        self.assertEqual(run.await_count, 1)
         self.assertIn(inline, item.reponse)
         self.assertIn("No file was produced", item.reponse)
         self.assertEqual(item.files, [])

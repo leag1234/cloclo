@@ -1,7 +1,6 @@
 """B2: recovery asks the model for real files and preserves honest inline content."""
 
 from decimal import Decimal
-import json
 import os
 import tempfile
 import unittest
@@ -10,13 +9,13 @@ from unittest.mock import AsyncMock, patch
 from services.orchestrator.chat_pipeline import process
 from services.orchestrator.chat_schema import ChatRequest
 from services.orchestrator.interactions import Interaction
-from services.orchestrator.loop import Call, Message, Reservation, Result, Turn
+from services.orchestrator.loop import Message, Reservation, Result, Turn
 from services.orchestrator.model import Configuration, GatewayError, GatewayModel
 from services.orchestrator.terminal_client import TerminalClient
 
 
 class PresentationRecoveryTests(unittest.IsolatedAsyncioTestCase):
-    async def test_real_loop_executes_only_model_selected_creation_and_publication(
+    async def test_validated_outline_is_built_and_published_without_model_terminal_code(
         self,
     ) -> None:
         model = GatewayModel(
@@ -28,34 +27,18 @@ class PresentationRecoveryTests(unittest.IsolatedAsyncioTestCase):
                 gateway_reserves_quality=True,
             ),
         )
-        inline = "Le tri sépare le verre, le papier et les déchets organiques."
-        command = "python3 build_slides.py --content '" + inline + "'"
-        turns = [
-            Turn(inline),
-            Turn(
-                "",
-                (
-                    Call(
-                        "model-create",
-                        "terminal_command",
-                        json.dumps({"command": command}),
-                    ),
-                    Call(
-                        "model-publish",
-                        "publish_document",
-                        '{"path":"tri.pptx","strategy":"created"}',
-                    ),
-                ),
-            ),
-            Turn("La présentation sur le tri est disponible."),
-        ]
+        outline = (
+            '{"title":"Le tri","slides":['
+            '{"title":"Tri des déchets","bullets":["Le tri sépare le verre."]},'
+            '{"title":"Tri organique","bullets":["Les déchets organiques sont séparés."]}'
+            "]}"
+        )
         messages_seen = []
 
         async def complete(messages: list[Message], timeout: float) -> Turn:
             messages_seen.append(messages)
             model.spent += Decimal("0.01")
-            turn = turns.pop(0)
-            return Turn(turn.text, turn.calls, Reservation(1, Decimal("0.01")))
+            return Turn(outline, (), Reservation(1, Decimal("0.01")))
 
         async def publish(
             client: TerminalClient, path: str, strategy: str, timeout: float
@@ -75,8 +58,10 @@ class PresentationRecoveryTests(unittest.IsolatedAsyncioTestCase):
             patch.object(model, "complete", complete),
             patch.object(TerminalClient, "initialize", AsyncMock()),
             patch.object(
-                TerminalClient, "execute", AsyncMock(return_value={"exit_code": 0})
-            ) as execute,
+                TerminalClient,
+                "upload_generated",
+                AsyncMock(return_value="/request/presentation.pptx"),
+            ) as upload,
             patch.object(TerminalClient, "publish", publish),
         ):
             item = Interaction()
@@ -93,15 +78,20 @@ class PresentationRecoveryTests(unittest.IsolatedAsyncioTestCase):
                 ),
                 item,
             )
-        execute.assert_awaited_once()
-        assert execute.await_args is not None
-        self.assertEqual(execute.await_args.args[0], command)
-        self.assertEqual(len(messages_seen), 3)
-        self.assertIn({"role": "assistant", "content": inline}, messages_seen[1])
+        upload.assert_awaited_once()
+        self.assertEqual(len(messages_seen), 1)
+        self.assertFalse(
+            any(
+                isinstance(tool, dict)
+                and isinstance(function := tool.get("function"), dict)
+                and function.get("name") in {"terminal_command", "publish_document"}
+                for tool in model.tools
+            )
+        )
         self.assertEqual(len(item.files), 1)
         self.assertIn(item.files[0], item.reponse)
-        self.assertAlmostEqual(item.cout_eur, 0.03)
-        self.assertNotIn("solution de secours", item.reponse)
+        self.assertAlmostEqual(item.cout_eur, 0.01)
+        self.assertNotIn("Aucun fichier", item.reponse)
 
     async def recover(
         self,
@@ -148,22 +138,19 @@ class PresentationRecoveryTests(unittest.IsolatedAsyncioTestCase):
             await process(request, item)
         return item, runner, inline
 
-    async def test_recovery_invokes_model_without_placeholder_script(self) -> None:
+    async def test_invalid_outline_never_reenables_terminal_code_tools(self) -> None:
         _, runner, inline = await self.recover()
-        self.assertEqual(runner.await_count, 2)
-        recovery = runner.await_args_list[1]
-        self.assertFalse(recovery.kwargs.get("initial_calls"))
-        self.assertIn(
-            {"role": "assistant", "content": inline}, recovery.kwargs["history"]
+        self.assertEqual(runner.await_count, 1)
+        initial = runner.await_args
+        assert initial is not None
+        model = initial.args[1]
+        self.assertFalse(
+            any(
+                tool["function"]["name"] in {"terminal_command", "publish_document"}
+                for tool in model.tools
+            )
         )
-        model = recovery.args[1]
-        self.assertEqual(
-            {tool["function"]["name"] for tool in model.tools},
-            {"terminal_command", "publish_document"},
-        )
-        self.assertEqual(recovery.args[0].lang, "fr")
-        self.assertIn("terminal_command", recovery.args[3])
-        self.assertIn("publish_document", recovery.args[3])
+        self.assertEqual(initial.args[0].lang, "fr")
 
     async def test_inline_fallback_keeps_real_answer_and_request_language(self) -> None:
         for language, notice in (
@@ -189,11 +176,8 @@ class PresentationRecoveryTests(unittest.IsolatedAsyncioTestCase):
         item, runner, _ = await self.recover(
             second=Result(text="Recovery answer", state="done", cost=Decimal("0.02"))
         )
-        first, recovery = runner.await_args_list
-        self.assertEqual(recovery.args[4].cost, Decimal("0.26"))
-        self.assertEqual(recovery.args[4].tool_calls, 6)
-        self.assertLessEqual(recovery.args[4].wall_clock, first.args[4].wall_clock)
-        self.assertAlmostEqual(item.cout_eur, 0.06)
+        self.assertEqual(runner.await_count, 1)
+        self.assertAlmostEqual(item.cout_eur, 0.04)
 
     async def test_exhausted_budget_keeps_content_without_retry(self) -> None:
         item, runner, inline = await self.recover(cost=Decimal("0.30"))
@@ -201,14 +185,16 @@ class PresentationRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(inline, item.reponse)
         self.assertIn("Aucun fichier", item.reponse)
 
-    async def test_recovery_provider_failure_preserves_real_content(self) -> None:
+    async def test_invalid_outline_preserves_real_content_without_generic_recovery(
+        self,
+    ) -> None:
         item, runner, inline = await self.recover(
             second=GatewayError("provider_error", 502, "Provider failed")
         )
-        self.assertEqual(runner.await_count, 2)
+        self.assertEqual(runner.await_count, 1)
         self.assertIn(inline, item.reponse)
         self.assertIn("Aucun fichier", item.reponse)
-        self.assertIn("provider_error", item.erreurs)
+        self.assertIn("presentation_outline_invalid", item.erreurs)
         self.assertEqual(item.files, [])
 
     async def test_unpublished_recovery_link_never_replaces_real_content(self) -> None:

@@ -113,7 +113,7 @@ class TerminalContentTests(unittest.IsolatedAsyncioTestCase):
 
 
 class FileGuaranteeTests(unittest.IsolatedAsyncioTestCase):
-    async def test_search_only_then_noncompliant_recovery_creates_real_files(
+    async def test_validated_presentation_outline_publishes_all_requested_files(
         self,
     ) -> None:
         model = GatewayModel(
@@ -124,23 +124,17 @@ class FileGuaranteeTests(unittest.IsolatedAsyncioTestCase):
                 max_tokens=2048,
             ),
         )
-        choices = []
 
         async def runner(*args: object, **kwargs: object) -> Result:
-            choices.append(getattr(model, "required_file_tool", None))
             return Result(
-                text=REPLIES["J54"][len(choices) - 1],
+                text=(
+                    '{"title":"/e/OS et Murena","slides":['
+                    '{"title":"/e/OS","bullets":["/e/OS protège la vie privée."]},'
+                    '{"title":"Murena","bullets":["Murena propose des appareils."]}'
+                    "]}"
+                ),
                 state="done",
-                tool_calls=7 if len(choices) == 1 else 0,
             )
-
-        commands = []
-
-        async def execute(
-            client: TerminalClient, command: str, timeout: float
-        ) -> dict[str, object]:
-            commands.append(command)
-            return {"exit_code": 0}
 
         async def publish(
             client: TerminalClient, path: str, strategy: str, timeout: float
@@ -161,7 +155,16 @@ class FileGuaranteeTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(GatewayModel, "connect", AsyncMock(return_value=model)),
             patch.object(TerminalClient, "initialize", AsyncMock()),
-            patch.object(TerminalClient, "execute", execute),
+            patch.object(
+                TerminalClient,
+                "upload_generated",
+                AsyncMock(
+                    side_effect=[
+                        "/request/presentation.pptx",
+                        "/request/presentation.pdf",
+                    ]
+                ),
+            ) as upload,
             patch.object(TerminalClient, "publish", publish),
             patch("services.orchestrator.chat_pipeline.run", runner),
         ):
@@ -180,13 +183,16 @@ class FileGuaranteeTests(unittest.IsolatedAsyncioTestCase):
                 item,
             )
         self.assertEqual(len(item.files), 2)
-        self.assertEqual(choices, [None, "terminal_command"])
-        self.assertEqual(len(commands), 1)
-        self.assertIn("Origine et Histoire", commands[0])
-        self.assertIn("microG", commands[0])
-        self.assertNotIn("Requested presentation", commands[0])
-        self.assertNotIn("sandbox:", item.reponse)
-        self.assertNotIn("Je vais maintenant", item.reponse)
+        self.assertEqual(upload.await_count, 2)
+        self.assertFalse(
+            any(
+                isinstance(tool, dict)
+                and isinstance(function := tool.get("function"), dict)
+                and function.get("name") in {"terminal_command", "publish_document"}
+                for tool in model.tools
+            )
+        )
+        self.assertNotIn("Aucun fichier", item.reponse)
 
     def test_unpublished_original_claims_are_removed(self) -> None:
         from services.orchestrator.file_results import inline_fallback
