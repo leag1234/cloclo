@@ -17,7 +17,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from services.orchestrator.loop import Call, Message, Reservation, Turn, PublicFailure
 from services.orchestrator.tools import declarations
 from services.orchestrator.stream_client import Sink, receive
-from services.orchestrator.narration import NarrationFilter, clean_answer
+from services.orchestrator.narration import (
+    NarrationFilter,
+    clean_answer,
+    unfinished_announcement,
+)
 
 
 class Configuration(BaseModel):
@@ -467,7 +471,12 @@ class GatewayModel:
             result = WireTurn.model_validate(wire)
             self.provider_retries += result.provider_retries
             if result.text:
-                result.text = clean_answer(result.text, allow_empty=bool(result.calls))
+                cleaned = clean_answer(result.text, allow_empty=True)
+                # The loop needs the original one-line announcement to spend its
+                # single bounded recovery turn instead of treating it as a provider
+                # failure. Mixed narration remains removed before delivery.
+                if cleaned.strip() or not unfinished_announcement(result.text):
+                    result.text = cleaned
             if (
                 not self.profile
                 and result.usage.completion_tokens > self.configuration.max_tokens

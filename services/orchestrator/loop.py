@@ -166,6 +166,7 @@ async def run(
     counts: Counter[str] = Counter()
     recent: list[tuple[str, str]] = []
     quota_recovered = False
+    protocol_recovered = False
     answer_parts: list[str] = []
 
     def remaining() -> float:
@@ -213,11 +214,50 @@ async def run(
                         raise ValueError("provider_usage_exceeds_reservation")
                     result.tokens -= reserved.tokens - turn.usage.tokens
                     result.cost -= reserved.cost - turn.usage.cost
+            from services.orchestrator.narration import (
+                protocol_material,
+                unfinished_announcement,
+            )
+
+            if turn.calls and protocol_material(turn.text):
+                turn = Turn("", turn.calls, turn.usage)
             if not turn.calls:
                 if not turn.text.strip():
                     raise ValueError("empty_model_response")
-                result.text, result.state = "".join([*answer_parts, turn.text]), "done"
-                return result
+                from services.orchestrator.narration import raw_tool_call
+
+                complete_text = "".join([*answer_parts, turn.text])
+                offered = {
+                    str(function["name"])
+                    for tool in getattr(model, "tools", [])
+                    if isinstance(tool, dict)
+                    and isinstance(function := tool.get("function"), dict)
+                    and isinstance(function.get("name"), str)
+                }
+                raw = raw_tool_call(complete_text, offered)
+                if raw is not None:
+                    name, arguments = raw
+                    turn = Turn(
+                        "",
+                        (Call(f"raw-tool-{result.tool_calls + 1}", name, arguments),),
+                        turn.usage,
+                    )
+                elif protocol_material(complete_text) or unfinished_announcement(
+                    complete_text
+                ):
+                    if protocol_recovered:
+                        raise Stop("protocol_completion_limit")
+                    protocol_recovered = True
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": "Return only the bounded final answer. Do not include internal request scope, tool history, or tool-call JSON.",
+                        }
+                    )
+                    continue
+                else:
+                    result.text, result.state = complete_text, "done"
+                    return result
             # Streaming already exposes this content; retain it in the final
             # HTTP answer and journal as well when a tool interrupts the prose.
             answer_parts.append(turn.text)

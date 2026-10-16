@@ -44,9 +44,10 @@ def response(
     activity_labels = activity_labels.get(language, activity_labels["en"])
 
     async def generate() -> AsyncIterator[str]:
-        from services.orchestrator.narration import NarrationFilter
+        from services.orchestrator.narration import NarrationFilter, ProtocolFilter
 
         narration = NarrationFilter()
+        protocol = ProtocolFilter()
         queue: asyncio.Queue[dict[str, object] | None] = asyncio.Queue(maxsize=8)
         pending = ""
         turn = 0
@@ -267,7 +268,7 @@ def response(
                 return
             if isinstance(delta.get("content"), str):
                 count = len(narration.removed)
-                text = narration.feed(delta["content"])
+                text = protocol.feed(narration.feed(delta["content"]))
                 if len(narration.removed) > count:
                     activity = "thinking"
                     await queue.put(
@@ -311,7 +312,11 @@ def response(
                     if item.state != "done":
                         raise RuntimeError("request_stopped")
                     await content(
-                        item.reponse if file_request else pending + narration.finish()
+                        item.reponse
+                        if file_request
+                        else pending
+                        + protocol.feed(narration.finish())
+                        + protocol.finish()
                     )
                     if item.files and (not file_request or not item.reponse):
                         from services.orchestrator.file_results import file_footer
