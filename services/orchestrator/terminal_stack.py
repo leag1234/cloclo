@@ -77,51 +77,110 @@ def loopback_html_injector(
 
     class Handler(socketserver.BaseRequestHandler):
         def handle(self) -> None:
+            client = self.request
             try:
                 with socket.create_connection(target, timeout=5) as remote:
-                    request = self.request.recv(65536)
-                    if not request:
-                        return
-                    # Browsers request a compressed shell; ask WebUI for identity so
-                    # the byte-preserving HTML injection can safely update its length.
-                    request = re.sub(
-                        rb"(?im)^accept-encoding:[^\r\n]*\r\n",
-                        b"Accept-Encoding: identity\r\n",
-                        request,
+                    remote.settimeout(None)
+                    head = b""
+                    while b"\r\n\r\n" not in head:
+                        chunk = client.recv(65536)
+                        if not chunk or len(head) > 1048576:
+                            return
+                        head += chunk
+                    header, marker, body = head.partition(b"\r\n\r\n")
+                    method = header.split(b" ", 1)[0].upper()
+                    upgrade = re.search(rb"(?im)^upgrade:", header) is not None
+                    # Ask WebUI for an uncompressed shell so the injection can update
+                    # its length. One request per connection, so every HTML response
+                    # is seen, however the browser reuses connections.
+                    header = re.sub(
+                        rb"(?im)^accept-encoding:[^\r\n]*",
+                        b"Accept-Encoding: identity",
+                        header,
                     )
-                    remote.sendall(request)
-                    response = remote.recv(65536)
-                    header, marker, body = response.partition(b"\r\n\r\n")
-                    html = b"content-type: text/html" in header.lower()
-                    length = re.search(rb"\r\ncontent-length: (\d+)", header, re.I)
-                    if html and marker and length:
-                        expected = int(length.group(1))
-                        while len(body) < expected:
-                            chunk = remote.recv(min(65536, expected - len(body)))
-                            if not chunk:
-                                break
-                            body += chunk
-                        updated = inject_atlas_ui(body)
-                        header = re.sub(
-                            rb"(\r\ncontent-length: )\d+",
-                            lambda match: match.group(1) + str(len(updated)).encode(),
-                            header,
-                            flags=re.I,
-                        )
-                        self.request.sendall(header + marker + updated)
-                    else:
-                        self.request.sendall(response)
-                    peers = {self.request: remote, remote: self.request}
-                    while peers and not stopping.is_set():
-                        readable, _, _ = select.select(list(peers), [], [], 0.2)
-                        for source in readable:
-                            data = source.recv(65536)
-                            if data:
-                                peers[source].sendall(data)
-                            else:
-                                peers.pop(source).shutdown(socket.SHUT_WR)
+                    if not upgrade:
+                        if re.search(rb"(?im)^connection:", header):
+                            header = re.sub(
+                                rb"(?im)^connection:[^\r\n]*",
+                                b"Connection: close",
+                                header,
+                            )
+                        else:
+                            header += b"\r\nConnection: close"
+                    remote.sendall(header + marker + body)
+                    self.relay(client, remote, method, upgrade)
             except OSError:
-                self.request.close()
+                pass
+            finally:
+                try:
+                    client.close()
+                except OSError:
+                    pass
+
+        def relay(
+            self,
+            client: socket.socket,
+            remote: socket.socket,
+            method: bytes,
+            upgrade: bool,
+        ) -> None:
+            """Stream both directions at once; rewrite only a GET 200 HTML response."""
+            response = b""
+            head = b""
+            # -1: reading the response head, -2: plain relay, n >= 0: collecting body
+            expected = -1
+            peers = {client: remote, remote: client}
+            while peers and not stopping.is_set():
+                readable, _, _ = select.select(list(peers), [], [], 0.2)
+                for source in readable:
+                    data = source.recv(65536)
+                    if source is client:
+                        if data:
+                            remote.sendall(data)
+                        else:
+                            peers.pop(client, None)
+                            remote.shutdown(socket.SHUT_WR)
+                        continue
+                    if not data:
+                        if response:
+                            client.sendall(response)
+                        peers.clear()
+                        break
+                    if expected == -2:
+                        client.sendall(data)
+                        continue
+                    response += data
+                    if expected == -1 and b"\r\n\r\n" in response:
+                        head = response.partition(b"\r\n\r\n")[0]
+                        length = re.search(rb"\r\ncontent-length: (\d+)", head, re.I)
+                        status_ok = head.startswith((b"HTTP/1.1 200", b"HTTP/1.0 200"))
+                        html = b"content-type: text/html" in head.lower()
+                        if (
+                            method == b"GET"
+                            and not upgrade
+                            and status_ok
+                            and html
+                            and length
+                        ):
+                            expected = int(length.group(1))
+                        else:
+                            client.sendall(response)
+                            response, expected = b"", -2
+                            continue
+                    if expected >= 0:
+                        body = response.partition(b"\r\n\r\n")[2]
+                        if len(body) >= expected:
+                            updated = inject_atlas_ui(body[:expected])
+                            new_head = re.sub(
+                                rb"(\r\ncontent-length: )\d+",
+                                lambda m: m.group(1) + str(len(updated)).encode(),
+                                head,
+                                flags=re.I,
+                            )
+                            client.sendall(
+                                new_head + b"\r\n\r\n" + updated + body[expected:]
+                            )
+                            response, expected = b"", -2
 
     class Server(socketserver.ThreadingTCPServer):
         daemon_threads = True
