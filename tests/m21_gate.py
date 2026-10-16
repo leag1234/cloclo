@@ -19,7 +19,16 @@ from uuid import UUID
 from packages.ports import atlas_ports
 import stream_transport
 from serverless_support import environment
-from provider_recording import ExactHistory, capture_stream, capture_tool, replay_stream
+from provider_recording import (
+    ExactHistory,
+    capture_stream,
+    capture_tool,
+    match_request,
+    mismatch_report,
+    plan_refresh,
+    request_manifest,
+    replay_stream,
+)
 from services.orchestrator.serving import stack
 from services.orchestrator.tools import Runtime
 
@@ -66,6 +75,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     refresh = os.environ.get("M21_REFRESH") == "1"
     live = os.environ.get("M21_LIVE") == "1" or refresh
+    planning = os.environ.get("M21_PLAN") == "1"
     unchanged = ExactHistory(
         json.loads(gzip.decompress(ARCHIVE.read_bytes())) if refresh else []
     )
@@ -79,12 +89,23 @@ def main() -> None:
     )
     prefix = len(rows) if resume else 0
     position = 0
+    replay_summary: list[dict[str, object]] = []
+    planned_rows: list[dict[str, Any]] = []
 
     def replaying() -> bool:
         return not live or position < prefix
 
     def record(kind: str, request: Any, result: Any) -> None:
-        rows.append(copy.deepcopy(dict(kind=kind, request=request, response=result)))
+        rows.append(
+            copy.deepcopy(
+                dict(
+                    kind=kind,
+                    request=request,
+                    response=result,
+                    manifest=request_manifest(kind, request),
+                )
+            )
+        )
         raw = json.dumps(rows, ensure_ascii=False).encode()
         assert not any(
             value.encode() in raw
@@ -96,12 +117,33 @@ def main() -> None:
 
     def replay(kind: str, request: Any) -> Any:
         nonlocal position
+        if position >= len(rows):
+            raise AssertionError(
+                f"unrecorded_m21_exchange:{position + 1}:{kind}: no recorded row"
+            )
         row = rows[position]
         position += 1
-        assert row["kind"] == kind and row["request"] == request, (
-            "unrecorded_m21_exchange",
-            position,
-            kind,
+        if row["kind"] != kind:
+            raise AssertionError(
+                f"unrecorded_m21_exchange:{position}:{kind}: kind: {row['kind']} -> {kind}"
+            )
+        match = match_request(kind, row["request"], request)
+        if planning:
+            planned_rows.append({"kind": kind, "request": copy.deepcopy(request)})
+        if match["matched"] == "none":
+            if not planning:
+                raise AssertionError(
+                    f"unrecorded_m21_exchange:{position}:{kind}: "
+                    + "; ".join(mismatch_report(match))
+                )
+        replay_summary.append(
+            {
+                "row": position,
+                "kind": kind,
+                "matched": match["matched"],
+                "excluded_paths": match["excluded_paths"],
+                "prompt_hashes": match["prompt_hashes"],
+            }
         )
         return copy.deepcopy(row["response"])
 
@@ -157,6 +199,7 @@ def main() -> None:
     report["mode"] = "live" if live else "replay"
     report["m21_acquisition"] = "mixed" if resume or refresh else report["mode"]
     report["m21_replayed_prefix_exchanges"] = prefix
+    report["m21_replay_summary"] = replay_summary
     evidence: dict[str, Any] = {}
 
     def ask(
@@ -406,6 +449,10 @@ def main() -> None:
                 report["J31_rag_beyond_400"] = True
             assert set(useful) == set(models) and all(useful.values()), useful
         finally:
+            if planning:
+                # Planning replays the positional response solely to reach the
+                # current request graph; it never captures or writes a cassette.
+                report["m21_refresh_plan"] = plan_refresh(rows, planned_rows)
             report_path.parent.mkdir(parents=True, exist_ok=True)
             report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2))
     if not live:
