@@ -18,12 +18,12 @@ from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from packages.ports import atlas_ports
 from evals.truthfulness.score import Case, PROFILES, aggregate, load_cases
 
 ROOT = Path(__file__).resolve().parents[2]
 CASES = ROOT / "evals/truthfulness/cases.json"
 OUTPUT = ROOT / "BRAIN/truthfulness"
-API = "http://127.0.0.1:8020/v1/chat/completions"
 CAP = Decimal("3")
 RESERVATION = Decimal("0.10")
 
@@ -102,7 +102,7 @@ class Ledger:
 
 def post(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     request = Request(
-        API,
+        atlas_ports().url("adapter") + "/v1/chat/completions",
         data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -189,7 +189,9 @@ def busy_ports() -> list[int]:
             match = re.search(r":(\d+)$", fields[3])
             if match:
                 ports.add(int(match[1]))
-    return sorted(ports.intersection({8000, 8010, 8011, 8020}))
+    offsets = atlas_ports()
+    used = {offsets.port(s) for s in ("terminal", "gateway", "retrieval", "adapter")}
+    return sorted(ports.intersection(used))
 
 
 def audit_batch(output: Path, stage: str, provider: str, maximum_searches: int) -> None:
@@ -237,7 +239,12 @@ def public_stack(name: str, output: Path) -> Iterator[None]:
         ATLAS_TERMINAL_ENABLED="1",
         ATLAS_INTERACTION_DIR=str(output / "telemetry"),
     )
-    with terminal(name + "-terminal", "127.0.0.1:8000"), stack(name, False):
+    with (
+        terminal(
+            name + "-terminal", "127.0.0.1:" + str(atlas_ports().port("terminal"))
+        ),
+        stack(name, False),
+    ):
         yield
 
 
