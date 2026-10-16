@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
+from packages.ports import atlas_ports
 from services.retrieval.pipeline import ingest
 from services.retrieval.search import Gateway
 from services.retrieval.store import Store
@@ -15,7 +16,7 @@ class PipelineTests(TestCase):
             root = Path(directory)
             source = root / "doc.md"
             source.write_text("---\ndoc_id: doc\nlangue: fr\n---\nTexte public.")
-            gateway = Gateway("http://127.0.0.1:8010")
+            gateway = Gateway(atlas_ports().url("gateway"))
             store = Store("unused")
             with (
                 patch.object(gateway, "embed", return_value=([[1.0]], "rev")),
@@ -38,7 +39,7 @@ class PipelineTests(TestCase):
     def test_sidecar_symlink_empty_and_revision(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            gateway = Gateway("http://127.0.0.1:8010")
+            gateway = Gateway(atlas_ports().url("gateway"))
             store = Store("unused")
             with (
                 patch.object(store, "sync") as sync,

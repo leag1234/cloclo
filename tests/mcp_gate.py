@@ -12,6 +12,7 @@ import unittest
 from unittest.mock import patch
 import urllib.request
 from fastapi.testclient import TestClient
+from packages.ports import atlas_ports
 from services.orchestrator.chat_api import app
 from services.orchestrator import mcp_client as mcp
 from services.orchestrator import mcp_confirmation as confirmation
@@ -94,7 +95,9 @@ def main() -> None:
             patch.dict(os.environ, environment),
             patch.object(mcp, "invoke", recorded),
             patch.object(confirmation, "invoke", recorded),
-            TestClient(app, base_url="http://localhost:8020") as client,
+            TestClient(
+                app, base_url=atlas_ports().url("adapter", "localhost")
+            ) as client,
         ):
             server = mcp.configuration()["gitlab"]
             project = server.tools["get_issue"].fixed["project_id"]
@@ -136,14 +139,18 @@ def main() -> None:
             assert client.post(url, data=form).status_code == 403
             assert count() == before
             reply = client.post(
-                url, data=form, headers={"origin": "http://localhost:8020"}
+                url,
+                data=form,
+                headers={"origin": atlas_ports().url("adapter", "localhost")},
             )
             assert reply.status_code == 200
             created = data(reply.json())
             assert count() == before + 1
             assert (
                 client.post(
-                    url, data=form, headers={"origin": "http://localhost:8020"}
+                    url,
+                    data=form,
+                    headers={"origin": atlas_ports().url("adapter", "localhost")},
                 ).status_code
                 == 400
             )

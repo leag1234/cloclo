@@ -14,6 +14,7 @@ from typing import Any
 from unittest.mock import patch
 from uuid import UUID
 
+from packages.ports import DEFAULT_PORTS, atlas_ports
 from agent_provider import AgentProvider
 from vision import VisionProvider
 import imagegen
@@ -24,6 +25,23 @@ from services.orchestrator.serving import stack
 from services.orchestrator.tools import Runtime
 
 ARCHIVE = Path("tests/cassettes/journeys.json.gz")
+
+
+def cassette_request(value: Any) -> Any:
+    """Compare offset-stack requests with base-0 recordings without rewriting either."""
+    ports = atlas_ports()
+    if ports.base == 0:
+        return value
+    if isinstance(value, dict):
+        return {key: cassette_request(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [cassette_request(item) for item in value]
+    if isinstance(value, str):
+        for service in ("chat_ui", "terminal", "gateway", "retrieval", "adapter"):
+            value = value.replace(
+                ":" + str(ports.port(service)), ":" + str(DEFAULT_PORTS[service])
+            )
+    return value
 
 
 def main() -> None:
@@ -54,7 +72,9 @@ def main() -> None:
         nonlocal position
         row = rows[position]
         position += 1
-        if row["kind"] != kind or row["request"] != request:
+        if row["kind"] != kind or cassette_request(row["request"]) != cassette_request(
+            request
+        ):
             raise AssertionError(f"unrecorded_journey_exchange:{position}:{kind}")
         return copy.deepcopy(row["response"])
 

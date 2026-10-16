@@ -4,6 +4,7 @@ import socket
 import threading
 import unittest
 
+from packages.ports import atlas_ports
 from services.orchestrator.terminal_stack import loopback_forward
 
 
@@ -37,5 +38,7 @@ class ForwardingTests(unittest.TestCase):
 
     def test_rejects_non_loopback_binding(self) -> None:
         with self.assertRaises(ValueError):
-            with loopback_forward("0.0.0.0:8000", ("127.0.0.1", 1)):
+            with loopback_forward(
+                "0.0.0.0:" + str(atlas_ports().port("terminal")), ("127.0.0.1", 1)
+            ):
                 self.fail("unsafe listener")

@@ -1,6 +1,8 @@
 """M18 transformations disable tools without altering ordinary conversation."""
 
 import unittest
+
+from packages.ports import atlas_ports
 from unittest.mock import AsyncMock, patch
 from decimal import Decimal
 
@@ -82,7 +84,10 @@ class ImageHistoryTests(unittest.TestCase):
         messages = [
             ChatMessage(role="user", content="Generate an image of a cat"),
             ChatMessage(
-                role="assistant", content="![Image](http://localhost:8020/images/abc)"
+                role="assistant",
+                content="![Image]("
+                + atlas_ports().url("adapter", "localhost")
+                + "/images/abc)",
             ),
             ChatMessage(role="user", content="Ajoute des patins"),
         ]
@@ -227,13 +232,21 @@ class IntentBoundaryTests(unittest.TestCase):
                 max_tokens=100,
             ),
         )
-        link = "[Source](http://localhost:8020/sources/" + "a" * 64 + ")"
+        link = (
+            "[Source]("
+            + atlas_ports().url("adapter", "localhost")
+            + "/sources/"
+            + "a" * 64
+            + ")"
+        )
         answer = "Die Pflanzen nutzen Licht. " + link
 
         async def complete(messages: object, timeout: float) -> Turn:
             assert model.sink
             for piece in (
-                "Die Pflanzen nutzen Licht. [Source](http://localhost:8020/sources/",
+                "Die Pflanzen nutzen Licht. [Source]("
+                + atlas_ports().url("adapter", "localhost")
+                + "/sources/",
                 "a" * 64,
                 ")",
             ):

@@ -21,6 +21,7 @@ class ServingTests(unittest.TestCase):
                     "SCW_GENERATIVE_API_KEY": "test-only",
                     "TAVILY_API_KEY": "test-only",
                     "ATLAS_SEARCH_PROVIDER": "tavily",
+                    "ATLAS_PORT_BASE": "0",
                 },
             ),
             patch(

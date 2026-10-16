@@ -238,7 +238,7 @@ def user_interface(name: str, persistent: bool) -> Iterator[None]:
 
     ports = atlas_ports()
     network = ports.name(NETWORK)
-    name = ports.name(name)
+    container = ports.name(name)
     listener = adapter_socket(ports.port("adapter"))
     adapter = uvicorn.Server(
         uvicorn.Config(
@@ -253,7 +253,7 @@ def user_interface(name: str, persistent: bool) -> Iterator[None]:
     try:
         webui(name, persistent)
         started = True
-        details = json.loads(docker("inspect", name))[0]
+        details = json.loads(docker("inspect", container))[0]
         address = details["NetworkSettings"]["Networks"][network]["IPAddress"]
         binding = "127.0.0.1:" + str(ports.port("chat_ui"))
         with loopback_forward(binding, (address, ports.port("chat_ui"))):
@@ -261,7 +261,7 @@ def user_interface(name: str, persistent: bool) -> Iterator[None]:
             yield
     finally:
         if started:
-            docker("stop", name)
+            docker("stop", container)
         adapter.should_exit = True
         worker.join(timeout=10)
         listener.close()

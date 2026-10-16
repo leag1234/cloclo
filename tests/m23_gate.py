@@ -14,6 +14,7 @@ from typing import Any
 from unittest.mock import patch
 from urllib.request import Request, urlopen
 
+from packages.ports import atlas_ports
 from packages.profiles import PROFILES
 from provider_recording import ExactHistory, capture_stream, replay_stream
 from serverless_support import environment
@@ -92,7 +93,7 @@ def main() -> None:
         events = []
         with urlopen(
             Request(
-                "http://127.0.0.1:8020/v1/chat/completions",
+                atlas_ports().url("adapter") + "/v1/chat/completions",
                 data=json.dumps(
                     {
                         "model": profile,
@@ -214,7 +215,9 @@ def main() -> None:
                 if token:
                     headers["Authorization"] = "Bearer " + token
                 with urlopen(
-                    Request("http://127.0.0.1:3000" + path, data=data, headers=headers),
+                    Request(
+                        atlas_ports().url("chat_ui") + path, data=data, headers=headers
+                    ),
                     timeout=130,
                 ) as reply:
                     return json.load(reply)

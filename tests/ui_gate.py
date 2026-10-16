@@ -19,6 +19,7 @@ from stream_transport import StreamRequest
 from services.orchestrator.interactions import Interaction
 from services.orchestrator.serving import stack
 from native_ui import native_ui
+from packages.ports import atlas_ports
 
 RECORDING = Path("tests/cassettes/chat.json.gz")
 
@@ -94,7 +95,7 @@ def main() -> None:
                 ],
             }
             request = Request(
-                "http://127.0.0.1:8020/v1/chat/completions",
+                atlas_ports().url("adapter") + "/v1/chat/completions",
                 data=json.dumps(payload).encode(),
                 headers={"Content-Type": "application/json"},
             )
@@ -125,7 +126,8 @@ def main() -> None:
                     for p in row["chunks_recuperes"]
                 )
                 with urlopen(
-                    "http://127.0.0.1:8020/sources/" + citation["chunk_id"], timeout=5
+                    atlas_ports().url("adapter") + "/sources/" + citation["chunk_id"],
+                    timeout=5,
                 ) as source:
                     assert source.status == 200
             if not record:

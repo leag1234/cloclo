@@ -4,13 +4,14 @@ import unittest
 from decimal import Decimal
 from unittest.mock import AsyncMock, patch
 
+from packages.ports import atlas_ports
 from services.orchestrator.model import Configuration, GatewayModel
 
 
 class ClientTests(unittest.IsolatedAsyncioTestCase):
     def model(self) -> GatewayModel:
         return GatewayModel(
-            "http://localhost:8010",
+            atlas_ports().url("gateway", "localhost"),
             Configuration(
                 input_eur_per_mtok=Decimal("0.6"),
                 output_eur_per_mtok=Decimal("3.6"),
