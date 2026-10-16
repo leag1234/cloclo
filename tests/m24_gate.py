@@ -180,7 +180,7 @@ def main() -> None:
                         assert terminal_position < len(terminal_rows), (
                             f"unrecorded_m24_terminal_io:{name}:{kind}"
                         )
-                        row = substitute(
+                        row: dict[str, Any] = substitute(
                             terminal_rows[terminal_position], old_id, current_id
                         )
                         terminal_position += 1
