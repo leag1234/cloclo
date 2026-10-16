@@ -88,6 +88,8 @@ def webui(name: str, persistent: bool) -> None:
         "-e",
         f"OPENAI_API_BASE_URL=http://{gateway}:{ports.port('adapter')}/v1",
         "-e",
+        "ENABLE_TITLE_GENERATION=True",
+        "-e",
         f"ATLAS_ADAPTER_URL=http://{gateway}:{ports.port('adapter')}",
     ]
     options.extend(

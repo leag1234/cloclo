@@ -192,3 +192,18 @@
 .dark .chat-assistant .markdown-prose {
   color: var(--atlas-text);
 }
+
+/* The Open WebUI chat header remains in normal flow while scrolling, so it never
+   covers the first assistant line. The named class makes this contract testable
+   when upstream retains its structural header selector. */
+.atlas-chat-header,
+main:has(.chat-assistant) > header,
+header:has(+ div .chat-assistant) {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+main:has(.chat-assistant),
+#chat-container {
+  scroll-padding-top: 4rem;
+}

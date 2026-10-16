@@ -408,7 +408,14 @@ class ChatTools(Runtime):
 
 async def process(request: ChatRequest, item: Interaction) -> None:
     from services.orchestrator.narration import clean_answer
+    from services.orchestrator.title import is_title_task, title_response
 
+    # Open WebUI sends its title task to the same OpenAI-compatible endpoint.
+    # It is auxiliary UI work: keep it deterministic and outside the agent loop.
+    if is_title_task(request.messages[-1].text):
+        item.reponse = title_response(request.messages[-1].text, request.lang)
+        item.state, item.task_type, item.cout_eur = "done", "title", 0.0
+        return
     request = request.model_copy(
         update={"lang": conversation_language(request.messages, request.ui_locale)}
     )
@@ -428,6 +435,7 @@ async def process(request: ChatRequest, item: Interaction) -> None:
         "vision",
     }:
         from services.orchestrator.source_truth import (
+            inline_source_markers,
             without_unretrieved,
             source_footer,
         )
@@ -449,6 +457,7 @@ async def process(request: ChatRequest, item: Interaction) -> None:
                 )
             ),
         )
+        item.reponse = inline_source_markers(item.reponse, item.retrieved_urls)
         item.reponse += source_footer(item.retrieved_urls, request.lang)
 
 
