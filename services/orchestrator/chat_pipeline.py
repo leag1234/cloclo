@@ -117,6 +117,7 @@ class ChatTools(Runtime):
         self.item = item
         self.allow_image = allow_image
         self.image_prompt: str | None = None
+        self.terminal_code_disabled = False
         self.source_truncated = False
         self.model: GatewayModel | None = None
         self.terminal = None
@@ -139,6 +140,8 @@ class ChatTools(Runtime):
         if call.name in {"terminal_command", "publish_document"}:
             from services.orchestrator.terminal_client import Command, Publish
 
+            if self.terminal_code_disabled:
+                return {"error": "tool_unavailable"}
             if self.terminal is None:
                 return {"error": "terminal_unavailable"}
             try:
@@ -529,6 +532,10 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
     deliver_files = requests_file_delivery(request.messages[-1].text) or (
         bool(request.documents) and edits_attachment(request.messages[-1].text)
     )
+    from services.orchestrator.file_content import requested_formats
+
+    requested_file_formats = requested_formats(request.messages[-1].text)
+    structured_presentation = deliver_files and "pptx" in requested_file_formats
     if (
         os.environ.get("ATLAS_TERMINAL_ENABLED") == "1"
         and not produces_files
@@ -540,6 +547,10 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
             if isinstance(function := tool.get("function"), dict)
             and function.get("name") not in {"terminal_command", "publish_document"}
         ]
+    if structured_presentation:
+        # The terminal remains the delivery boundary, but model-authored tool use
+        # cannot replace the validated outline path.
+        model.tools = []
     model.configure_quality(
         request.model,
         request.max_tokens,
@@ -553,6 +564,7 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
     )  # Reserved until ledger returns.
     tools = ChatTools(item, request.messages[-1].text, allow_image=not followup)
     tools.model = model
+    tools.terminal_code_disabled = structured_presentation
     file_context = ""
     terminal_error = ""
     if tools.terminal is not None:
@@ -578,6 +590,10 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                 ensure_ascii=False,
             )
         )
+        if structured_presentation:
+            from services.orchestrator.presentation_delivery import OUTLINE_INSTRUCTION
+
+            file_context += "\n" + OUTLINE_INSTRUCTION
     from services.orchestrator.attachment_reading import (
         document_status,
         failure_notice,
@@ -691,11 +707,33 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
         )
         file_recovery_attempted = False
         file_recovery_failed = False
+        if structured_presentation and tools.terminal is not None:
+            from services.orchestrator.presentation_delivery import deliver_presentation
+
+            delivered = await deliver_presentation(
+                model, request, item, result, tools.terminal, started, formats
+            )
+            if delivered is None:
+                # D5: no second file-generation route can replace an honest failure.
+                from services.orchestrator.presentation_delivery import (
+                    outline_markdown,
+                )
+
+                file_recovery_failed = True
+                result.text = outline_markdown(result.text)
+            else:
+                from services.orchestrator.presentation_delivery import (
+                    outline_markdown,
+                )
+
+                result = delivered
+                result.text = outline_markdown(result.text)
         if (
             deliver_files
             and tools.terminal is not None
             and not tools.terminal.files
             and tools.terminal.commands == 0
+            and not file_recovery_failed
             and "terminal_operation_failed" not in item.erreurs
             and result.tool_calls <= 7
         ):
@@ -789,7 +827,11 @@ async def _process(request: ChatRequest, item: Interaction) -> None:
                 for ext in formats
                 if not any(url.endswith("." + ext) for url in tools.terminal.files)
             )
-            if missing and "terminal_operation_failed" not in item.erreurs:
+            if (
+                missing
+                and not file_recovery_failed
+                and "terminal_operation_failed" not in item.erreurs
+            ):
                 ready = not file_recovery_failed and presentable(result.text, missing)
                 if not ready and result.tool_calls + 1 + len(missing) <= 10:
                     from services.orchestrator.content_recovery import recover_content

@@ -4,6 +4,7 @@ from contextlib import aclosing
 from dataclasses import asdict
 import copy
 import gzip
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -23,6 +24,7 @@ from services.orchestrator.chat_api import app
 from services.orchestrator.chat_pipeline import ChatTools
 from services.orchestrator.loop import Call, Message
 from services.orchestrator.model import GatewayModel
+from services.orchestrator.terminal_client import TerminalClient
 import stream_transport
 
 
@@ -33,6 +35,8 @@ def main() -> None:
     original_stream = stream_transport.attempt
     original_post = GatewayModel.post
     original_tool = ChatTools.execute
+    original_upload = TerminalClient.upload_generated
+    original_publish = TerminalClient.publish
 
     def record(request: Any, response: Any) -> None:
         rows.append(copy.deepcopy({"request": request, "response": response}))
@@ -75,6 +79,37 @@ def main() -> None:
                 response,
             )
         return response
+
+    async def upload_generated(
+        client: TerminalClient, filename: str, content: bytes, timeout: float
+    ) -> str:
+        path = await original_upload(client, filename, content, timeout)
+        record(
+            {
+                "kind": "terminal_upload",
+                "filename": filename,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "size": len(content),
+            },
+            {"path": path},
+        )
+        return path
+
+    async def publish(
+        client: TerminalClient, path: str, strategy: str, timeout: float
+    ) -> dict[str, object]:
+        output = await original_publish(client, path, strategy, timeout)
+        record(
+            {"kind": "terminal_publish", "path": path, "strategy": strategy},
+            {
+                "output": output,
+                "commands": client.commands,
+                "failed_commands": client.failed_commands,
+                "files": client.files,
+                "strategies": client.strategies,
+            },
+        )
+        return output
 
     async def execute(runtime: ChatTools, call: Call, timeout: float) -> Message:
         output = await original_tool(runtime, call, timeout)
@@ -124,6 +159,8 @@ def main() -> None:
                 patch.object(stream_transport, "attempt", stream),
                 patch.object(GatewayModel, "post", staticmethod(post)),
                 patch.object(ChatTools, "execute", execute),
+                patch.object(TerminalClient, "upload_generated", upload_generated),
+                patch.object(TerminalClient, "publish", publish),
                 TestClient(app) as client,
             ):
                 for name, case in cases.items():

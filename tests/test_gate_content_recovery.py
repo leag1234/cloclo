@@ -150,32 +150,29 @@ class GateContentTests(unittest.IsolatedAsyncioTestCase):
             )
         return item, observed, execute
 
-    async def test_gate_plan_gets_content_turn_before_rendering(self) -> None:
+    async def test_legacy_plan_is_an_honest_presentation_failure(self) -> None:
         item, seen, execute = await self.recover([CONTENT])
         self.assertEqual(len(seen), 1)
         self.assertEqual(seen[0][2], [])
-        self.assertEqual(len(item.files), 2)
-        assert execute.await_args is not None
-        self.assertIn("Le système mobile", execute.await_args.args[0])
-        self.assertNotIn("Plan de la présentation", execute.await_args.args[0])
-        self.assertIn("recherche", item.reponse.casefold())
-        self.assertNotIn("https://", item.reponse)
-        self.assertAlmostEqual(item.cout_eur, 0.07)
+        self.assertEqual(item.files, [])
+        execute.assert_not_awaited()
+        self.assertIn("Aucun fichier", item.reponse)
+        self.assertNotIn("J'ai créé", item.reponse)
+        self.assertAlmostEqual(item.cout_eur, 0.05)
 
     async def test_captured_irrelevant_search_through_real_loop(self) -> None:
         item, seen, execute = await self.recover([CONTENT], through_search=True)
-        self.assertEqual(len(seen), 1)
-        self.assertEqual(len(item.files), 2)
+        self.assertEqual(len(seen), 0)
+        self.assertEqual(item.files, [])
+        execute.assert_not_awaited()
         self.assertIn("https://www.eon.com/en.html", item.retrieved_urls)
-        self.assertIn("recherches n'ont pas permis", item.reponse)
-        assert execute.await_args is not None
-        self.assertNotIn("mathematical constant", execute.await_args.args[0])
-        self.assertNotIn("www.eon.com", execute.await_args.args[0])
+        self.assertIn("Aucun fichier", item.reponse)
 
     async def test_failed_forced_turn_reserves_content_budget(self) -> None:
         item, seen, _ = await self.recover([CONTENT], forced_error=True)
         self.assertEqual(len(seen), 1)
-        self.assertEqual(len(item.files), 2)
+        self.assertEqual(item.files, [])
+        self.assertIn("Aucun fichier", item.reponse)
         self.assertLessEqual(item.cout_eur, 0.30)
 
     async def test_captured_substantive_answer_retains_content_budget_after_tool_error(
@@ -185,19 +182,20 @@ class GateContentTests(unittest.IsolatedAsyncioTestCase):
             [CONTENT], forced_error=True, first_answer=CAPTURE["J54_substantive"]
         )
         self.assertEqual(len(seen), 1)
-        self.assertEqual(len(item.files), 2)
+        self.assertEqual(item.files, [])
+        self.assertIn("Aucun fichier", item.reponse)
         self.assertLessEqual(item.cout_eur, 0.30)
 
-    async def test_content_retry_is_bounded_and_rejects_plan(self) -> None:
+    async def test_outline_repair_is_bounded_and_rejects_legacy_plan(self) -> None:
         item, seen, execute = await self.recover([CAPTURE["J54"][0], CONTENT])
-        self.assertEqual(len(seen), 2)
-        self.assertGreater(len(str(seen[1][0][-1])), len(str(seen[0][0][-1])))
-        self.assertEqual(len(item.files), 2)
-        execute.assert_awaited_once()
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(item.files, [])
+        execute.assert_not_awaited()
+        self.assertIn("Aucun fichier", item.reponse)
 
     async def test_two_invalid_content_turns_leave_honest_inline_answer(self) -> None:
         item, seen, execute = await self.recover([CAPTURE["J54"][0]] * 2)
-        self.assertEqual(len(seen), 2)
+        self.assertEqual(len(seen), 1)
         execute.assert_not_awaited()
         self.assertEqual(item.files, [])
         self.assertIn("Aucun fichier", item.reponse)
