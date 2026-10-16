@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from packages.ports import DEFAULT_PORTS
 from unittest.mock import patch
 
 from evals.truthfulness.run import Ledger, ask, busy_ports, audit_batch, run
@@ -105,9 +106,17 @@ class TruthfulnessRunnerTests(unittest.TestCase):
                 self.assertEqual(str(ledger.spent), "3.00")
 
     def test_ports_parse_wildcard_ipv4_ipv6(self) -> None:
-        with patch("evals.truthfulness.run.subprocess.run") as run:
-            run.return_value.stdout = "LISTEN 0 5 127.0.0.1:8000 0.0.0.0:*\nLISTEN 0 5 [::]:8020 [::]:*\nLISTEN 0 5 127.0.0.1:18020 *:*\n"
-            self.assertEqual(busy_ports(), [8000, 8020])
+        terminal, adapter = DEFAULT_PORTS["terminal"], DEFAULT_PORTS["adapter"]
+        with (
+            patch.dict(os.environ, {"ATLAS_PORT_BASE": "0"}),
+            patch("evals.truthfulness.run.subprocess.run") as run,
+        ):
+            run.return_value.stdout = (
+                f"LISTEN 0 5 127.0.0.1:{terminal} 0.0.0.0:*\n"
+                f"LISTEN 0 5 [::]:{adapter} [::]:*\n"
+                f"LISTEN 0 5 127.0.0.1:1{adapter} *:*\n"
+            )
+            self.assertEqual(busy_ports(), [terminal, adapter])
             run.assert_called_once_with(
                 ["ss", "-ltnH"], check=True, capture_output=True, text=True
             )

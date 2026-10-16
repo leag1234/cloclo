@@ -227,9 +227,10 @@ async def run(
                 from services.orchestrator.narration import raw_tool_call
 
                 complete_text = "".join([*answer_parts, turn.text])
+                declared = getattr(model, "tools", None)
                 offered = {
                     str(function["name"])
-                    for tool in getattr(model, "tools", [])
+                    for tool in (declared if isinstance(declared, list) else [])
                     if isinstance(tool, dict)
                     and isinstance(function := tool.get("function"), dict)
                     and isinstance(function.get("name"), str)
