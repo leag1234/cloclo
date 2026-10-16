@@ -1,194 +1,157 @@
-/* Open WebUI user-message component: a quiet, warm neutral bubble preserves its layout. */
-.user-message {
-  background: #eeeae4 !important;
-  color: #2f2d2a !important;
-  border: 0;
-  border-radius: 18px;
-  padding: 0.75rem 1rem;
-}
-/* Option A: a compact bubble aligned to the right instead of a full-width band. */
-.user-message {
-  width: auto !important;
-  max-width: min(75%, 40rem) !important;
-  align-self: flex-end !important;
-}
-.user-message > div {
-  flex: 0 1 auto !important;
-  width: auto !important;
-}
-/* Dark mode uses the same neutral hierarchy with readable normal text. */
-.dark .user-message {
-  background: #302e2b !important;
-  color: #f1efeb !important;
-  border: 0;
-}
-/* Nested Open WebUI utility surfaces inherit the bubble instead of restoring green. */
-.user-message [class*="bg-gray-"],
-.user-message [class*="bg-white"] {
-  background-color: transparent !important;
-}
-/* Nested text keeps the accessible neutral-bubble foreground. */
-.user-message [class*="text-gray-"] {
-  color: inherit !important;
-}
+/* Owner-approved ATLAS visual tokens; Open WebUI continues to own html.dark. */
+@font-face { font-family: Geist; src: url('/static/atlas/fonts/geist-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: Geist; src: url('/static/atlas/fonts/geist-latin-ext-400-normal.woff2') format('woff2'); font-display: swap; unicode-range:U+0100-024F; }
+@font-face { font-family: 'Hanken Grotesk'; src: url('/static/atlas/fonts/hanken-grotesk-latin-400-normal.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Hanken Grotesk'; src: url('/static/atlas/fonts/hanken-grotesk-latin-ext-400-normal.woff2') format('woff2'); font-display: swap; unicode-range:U+0100-024F; }
+:root { --atlas-radius:20px; --atlas-font:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif; --atlas-bg:#fff; --atlas-side:#f2f2f7; --atlas-text:#1d1d1f; --atlas-muted:#646468; --atlas-border:#e5e5ea; --atlas-surface:#f2f2f7; --atlas-user-bg:#f2f2f7; --atlas-accent:#1f7534; --atlas-on-accent:#fff; --atlas-body-size:16px; --atlas-ui-size:14px; --atlas-answer-leading:1.6; --atlas-user-leading:1.5; --atlas-column:700px; }
+html.dark { --atlas-bg:#000; --atlas-side:#1c1c1e; --atlas-text:#f5f5f7; --atlas-muted:#98989d; --atlas-border:#2c2c2e; --atlas-surface:#1c1c1e; --atlas-user-bg:#1c1c1e; --atlas-accent:#30d158; --atlas-on-accent:#0b0b0c; }
+html[data-atlas-style="dense"] { --atlas-radius:8px; --atlas-font:Geist,system-ui,sans-serif; --atlas-bg:#fbfbfa; --atlas-side:#f4f4f1; --atlas-text:#1c1c19; --atlas-muted:#66665f; --atlas-border:#e6e6e1; --atlas-surface:#fff; --atlas-user-bg:#f0efea; }
+html.dark[data-atlas-style="dense"] { --atlas-bg:#121211; --atlas-side:#171716; --atlas-text:#ecece8; --atlas-muted:#909088; --atlas-border:#262624; --atlas-surface:#1a1a19; --atlas-user-bg:#242422; }
+html[data-atlas-style="document"] { --atlas-radius:8px; --atlas-font:'Hanken Grotesk',system-ui,sans-serif; --atlas-bg:#fff; --atlas-side:#fbfaf8; --atlas-text:#2a2a28; --atlas-muted:#676662; --atlas-border:#e9e8e4; --atlas-surface:#f7f6f3; --atlas-user-bg:#f7f6f3; }
+html.dark[data-atlas-style="document"] { --atlas-bg:#191919; --atlas-side:#202020; --atlas-text:#e6e6e3; --atlas-muted:#9b9a97; --atlas-border:#2f2f2f; --atlas-surface:#252525; --atlas-user-bg:#252525; }
+html[data-atlas-accent="blue"] { --atlas-accent:#0960d6; } html.dark[data-atlas-accent="blue"] { --atlas-accent:#4d9bff; } html[data-atlas-accent="orange"] { --atlas-accent:#b63d1d; } html.dark[data-atlas-accent="orange"] { --atlas-accent:#ff7a45; } html[data-atlas-accent="violet"] { --atlas-accent:#6d4bd1; } html.dark[data-atlas-accent="violet"] { --atlas-accent:#a58bff; } html[data-atlas-accent="graphite"] { --atlas-accent:#2a2a28; } html.dark[data-atlas-accent="graphite"] { --atlas-accent:#e6e6e6; }
+html[data-atlas-size="14"] { --atlas-body-size:14px; --atlas-ui-size:12px; } html[data-atlas-size="18"] { --atlas-body-size:18px; --atlas-ui-size:15px; } html[data-atlas-size="20"] { --atlas-body-size:20px; --atlas-ui-size:17px; }
+html,body { background:var(--atlas-bg); color:var(--atlas-text); font-family:var(--atlas-font); font-size:var(--atlas-ui-size); }
+/* Semantic surfaces survive utility-class churn. */
+:is(nav,aside,header,[class*="sidebar"],[class*="Sidebar"]) { background-color:var(--atlas-side); border-color:var(--atlas-border); color:var(--atlas-text); }
+:is(.markdown,.markdown-prose,.chat-assistant .markdown-prose) { --font-sans:var(--atlas-font); --font-primary:var(--atlas-font); --tw-prose-body:var(--atlas-text); --tw-prose-headings:var(--atlas-text); --tw-prose-links:var(--atlas-accent); color:var(--atlas-text); font-family:var(--atlas-font); font-size:var(--atlas-body-size); line-height:var(--atlas-answer-leading); max-width:none; }
+:is(.markdown,.markdown-prose) :is(p,ul,ol,h1,h2,h3,blockquote,table) { max-width:var(--atlas-column); }
+.user-message { display:inline-flex!important; flex:0 1 auto!important; flex-direction:column!important; align-items:stretch!important; box-sizing:border-box!important; background:var(--atlas-accent)!important; color:var(--atlas-on-accent)!important; border:0; border-radius:var(--atlas-radius); padding:10px 16px!important; width:fit-content!important; min-width:0!important; max-width:80%!important; align-self:flex-end!important; line-height:var(--atlas-user-leading); font-size:var(--atlas-body-size); }
+.user-message > div { flex:0 1 auto!important; width:auto!important; min-width:0!important; } .user-message :is(p,.markdown,.markdown-prose,[class*="message-content"]) { background:transparent!important; color:inherit!important; margin:0!important; }
+html[data-atlas-style="dense"] .user-message,html[data-atlas-style="document"] .user-message { background:var(--atlas-user-bg)!important; color:var(--atlas-text)!important; } html[data-atlas-style="document"] .chat-assistant { background:transparent!important; } html[data-atlas-style="document"] .user-message { border-left:0; max-width:80%!important; align-self:flex-end!important; }
+/* Attachment and delivered-file cards preserve original links and controls. */
+:is(.file-item,.attachment,[data-testid="file-item"],[data-testid="attachment"],[class*="file-item"]) { display:flex!important; flex:0 1 auto!important; width:100%!important; box-sizing:border-box!important; background:var(--atlas-surface)!important; border:1px solid var(--atlas-border)!important; border-radius:12px!important; color:var(--atlas-text)!important; } .user-message :is(.file-item,.attachment,[data-testid="file-item"],[data-testid="attachment"],[class*="file-item"]) { margin:0 0 .5rem!important; } :is(.file-item,.attachment,[data-testid="file-item"],[data-testid="attachment"],[class*="file-item"]) :is(*,::before,::after) { color:var(--atlas-text)!important; }
+/* Open WebUI v0.11.3 renders saved user attachments as anonymous buttons. */
+.user-message .chat-user > .mb-1 > .self-end > button { background:var(--atlas-surface)!important; border-color:var(--atlas-border)!important; color:var(--atlas-text)!important; } .user-message .chat-user > .mb-1 > .self-end > button :is(*,::before,::after) { color:var(--atlas-text)!important; }
+/* The native message chip is only a layout wrapper: the outer user bubble owns its surface. */
+.user-message .chat-user > .w-full > .flex > .rounded-3xl { background:transparent!important; border-radius:0!important; max-width:none!important; padding:0!important; }
+:is(.markdown,.markdown-prose) table { border:1px solid var(--atlas-border); border-radius:var(--atlas-radius); overflow:hidden; } :is(.markdown,.markdown-prose) :is(th,td) { border-color:var(--atlas-border); padding:.6em .75em; } :is(.markdown,.markdown-prose) th { background:var(--atlas-surface); }
+:is(.markdown,.markdown-prose) :is(pre,.cm-editor,.nb-code-content,.nb-code-source,.file-code-editor) { background:var(--atlas-surface)!important; color:var(--atlas-text); border:1px solid var(--atlas-border); border-radius:var(--atlas-radius); padding:1rem 1.25rem; box-shadow:none!important; max-width:100%; overflow-x:auto; } :is(.markdown,.markdown-prose) :is(pre,pre code,.cm-content,.cm-line) { white-space:pre!important; overflow-wrap:normal!important; word-break:normal; font-family:var(--font-mono,monospace); } :is(.markdown,.markdown-prose) :not(pre)>code { background:var(--atlas-surface); color:var(--atlas-text); border-radius:.25em; padding:.15em .3em; font-family:var(--font-mono,monospace); font-size:.88em; } :is(.markdown,.markdown-prose) :not(pre)>code::before,:is(.markdown,.markdown-prose) :not(pre)>code::after { content:none; }
+/* M24: gutters stay off; retain its copy-only code control. */
+:is(.markdown,.markdown-prose) :is(.cm-gutters,.cm-lineNumbers) { display:none; } :is(.markdown,.markdown-prose) .cm-activeLine { background:transparent!important; } :is(.markdown,.markdown-prose) div:has(> .copy-code-button) { position:absolute; right:.5rem; top:.5rem; z-index:20; } :is(.markdown,.markdown-prose) div:has(> .copy-code-button) > :not(.copy-code-button),:is(.markdown,.markdown-prose) div:has(> div > .copy-code-button) > :not(:has(.copy-code-button)) { display:none; } :is(.markdown,.markdown-prose) div:has(> div > .copy-code-button) { position:relative; height:0; padding:0; background:transparent!important; } :is(.markdown,.markdown-prose) div[class*="language-"]:has(pre,.cm-editor) { margin-top:0; } :is(.markdown,.markdown-prose) div[class*="language-"] > div:empty { display:none; } :is(.markdown,.markdown-prose) .copy-code-button { opacity:0; background:var(--atlas-surface)!important; color:var(--atlas-text); } :is(.markdown,.markdown-prose) [dir="ltr"]:hover .copy-code-button,:is(.markdown,.markdown-prose) [dir="ltr"]:focus-within .copy-code-button,.markdown-prose div:has(> div > div > .copy-code-button):hover .copy-code-button,.markdown-prose div:has(> div > div > .copy-code-button):focus-within .copy-code-button { opacity:1; }
+:is(a,[class*="source"],[class*="citation"],[class*="status"],[class*="activity"]) { border-color:var(--atlas-border); } :is(.markdown,.markdown-prose) a { color:var(--atlas-accent); } textarea,input,[contenteditable="true"] { color:var(--atlas-text)!important; } [class*="composer"],form:has(textarea) { background:var(--atlas-surface); border-color:var(--atlas-border); border-radius:var(--atlas-radius); } html[data-atlas-style="arrondi"] form:has(textarea) { border-radius:999px; } button:focus-visible,a:focus-visible { outline:3px solid var(--atlas-accent); outline-offset:2px; } ::-webkit-scrollbar { width:10px; height:10px; } ::-webkit-scrollbar-thumb { background:var(--atlas-muted); border:3px solid var(--atlas-bg); border-radius:999px; }
+#atlas-ui-selector { position:fixed; right:20px; bottom:20px; z-index:100000; font-family:var(--atlas-font); font-size:var(--atlas-ui-size); } #atlas-ui-toggle { width:44px; height:44px; border-radius:50%; border:1px solid var(--atlas-border); background:var(--atlas-surface); color:var(--atlas-text); box-shadow:0 4px 18px #0003; font-weight:700; } #atlas-ui-popover { position:absolute; right:0; bottom:52px; width:250px; padding:14px; border:1px solid var(--atlas-border); border-radius:var(--atlas-radius); background:var(--atlas-surface); color:var(--atlas-text); box-shadow:0 12px 32px #0004; } #atlas-ui-popover h2 { margin:0 0 10px; font-size:1em; color:var(--atlas-text); } #atlas-ui-popover fieldset { border:0; padding:0 0 10px; } #atlas-ui-popover legend { color:var(--atlas-muted); padding:0 0 5px; } .atlas-option { min-width:44px; min-height:44px; margin:2px; padding:0 8px; border:1px solid var(--atlas-border); border-radius:12px; background:var(--atlas-bg); color:var(--atlas-text); } .atlas-option[aria-pressed="true"] { background:var(--atlas-accent); color:var(--atlas-on-accent); border-color:var(--atlas-accent); }
 
-/* Open WebUI attachment chips become compact file cards without altering controls. */
-:is(.file-item, .attachment, [data-testid="file-item"], [data-testid="attachment"]) {
-  background: #fff !important;
-  border: 1px solid #d8d3cb !important;
-  border-radius: 12px !important;
-  color: #2f2d2a !important;
-}
-/* File type, filename and size remain readable when the chip contains utility text. */
-:is(.file-item, .attachment, [data-testid="file-item"], [data-testid="attachment"]) :is([class*="text-"], span) {
-  color: inherit !important;
-}
-/* The same attachment card surface is used in Open WebUI's dark theme. */
-.dark :is(.file-item, .attachment, [data-testid="file-item"], [data-testid="attachment"]) {
-  background: #272624 !important;
-  border-color: #56524c !important;
-  color: #f1efeb !important;
-}
-
-/* Defaults are centralized: changing --atlas-body-font switches the reading font. */
-:root {
-  --atlas-body-font: Georgia, "Iowan Old Style", "Times New Roman", serif;
-  --atlas-body-size: 1.0625rem;
-  --atlas-line-height: 1.75;
-  --atlas-column: 700px;
-  --atlas-section-space: 1.8em;
-  --atlas-text: #303030;
-  --atlas-code-bg: #f5f5f3;
-  --atlas-code-border: #d9d9d5;
-}
-/* Dark values cascade into every shared geometry rule without changing layout. */
-.dark {
-  --atlas-text: #e3e3df;
-  --atlas-code-bg: #242625;
-  --atlas-code-border: #454944;
-}
-/* Theme font fallback honors Open WebUI's user-selected --app-font-family. */
-:where(:is(.markdown, .markdown-prose):not(.user-message), .dark :is(.markdown, .markdown-prose):not(.user-message)) {
-  --font-sans: var(--app-font-family, var(--atlas-body-font));
-  --font-primary: var(--font-sans);
-  --tw-prose-body: var(--atlas-text);
-  --tw-prose-invert-body: var(--atlas-text);
-  --tw-prose-headings: var(--atlas-text);
-  --tw-prose-invert-headings: var(--atlas-text);
-  --tw-prose-bold: var(--atlas-text);
-  --tw-prose-invert-bold: var(--atlas-text);
-  --tw-prose-quotes: var(--atlas-text);
-  --tw-prose-invert-quotes: var(--atlas-text);
-  --tw-prose-links: var(--atlas-text);
-  --tw-prose-invert-links: var(--atlas-text);
-  font-family: var(--atlas-body-font);
-  font-family: var(--app-font-family, var(--atlas-body-font));
-  font-size: var(--atlas-body-size);
-  line-height: var(--atlas-line-height);
-  color: var(--atlas-text);
-  max-width: none;
-}
-/* Semantic prose has a readable measure; code wrappers retain available width. */
-:is(.markdown, .markdown-prose) :is(p, ul, ol, h1, h2, h3, blockquote),
-.dark :is(.markdown, .markdown-prose) :is(p, ul, ol, h1, h2, h3, blockquote) {
-  max-width: var(--atlas-column);
-}
-/* Section separation is identical in both themes. */
-:is(.markdown, .markdown-prose) h2, .dark :is(.markdown, .markdown-prose) h2 { margin-top: var(--atlas-section-space); margin-bottom: 0.7em; }
-/* Subsections retain hierarchy with slightly less space than major sections. */
-:is(.markdown, .markdown-prose) h3, .dark :is(.markdown, .markdown-prose) h3 { margin-top: 1.4em; margin-bottom: 0.6em; }
-/* Separate list items without widening the prose column in either theme. */
-:is(.markdown, .markdown-prose) li + li, .dark :is(.markdown, .markdown-prose) li + li { margin-top: 0.55em; }
-/* Plain blocks and CodeMirror use the same theme palette and thin border. */
-:is(.markdown, .markdown-prose) :is(pre, .cm-editor, .nb-code-content, .nb-code-source, .file-code-editor), .dark :is(.markdown, .markdown-prose) :is(pre, .cm-editor, .nb-code-content, .nb-code-source, .file-code-editor) {
-  background: var(--atlas-code-bg) !important;
-  color: var(--atlas-text);
-  border: 1px solid var(--atlas-code-border);
-  border-radius: 0.5rem;
-  padding: 1rem 1.25rem;
-  box-shadow: none !important;
-  max-width: 100%;
-  overflow-x: auto;
-}
-/* Code always scrolls horizontally; neither theme may wrap long source lines. */
-:is(.markdown, .markdown-prose) :is(pre, pre code, .cm-content, .cm-line),
-.dark :is(.markdown, .markdown-prose) :is(pre, pre code, .cm-content, .cm-line) {
-  white-space: pre !important;
-  overflow-wrap: normal !important;
-  word-break: normal;
-  font-family: var(--font-mono, monospace);
-}
-/* Inline identifiers are subtle capsules; exclude block code in both themes. */
-:is(.markdown, .markdown-prose) :not(pre) > code, .dark :is(.markdown, .markdown-prose) :not(pre) > code {
-  background: var(--atlas-code-bg);
-  color: var(--atlas-text);
-  border: 0;
-  border-radius: 0.25em;
-  padding: 0.15em 0.3em;
-  font-family: var(--font-mono, monospace);
-  font-size: 0.88em;
-}
-/* Tailwind prose decoration would add distracting backticks to capsules. */
-:is(.markdown, .markdown-prose) :not(pre) > code::before, :is(.markdown, .markdown-prose) :not(pre) > code::after,
-.dark :is(.markdown, .markdown-prose) :not(pre) > code::before, .dark :is(.markdown, .markdown-prose) :not(pre) > code::after { content: none; }
-/* CodeMirror semantic classes hide line numbers, gutters and active-line tint. */
-:is(.markdown, .markdown-prose) .cm-gutters, :is(.markdown, .markdown-prose) .cm-lineNumbers,
-.dark :is(.markdown, .markdown-prose) .cm-gutters, .dark :is(.markdown, .markdown-prose) .cm-lineNumbers { display: none; }
-/* Preserve text selection but remove the idle active-line highlight. */
-:is(.markdown, .markdown-prose) .cm-activeLine, .dark :is(.markdown, .markdown-prose) .cm-activeLine { background: transparent !important; }
-/* v0.11.3 toolbar wrapper: use its copy control, not generated utility hashes. */
-:is(.markdown, .markdown-prose) div:has(> .copy-code-button), .dark :is(.markdown, .markdown-prose) div:has(> .copy-code-button) {
-  position: absolute;
-  right: 0.5rem;
-  top: 0.5rem;
-  z-index: 20;
-}
-/* Collapse/save/run furniture is hidden; leave the keyboard-focusable copy action. */
-:is(.markdown, .markdown-prose) div:has(> .copy-code-button) > :not(.copy-code-button),
-.dark :is(.markdown, .markdown-prose) div:has(> .copy-code-button) > :not(.copy-code-button) { display: none; }
-/* Remove toolbar title and its reserved height using structural selectors. */
-:is(.markdown, .markdown-prose) div:has(> div > .copy-code-button),
-.dark :is(.markdown, .markdown-prose) div:has(> div > .copy-code-button) {
-  position: relative;
-  height: 0;
-  padding: 0;
-  background: transparent !important;
-}
-/* The toolbar's language title is furniture too. */
-:is(.markdown, .markdown-prose) div:has(> div > .copy-code-button) > :not(:has(.copy-code-button)),
-.dark :is(.markdown, .markdown-prose) div:has(> div > .copy-code-button) > :not(:has(.copy-code-button)) { display: none; }
-/* Undo the v0.11.3 toolbar overlap spacer; scope to its language wrapper. */
-:is(.markdown, .markdown-prose) div[class*="language-"]:has(pre, .cm-editor),
-.dark :is(.markdown, .markdown-prose) div[class*="language-"]:has(pre, .cm-editor) { margin-top: 0; }
-/* Empty toolbar offset div must not leave blank space above the code. */
-:is(.markdown, .markdown-prose) div[class*="language-"] > div:empty,
-.dark :is(.markdown, .markdown-prose) div[class*="language-"] > div:empty { display: none; }
-/* Copy appears on hover or keyboard focus; opacity keeps it reachable with Tab. */
-:is(.markdown, .markdown-prose) .copy-code-button, .dark :is(.markdown, .markdown-prose) .copy-code-button {
-  opacity: 0;
-  background: var(--atlas-code-bg) !important;
-  color: var(--atlas-text);
-}
-/* The existing dir=ltr code wrapper supplies hover and focus visibility. */
-:is(.markdown, .markdown-prose) [dir="ltr"]:hover .copy-code-button,
-:is(.markdown, .markdown-prose) [dir="ltr"]:focus-within .copy-code-button,
-.dark :is(.markdown, .markdown-prose) [dir="ltr"]:hover .copy-code-button,
-.dark :is(.markdown, .markdown-prose) [dir="ltr"]:focus-within .copy-code-button { opacity: 1; }
-
-/* Rendered v0.11.3 code wrapper has no dir attribute; locate its stable copy control. */
-.markdown-prose div:has(> div > div > .copy-code-button):hover .copy-code-button,
-.markdown-prose div:has(> div > div > .copy-code-button):focus-within .copy-code-button {
-  opacity: 1;
-}
-/* Notebook source follows ordinary code geometry without generated Svelte classes. */
-.markdown-prose :is(.nb-code-source-raw, .nb-code-content) {
-  white-space: pre;
-  overflow-x: auto;
-  font-family: var(--font-mono, monospace);
-}
-
-/* The rendered theme declares prose color directly; match its specificity in both themes. */
+/* Open WebUI v0.11.3: pin actual text nodes, not just inherited prose styles.
+   Keep the root rem at 16px so choosing message size cannot shrink the shell. */
+html { font-size:16px!important; --atlas-chat-panel:var(--atlas-bg); --atlas-layout-column:640px; --atlas-sidebar-width:calc(var(--sidebar-width,245px) + 5px); --atlas-composer-height:52px; --atlas-composer-radius:26px; }
+html.dark[data-atlas-style="arrondi"] { --atlas-chat-panel:#1c1c1e; }
+html:is([data-atlas-style="dense"],[data-atlas-style="document"]) { --atlas-layout-column:700px; --atlas-sidebar-width:calc(var(--sidebar-width,245px) - 13px); --atlas-composer-height:48px; --atlas-composer-radius:10px; }
+html[data-atlas-style="document"] { --atlas-sidebar-width:calc(var(--sidebar-width,245px) - 15px); }
+body,button,input,textarea { font-family:var(--atlas-font); }
 .chat-assistant .markdown-prose,
-.dark .chat-assistant .markdown-prose {
-  color: var(--atlas-text);
+.chat-assistant .markdown-prose :is(p,li,ul,ol,td,th,blockquote) {
+  font-family:var(--atlas-font)!important; font-size:var(--atlas-body-size)!important;
+  line-height:1.6!important; color:var(--atlas-text)!important;
 }
+.chat-assistant .markdown-prose :is(h1,h2,h3,h4,h5,h6) { font-family:var(--atlas-font)!important; line-height:1.6!important; color:var(--atlas-text)!important; }
+.chat-assistant .markdown-prose h1 { font-size:calc(var(--atlas-body-size) * 1.75)!important; }
+.chat-assistant .markdown-prose h2 { font-size:calc(var(--atlas-body-size) * 1.375)!important; }
+.chat-assistant .markdown-prose h3 { font-size:calc(var(--atlas-body-size) * 1.125)!important; }
+.chat-assistant .markdown-prose :is(h4,h5,h6) { font-size:var(--atlas-body-size)!important; }
+.chat-assistant .markdown-prose :is(code,pre,.cm-editor,.cm-content,.cm-line,.cm-line *) { font-size:var(--atlas-body-size)!important; line-height:1.6!important; }
+.chat-assistant .markdown-prose :is(p,ul,ol,table,pre) { margin-top:0; margin-bottom:10px; }
+.chat-assistant .markdown-prose :is(h1,h2,h3) { margin:6px 0 10px; }
+.chat-assistant .markdown-prose li { margin:0; }
+.user-message { position:relative; margin-left:auto; line-height:1.5!important; font-size:var(--atlas-body-size)!important; }
+.user-message > div { padding:0!important; }
+.user-message .markdown-prose,
+.user-message .markdown-prose :is(p,li,ul,ol,td,th,code) { font-family:var(--atlas-font)!important; font-size:var(--atlas-body-size)!important; line-height:1.5!important; color:inherit!important; }
+.user-message .chat-user > .w-full > .flex { padding:0!important; }
+/* Native edit/copy/timestamp controls stay reachable outside the measured bubble. */
+.user-message .chat-user > .flex:last-child:not(.mb-1) { position:absolute; right:0; top:100%; height:28px; color:var(--atlas-muted)!important; }
+.user-message .chat-user > .mb-1 { gap:4px!important; margin:0!important; padding:0!important; }
+.user-message .chat-user > .mb-1 > .self-end { align-self:stretch; }
+.user-message .chat-user > .mb-1 > .self-end > button {
+  width:100%; height:auto; min-height:40px; padding:8px 12px; border-radius:12px;
+  font-size:var(--atlas-ui-size)!important; line-height:20px;
+}
+.user-message .chat-user > .mb-1 > .self-end > button .font-normal { font-weight:600; }
+.user-message .chat-user > .mb-1 > .self-end > button .text-gray-500 { color:var(--atlas-muted)!important; }
+.user-message .chat-user > .mb-1 > .self-end > button .truncate { font-size:var(--atlas-ui-size)!important; }
+#messages-container .message-listitem { max-width:var(--atlas-layout-column)!important; padding:0!important; margin-bottom:32px; }
+#messages-container .chat-assistant { background:transparent!important; }
+#messages-container .chat-assistant > div { padding-left:0!important; }
+#messages-container .h-full.flex.pt-18 { padding-top:14px!important; }
+#messages-container { padding:0 24px!important; }
+#chat-container, #chat-pane { background:var(--atlas-chat-panel)!important; color:var(--atlas-text); }
+#chat-container { height:100%!important; max-height:100%!important; max-width:100%!important; }
+#chat-container nav { height:52px; min-height:52px; margin:0!important; padding:0 18px!important; justify-content:center; background:var(--atlas-chat-panel)!important; color:var(--atlas-text)!important; }
+#navbar-bg-gradient-to-b { background:none!important; }
+#chat-container nav .truncate { font-size:var(--atlas-ui-size)!important; font-weight:600; color:var(--atlas-text)!important; }
+html[data-atlas-style="arrondi"] #chat-container nav .flex-1 > .flex { justify-content:center; }
+#sidebar { background:var(--atlas-side)!important; color:var(--atlas-text)!important; font-family:var(--atlas-font)!important; font-size:var(--atlas-ui-size)!important; }
+#sidebar :is(a,button) { color:inherit; }
+#sidebar .sidebar { background:transparent; }
+#sidebar a[href^="/c/"] { height:34px; padding:0 10px!important; align-items:center; font-size:var(--atlas-ui-size)!important; border-radius:9px; }
+#sidebar a.selected { background:var(--atlas-accent)!important; color:var(--atlas-on-accent)!important; }
+@media (min-width:768px) {
+  div:has(> #sidebar) { position:relative; padding:0; gap:0; background:var(--atlas-bg)!important; overflow:hidden!important; }
+  #main-content { display:block; flex:1; min-width:0; height:100%; }
+  #sidebar[data-state] { position:relative!important; top:auto; left:auto; height:100%!important; min-height:0!important; max-height:100%!important; width:var(--atlas-sidebar-width)!important; }
+  #sidebar > .h-screen { height:100%!important; max-height:100%!important; width:100%!important; }
+  #sidebar-resizer { position:absolute; top:0; bottom:0; width:1px; height:auto; left:var(--atlas-sidebar-width); border:0; }
+  html[data-atlas-style="arrondi"] #sidebar-resizer { top:14px; bottom:14px; left:calc(14px + var(--atlas-sidebar-width)); }
+  html[data-atlas-style="arrondi"] div:has(> #sidebar) { padding:14px; gap:14px; background:#eceef2!important; }
+  html.dark[data-atlas-style="arrondi"] div:has(> #sidebar) { background:#000!important; }
+  html[data-atlas-style="arrondi"] #sidebar { border-radius:20px; background:rgba(255,255,255,.62)!important; border:1px solid rgba(255,255,255,.9); box-shadow:0 1px 2px rgba(0,0,0,.05); overflow:hidden; }
+  html.dark[data-atlas-style="arrondi"] #sidebar { background:#1c1c1e!important; border-color:var(--atlas-border); }
+  html[data-atlas-style="arrondi"] #chat-container { border-radius:20px; box-shadow:0 1px 2px rgba(0,0,0,.05); overflow:hidden; }
+}
+html[data-atlas-style="dense"] #sidebar a[href^="/c/"] { height:30px; border-radius:6px; padding:0 8px!important; }
+html[data-atlas-style="dense"] #sidebar a.selected { background:var(--atlas-border)!important; color:var(--atlas-text)!important; }
+html[data-atlas-style="dense"] :is(time,.tabular-nums) { font-family:ui-monospace,monospace!important; font-variant-numeric:tabular-nums; }
+html[data-atlas-style="dense"] #chat-container nav { height:44px; min-height:44px; border-bottom:1px solid var(--atlas-border); }
+html:is([data-atlas-style="dense"],[data-atlas-style="document"]) #sidebar { border-right:1px solid var(--atlas-border); }
+html[data-atlas-style="document"] #chat-container nav { height:48px; min-height:48px; }
+html[data-atlas-style="document"] .user-message { box-shadow:inset 3px 0 var(--atlas-border); }
+/* Native Tiptap composer: one input row; auxiliary native controls remain below. */
+#chat-pane > div:has(#message-input-container) { padding:0 24px 42px; flex-shrink:0; }
+#chat-pane div:has(> div > form) { max-width:var(--atlas-layout-column)!important; padding-left:0!important; padding-right:0!important; }
+#message-input-container { flex:none; min-height:var(--atlas-composer-height); border:1px solid var(--atlas-border)!important; border-radius:var(--atlas-composer-radius)!important; background:var(--atlas-surface)!important; padding:5px 8px; box-shadow:0 6px 24px rgba(0,0,0,.08)!important; }
+#message-input-container > .relative:has(#chat-input-container) { padding:0 48px!important; margin:auto 0; }
+#chat-input-container { padding:0!important; max-height:160px; }
+#chat-input, #chat-input p { font-family:var(--atlas-font)!important; font-size:var(--atlas-body-size)!important; line-height:1.5!important; margin:0!important; }
+#message-input-container > .justify-between { position:absolute; top:calc(100% + 6px); left:8px; right:8px; margin:0!important; height:28px; }
+#input-menu-button { position:absolute; left:0; top:calc(-1 * var(--atlas-composer-height)); width:40px; height:40px; background:var(--atlas-border)!important; border-radius:50%; color:var(--atlas-text)!important; }
+#send-message-button, #stop-response-button,
+#message-input-container > .justify-between > .self-end > .items-center > .flex > button { position:absolute; right:0; top:calc(-1 * var(--atlas-composer-height)); width:40px; height:40px; display:flex; justify-content:center; align-items:center; border-radius:50%; background:var(--atlas-accent)!important; color:var(--atlas-on-accent)!important; }
+#message-input-container :is(button,.text-gray-600) { font-size:var(--atlas-ui-size); }
+html:is([data-atlas-style="dense"],[data-atlas-style="document"]) #message-input-container { background:var(--atlas-bg)!important; box-shadow:0 1px 2px rgba(28,28,25,.04)!important; }
+html:is([data-atlas-style="dense"],[data-atlas-style="document"]) :is(#input-menu-button,#send-message-button,#stop-response-button) { width:36px; height:36px; border-radius:6px; }
+.chat-assistant .markdown-prose a[href*="/files/"][href$="/content"] { display:inline-flex; padding:10px 14px; border:1px solid var(--atlas-border); border-radius:12px; background:var(--atlas-surface); font-size:var(--atlas-ui-size)!important; font-weight:600; text-decoration:none; }
+.chat-assistant .markdown-prose a[href^="https:"] { font-size:var(--atlas-ui-size); color:var(--atlas-accent); }
+#atlas-ui-popover { width:310px; max-width:calc(100vw - 32px); box-sizing:border-box; padding:16px; }
+.atlas-options { display:flex; flex-wrap:nowrap; gap:4px; }
+.atlas-option { flex:1 1 0; min-width:44px; min-height:44px; margin:0; padding:0 4px; font-size:var(--atlas-ui-size); }
+.atlas-options[data-atlas-group="accent"] { flex-wrap:wrap; }
+@media (max-width:359px) { .atlas-options { flex-wrap:wrap; } }
+body:has(#chat-container) { height:100dvh; overflow:hidden; }
+#chat-container nav { flex-shrink:0; }
+#chat-pane { min-height:0; overflow:hidden; }
+.chat-assistant .markdown-prose :is(th,td) { padding:8px 12px!important; }
+.chat-assistant .markdown-prose :is(pre,.cm-editor) { padding:12px 16px; }
+#atlas-ui-toggle { font-size:var(--atlas-ui-size); }
+.atlas-option { white-space:nowrap; font-size:min(var(--atlas-ui-size),14px); }
+.atlas-options[data-atlas-group="accent"] { gap:8px; }
+.atlas-options[data-atlas-group="accent"] .atlas-option { flex:0 0 44px; width:44px; height:44px; border-radius:50%; font-size:0; border:3px solid var(--atlas-border); background:var(--swatch); }
+.atlas-options[data-atlas-group="accent"] .atlas-option[aria-pressed="true"] { border-color:var(--atlas-text); box-shadow:inset 0 0 0 2px var(--atlas-surface); }
+.atlas-option[data-value="green"] { --swatch:#1f7534; }
+.atlas-option[data-value="blue"] { --swatch:#0960d6; }
+.atlas-option[data-value="orange"] { --swatch:#b63d1d; }
+.atlas-option[data-value="violet"] { --swatch:#6d4bd1; }
+.atlas-option[data-value="graphite"] { --swatch:#2a2a28; }
+html.dark .atlas-option[data-value="green"] { --swatch:#30d158; }
+html.dark .atlas-option[data-value="blue"] { --swatch:#4d9bff; }
+html.dark .atlas-option[data-value="orange"] { --swatch:#ff7a45; }
+html.dark .atlas-option[data-value="violet"] { --swatch:#a58bff; }
+html.dark .atlas-option[data-value="graphite"] { --swatch:#e6e6e6; }
+#sidebar :is(a,button,span,div,time), #message-input-container button * { font-size:var(--atlas-ui-size); }
+.chat-assistant .markdown-prose table { border-radius:10px; border-collapse:separate; border-spacing:0; }
+.chat-assistant .markdown-prose th { font-weight:600!important; text-transform:none!important; }
+.chat-assistant .markdown-prose li::marker { color:var(--atlas-muted); }
+.user-message .markdown-prose :is(h1,h2,h3,h4,h5,h6) { font-family:var(--atlas-font)!important; line-height:1.5!important; color:inherit!important; }
+.user-message .markdown-prose h1 { font-size:calc(var(--atlas-body-size) * 1.75)!important; }
+.user-message .markdown-prose h2 { font-size:calc(var(--atlas-body-size) * 1.375)!important; }
+.user-message .markdown-prose h3 { font-size:calc(var(--atlas-body-size) * 1.125)!important; }
+.user-message .markdown-prose :is(h4,h5,h6) { font-size:var(--atlas-body-size)!important; }

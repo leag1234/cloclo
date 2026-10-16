@@ -1,0 +1,2059 @@
+{
+  "arrondi-light.png": {
+    "fonts": {
+      "user": {
+        "size": 16,
+        "line": 24
+      },
+      "answer": {
+        "size": 16,
+        "line": 25.6
+      },
+      "list": {
+        "size": 16,
+        "line": 25.6
+      },
+      "heading": {
+        "size": 22,
+        "line": 35.2
+      },
+      "table": {
+        "size": 16,
+        "line": 25.6
+      },
+      "code": {
+        "size": 16,
+        "line": 25.6
+      },
+      "ui": {
+        "size": 14,
+        "line": 21
+      }
+    },
+    "bubble": {
+      "height": 152,
+      "textHeight": 48,
+      "fileHeight": 84,
+      "lines": 2,
+      "width": 512,
+      "columnWidth": 640,
+      "right": 0,
+      "padding": [
+        10,
+        16,
+        10,
+        16
+      ],
+      "radius": 20,
+      "color": "rgb(255, 255, 255)",
+      "expectedColor": "rgb(255, 255, 255)"
+    },
+    "composer": {
+      "height": 52,
+      "radius": 26
+    },
+    "sidebarWidth": 250,
+    "panelRadius": 20,
+    "gap": 14,
+    "frame": "rgb(236, 238, 242)",
+    "panelColor": "rgb(255, 255, 255)",
+    "sidebarColor": "rgba(255, 255, 255, 0.62)",
+    "sidebarRowHeight": 34,
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "overflow": false
+  },
+  "arrondi-dark.png": {
+    "fonts": {
+      "user": {
+        "size": 16,
+        "line": 24
+      },
+      "answer": {
+        "size": 16,
+        "line": 25.6
+      },
+      "list": {
+        "size": 16,
+        "line": 25.6
+      },
+      "heading": {
+        "size": 22,
+        "line": 35.2
+      },
+      "table": {
+        "size": 16,
+        "line": 25.6
+      },
+      "code": {
+        "size": 16,
+        "line": 25.6
+      },
+      "ui": {
+        "size": 14,
+        "line": 21
+      }
+    },
+    "bubble": {
+      "height": 152,
+      "textHeight": 48,
+      "fileHeight": 84,
+      "lines": 2,
+      "width": 512,
+      "columnWidth": 640,
+      "right": 0,
+      "padding": [
+        10,
+        16,
+        10,
+        16
+      ],
+      "radius": 20,
+      "color": "rgb(11, 11, 12)",
+      "expectedColor": "rgb(11, 11, 12)"
+    },
+    "composer": {
+      "height": 52,
+      "radius": 26
+    },
+    "sidebarWidth": 250,
+    "panelRadius": 20,
+    "gap": 14,
+    "frame": "rgb(0, 0, 0)",
+    "panelColor": "rgb(28, 28, 30)",
+    "sidebarColor": "rgb(28, 28, 30)",
+    "sidebarRowHeight": 34,
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "overflow": false
+  },
+  "dense-light.png": {
+    "fonts": {
+      "user": {
+        "size": 16,
+        "line": 24
+      },
+      "answer": {
+        "size": 16,
+        "line": 25.6
+      },
+      "list": {
+        "size": 16,
+        "line": 25.6
+      },
+      "heading": {
+        "size": 22,
+        "line": 35.2
+      },
+      "table": {
+        "size": 16,
+        "line": 25.6
+      },
+      "code": {
+        "size": 16,
+        "line": 25.6
+      },
+      "ui": {
+        "size": 14,
+        "line": 21
+      }
+    },
+    "bubble": {
+      "height": 128,
+      "textHeight": 24,
+      "fileHeight": 84,
+      "lines": 1,
+      "width": 548,
+      "columnWidth": 700,
+      "right": 0,
+      "padding": [
+        10,
+        16,
+        10,
+        16
+      ],
+      "radius": 8,
+      "color": "rgb(28, 28, 25)",
+      "expectedColor": "rgb(28, 28, 25)"
+    },
+    "composer": {
+      "height": 48,
+      "radius": 10
+    },
+    "sidebarWidth": 232,
+    "panelRadius": 0,
+    "gap": 0,
+    "frame": "rgb(251, 251, 250)",
+    "panelColor": "rgb(251, 251, 250)",
+    "sidebarColor": "rgb(244, 244, 241)",
+    "sidebarRowHeight": 32,
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "overflow": false
+  },
+  "document-light.png": {
+    "fonts": {
+      "user": {
+        "size": 16,
+        "line": 24
+      },
+      "answer": {
+        "size": 16,
+        "line": 25.6
+      },
+      "list": {
+        "size": 16,
+        "line": 25.6
+      },
+      "heading": {
+        "size": 22,
+        "line": 35.2
+      },
+      "table": {
+        "size": 16,
+        "line": 25.6
+      },
+      "code": {
+        "size": 16,
+        "line": 25.6
+      },
+      "ui": {
+        "size": 14,
+        "line": 21
+      }
+    },
+    "bubble": {
+      "height": 128,
+      "textHeight": 24,
+      "fileHeight": 84,
+      "lines": 1,
+      "width": 548,
+      "columnWidth": 700,
+      "right": 0,
+      "padding": [
+        10,
+        16,
+        10,
+        16
+      ],
+      "radius": 8,
+      "color": "rgb(42, 42, 40)",
+      "expectedColor": "rgb(42, 42, 40)"
+    },
+    "composer": {
+      "height": 48,
+      "radius": 10
+    },
+    "sidebarWidth": 230,
+    "panelRadius": 0,
+    "gap": 0,
+    "frame": "rgb(255, 255, 255)",
+    "panelColor": "rgb(255, 255, 255)",
+    "sidebarColor": "rgb(251, 250, 248)",
+    "sidebarRowHeight": 34,
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "overflow": false
+  },
+  "arrondi-light-14px.png": {
+    "fonts": {
+      "user": {
+        "size": 14,
+        "line": 21
+      },
+      "answer": {
+        "size": 14,
+        "line": 22.4
+      },
+      "list": {
+        "size": 14,
+        "line": 22.4
+      },
+      "heading": {
+        "size": 19.25,
+        "line": 30.8
+      },
+      "table": {
+        "size": 14,
+        "line": 22.4
+      },
+      "code": {
+        "size": 14,
+        "line": 22.4
+      },
+      "ui": {
+        "size": 12,
+        "line": 18
+      }
+    },
+    "bubble": {
+      "height": 125,
+      "textHeight": 21,
+      "fileHeight": 84,
+      "lines": 1,
+      "width": 466.46875,
+      "columnWidth": 640,
+      "right": 0,
+      "padding": [
+        10,
+        16,
+        10,
+        16
+      ],
+      "radius": 20,
+      "color": "rgb(255, 255, 255)",
+      "expectedColor": "rgb(255, 255, 255)"
+    },
+    "composer": {
+      "height": 52,
+      "radius": 26
+    },
+    "sidebarWidth": 250,
+    "panelRadius": 20,
+    "gap": 14,
+    "frame": "rgb(236, 238, 242)",
+    "panelColor": "rgb(255, 255, 255)",
+    "sidebarColor": "rgba(255, 255, 255, 0.62)",
+    "sidebarRowHeight": 34,
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "overflow": false
+  },
+  "arrondi-light-18px.png": {
+    "fonts": {
+      "user": {
+        "size": 18,
+        "line": 27
+      },
+      "answer": {
+        "size": 18,
+        "line": 28.8
+      },
+      "list": {
+        "size": 18,
+        "line": 28.8
+      },
+      "heading": {
+        "size": 24.75,
+        "line": 39.6
+      },
+      "table": {
+        "size": 18,
+        "line": 28.8
+      },
+      "code": {
+        "size": 18,
+        "line": 28.8
+      },
+      "ui": {
+        "size": 15,
+        "line": 22.5
+      }
+    },
+    "bubble": {
+      "height": 158,
+      "textHeight": 54,
+      "fileHeight": 84,
+      "lines": 2,
+      "width": 512,
+      "columnWidth": 640,
+      "right": 0,
+      "padding": [
+        10,
+        16,
+        10,
+        16
+      ],
+      "radius": 20,
+      "color": "rgb(255, 255, 255)",
+      "expectedColor": "rgb(255, 255, 255)"
+    },
+    "composer": {
+      "height": 52,
+      "radius": 26
+    },
+    "sidebarWidth": 250,
+    "panelRadius": 20,
+    "gap": 14,
+    "frame": "rgb(236, 238, 242)",
+    "panelColor": "rgb(255, 255, 255)",
+    "sidebarColor": "rgba(255, 255, 255, 0.62)",
+    "sidebarRowHeight": 34,
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "overflow": false
+  },
+  "arrondi-light-20px.png": {
+    "fonts": {
+      "user": {
+        "size": 20,
+        "line": 30
+      },
+      "answer": {
+        "size": 20,
+        "line": 32
+      },
+      "list": {
+        "size": 20,
+        "line": 32
+      },
+      "heading": {
+        "size": 27.5,
+        "line": 44
+      },
+      "table": {
+        "size": 20,
+        "line": 32
+      },
+      "code": {
+        "size": 20,
+        "line": 32
+      },
+      "ui": {
+        "size": 17,
+        "line": 25.5
+      }
+    },
+    "bubble": {
+      "height": 164,
+      "textHeight": 60,
+      "fileHeight": 84,
+      "lines": 2,
+      "width": 512,
+      "columnWidth": 640,
+      "right": 0,
+      "padding": [
+        10,
+        16,
+        10,
+        16
+      ],
+      "radius": 20,
+      "color": "rgb(255, 255, 255)",
+      "expectedColor": "rgb(255, 255, 255)"
+    },
+    "composer": {
+      "height": 52,
+      "radius": 26
+    },
+    "sidebarWidth": 250,
+    "panelRadius": 20,
+    "gap": 14,
+    "frame": "rgb(236, 238, 242)",
+    "panelColor": "rgb(255, 255, 255)",
+    "sidebarColor": "rgba(255, 255, 255, 0.62)",
+    "sidebarRowHeight": 34,
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "overflow": false
+  },
+  "settings_matrix": {
+    "arrondi-light-14": {
+      "fonts": {
+        "user": {
+          "size": 14,
+          "line": 21
+        },
+        "answer": {
+          "size": 14,
+          "line": 22.4
+        },
+        "list": {
+          "size": 14,
+          "line": 22.4
+        },
+        "heading": {
+          "size": 19.25,
+          "line": 30.8
+        },
+        "table": {
+          "size": 14,
+          "line": 22.4
+        },
+        "code": {
+          "size": 14,
+          "line": 22.4
+        },
+        "ui": {
+          "size": 12,
+          "line": 18
+        }
+      },
+      "bubble": {
+        "height": 125,
+        "textHeight": 21,
+        "fileHeight": 84,
+        "lines": 1,
+        "width": 466.46875,
+        "columnWidth": 640,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 20,
+        "color": "rgb(255, 255, 255)",
+        "expectedColor": "rgb(255, 255, 255)"
+      },
+      "composer": {
+        "height": 52,
+        "radius": 26
+      },
+      "sidebarWidth": 250,
+      "panelRadius": 20,
+      "gap": 14,
+      "frame": "rgb(236, 238, 242)",
+      "panelColor": "rgb(255, 255, 255)",
+      "sidebarColor": "rgba(255, 255, 255, 0.62)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "arrondi-light-16": {
+      "fonts": {
+        "user": {
+          "size": 16,
+          "line": 24
+        },
+        "answer": {
+          "size": 16,
+          "line": 25.6
+        },
+        "list": {
+          "size": 16,
+          "line": 25.6
+        },
+        "heading": {
+          "size": 22,
+          "line": 35.2
+        },
+        "table": {
+          "size": 16,
+          "line": 25.6
+        },
+        "code": {
+          "size": 16,
+          "line": 25.6
+        },
+        "ui": {
+          "size": 14,
+          "line": 21
+        }
+      },
+      "bubble": {
+        "height": 152,
+        "textHeight": 48,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 512,
+        "columnWidth": 640,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 20,
+        "color": "rgb(255, 255, 255)",
+        "expectedColor": "rgb(255, 255, 255)"
+      },
+      "composer": {
+        "height": 52,
+        "radius": 26
+      },
+      "sidebarWidth": 250,
+      "panelRadius": 20,
+      "gap": 14,
+      "frame": "rgb(236, 238, 242)",
+      "panelColor": "rgb(255, 255, 255)",
+      "sidebarColor": "rgba(255, 255, 255, 0.62)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "arrondi-light-18": {
+      "fonts": {
+        "user": {
+          "size": 18,
+          "line": 27
+        },
+        "answer": {
+          "size": 18,
+          "line": 28.8
+        },
+        "list": {
+          "size": 18,
+          "line": 28.8
+        },
+        "heading": {
+          "size": 24.75,
+          "line": 39.6
+        },
+        "table": {
+          "size": 18,
+          "line": 28.8
+        },
+        "code": {
+          "size": 18,
+          "line": 28.8
+        },
+        "ui": {
+          "size": 15,
+          "line": 22.5
+        }
+      },
+      "bubble": {
+        "height": 158,
+        "textHeight": 54,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 512,
+        "columnWidth": 640,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 20,
+        "color": "rgb(255, 255, 255)",
+        "expectedColor": "rgb(255, 255, 255)"
+      },
+      "composer": {
+        "height": 52,
+        "radius": 26
+      },
+      "sidebarWidth": 250,
+      "panelRadius": 20,
+      "gap": 14,
+      "frame": "rgb(236, 238, 242)",
+      "panelColor": "rgb(255, 255, 255)",
+      "sidebarColor": "rgba(255, 255, 255, 0.62)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "arrondi-light-20": {
+      "fonts": {
+        "user": {
+          "size": 20,
+          "line": 30
+        },
+        "answer": {
+          "size": 20,
+          "line": 32
+        },
+        "list": {
+          "size": 20,
+          "line": 32
+        },
+        "heading": {
+          "size": 27.5,
+          "line": 44
+        },
+        "table": {
+          "size": 20,
+          "line": 32
+        },
+        "code": {
+          "size": 20,
+          "line": 32
+        },
+        "ui": {
+          "size": 17,
+          "line": 25.5
+        }
+      },
+      "bubble": {
+        "height": 164,
+        "textHeight": 60,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 512,
+        "columnWidth": 640,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 20,
+        "color": "rgb(255, 255, 255)",
+        "expectedColor": "rgb(255, 255, 255)"
+      },
+      "composer": {
+        "height": 52,
+        "radius": 26
+      },
+      "sidebarWidth": 250,
+      "panelRadius": 20,
+      "gap": 14,
+      "frame": "rgb(236, 238, 242)",
+      "panelColor": "rgb(255, 255, 255)",
+      "sidebarColor": "rgba(255, 255, 255, 0.62)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "dense-light-14": {
+      "fonts": {
+        "user": {
+          "size": 14,
+          "line": 21
+        },
+        "answer": {
+          "size": 14,
+          "line": 22.4
+        },
+        "list": {
+          "size": 14,
+          "line": 22.4
+        },
+        "heading": {
+          "size": 19.25,
+          "line": 30.8
+        },
+        "table": {
+          "size": 14,
+          "line": 22.4
+        },
+        "code": {
+          "size": 14,
+          "line": 22.4
+        },
+        "ui": {
+          "size": 12,
+          "line": 18
+        }
+      },
+      "bubble": {
+        "height": 125,
+        "textHeight": 21,
+        "fileHeight": 84,
+        "lines": 1,
+        "width": 482,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(28, 28, 25)",
+        "expectedColor": "rgb(28, 28, 25)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 232.515625,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(251, 251, 250)",
+      "panelColor": "rgb(251, 251, 250)",
+      "sidebarColor": "rgb(244, 244, 241)",
+      "sidebarRowHeight": 32,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "dense-light-16": {
+      "fonts": {
+        "user": {
+          "size": 16,
+          "line": 24
+        },
+        "answer": {
+          "size": 16,
+          "line": 25.6
+        },
+        "list": {
+          "size": 16,
+          "line": 25.6
+        },
+        "heading": {
+          "size": 22,
+          "line": 35.2
+        },
+        "table": {
+          "size": 16,
+          "line": 25.6
+        },
+        "code": {
+          "size": 16,
+          "line": 25.6
+        },
+        "ui": {
+          "size": 14,
+          "line": 21
+        }
+      },
+      "bubble": {
+        "height": 128,
+        "textHeight": 24,
+        "fileHeight": 84,
+        "lines": 1,
+        "width": 548,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(28, 28, 25)",
+        "expectedColor": "rgb(28, 28, 25)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 232,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(251, 251, 250)",
+      "panelColor": "rgb(251, 251, 250)",
+      "sidebarColor": "rgb(244, 244, 241)",
+      "sidebarRowHeight": 32,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "dense-light-18": {
+      "fonts": {
+        "user": {
+          "size": 18,
+          "line": 27
+        },
+        "answer": {
+          "size": 18,
+          "line": 28.8
+        },
+        "list": {
+          "size": 18,
+          "line": 28.8
+        },
+        "heading": {
+          "size": 24.75,
+          "line": 39.6
+        },
+        "table": {
+          "size": 18,
+          "line": 28.8
+        },
+        "code": {
+          "size": 18,
+          "line": 28.8
+        },
+        "ui": {
+          "size": 15,
+          "line": 22.5
+        }
+      },
+      "bubble": {
+        "height": 158,
+        "textHeight": 54,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 560,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(28, 28, 25)",
+        "expectedColor": "rgb(28, 28, 25)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 232,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(251, 251, 250)",
+      "panelColor": "rgb(251, 251, 250)",
+      "sidebarColor": "rgb(244, 244, 241)",
+      "sidebarRowHeight": 32,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "dense-light-20": {
+      "fonts": {
+        "user": {
+          "size": 20,
+          "line": 30
+        },
+        "answer": {
+          "size": 20,
+          "line": 32
+        },
+        "list": {
+          "size": 20,
+          "line": 32
+        },
+        "heading": {
+          "size": 27.5,
+          "line": 44
+        },
+        "table": {
+          "size": 20,
+          "line": 32
+        },
+        "code": {
+          "size": 20,
+          "line": 32
+        },
+        "ui": {
+          "size": 17,
+          "line": 25.5
+        }
+      },
+      "bubble": {
+        "height": 164,
+        "textHeight": 60,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 560,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(28, 28, 25)",
+        "expectedColor": "rgb(28, 28, 25)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 232,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(251, 251, 250)",
+      "panelColor": "rgb(251, 251, 250)",
+      "sidebarColor": "rgb(244, 244, 241)",
+      "sidebarRowHeight": 32,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "document-light-14": {
+      "fonts": {
+        "user": {
+          "size": 14,
+          "line": 21
+        },
+        "answer": {
+          "size": 14,
+          "line": 22.4
+        },
+        "list": {
+          "size": 14,
+          "line": 22.4
+        },
+        "heading": {
+          "size": 19.25,
+          "line": 30.8
+        },
+        "table": {
+          "size": 14,
+          "line": 22.4
+        },
+        "code": {
+          "size": 14,
+          "line": 22.4
+        },
+        "ui": {
+          "size": 12,
+          "line": 18
+        }
+      },
+      "bubble": {
+        "height": 125,
+        "textHeight": 21,
+        "fileHeight": 84,
+        "lines": 1,
+        "width": 489,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(42, 42, 40)",
+        "expectedColor": "rgb(42, 42, 40)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 230.265625,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(255, 255, 255)",
+      "panelColor": "rgb(255, 255, 255)",
+      "sidebarColor": "rgb(251, 250, 248)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "document-light-16": {
+      "fonts": {
+        "user": {
+          "size": 16,
+          "line": 24
+        },
+        "answer": {
+          "size": 16,
+          "line": 25.6
+        },
+        "list": {
+          "size": 16,
+          "line": 25.6
+        },
+        "heading": {
+          "size": 22,
+          "line": 35.2
+        },
+        "table": {
+          "size": 16,
+          "line": 25.6
+        },
+        "code": {
+          "size": 16,
+          "line": 25.6
+        },
+        "ui": {
+          "size": 14,
+          "line": 21
+        }
+      },
+      "bubble": {
+        "height": 128,
+        "textHeight": 24,
+        "fileHeight": 84,
+        "lines": 1,
+        "width": 548,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(42, 42, 40)",
+        "expectedColor": "rgb(42, 42, 40)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 230,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(255, 255, 255)",
+      "panelColor": "rgb(255, 255, 255)",
+      "sidebarColor": "rgb(251, 250, 248)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "document-light-18": {
+      "fonts": {
+        "user": {
+          "size": 18,
+          "line": 27
+        },
+        "answer": {
+          "size": 18,
+          "line": 28.8
+        },
+        "list": {
+          "size": 18,
+          "line": 28.8
+        },
+        "heading": {
+          "size": 24.75,
+          "line": 39.6
+        },
+        "table": {
+          "size": 18,
+          "line": 28.8
+        },
+        "code": {
+          "size": 18,
+          "line": 28.8
+        },
+        "ui": {
+          "size": 15,
+          "line": 22.5
+        }
+      },
+      "bubble": {
+        "height": 158,
+        "textHeight": 54,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 560,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(42, 42, 40)",
+        "expectedColor": "rgb(42, 42, 40)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 230,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(255, 255, 255)",
+      "panelColor": "rgb(255, 255, 255)",
+      "sidebarColor": "rgb(251, 250, 248)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "document-light-20": {
+      "fonts": {
+        "user": {
+          "size": 20,
+          "line": 30
+        },
+        "answer": {
+          "size": 20,
+          "line": 32
+        },
+        "list": {
+          "size": 20,
+          "line": 32
+        },
+        "heading": {
+          "size": 27.5,
+          "line": 44
+        },
+        "table": {
+          "size": 20,
+          "line": 32
+        },
+        "code": {
+          "size": 20,
+          "line": 32
+        },
+        "ui": {
+          "size": 17,
+          "line": 25.5
+        }
+      },
+      "bubble": {
+        "height": 164,
+        "textHeight": 60,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 560,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(42, 42, 40)",
+        "expectedColor": "rgb(42, 42, 40)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 230,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(255, 255, 255)",
+      "panelColor": "rgb(255, 255, 255)",
+      "sidebarColor": "rgb(251, 250, 248)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "arrondi-dark-14": {
+      "fonts": {
+        "user": {
+          "size": 14,
+          "line": 21
+        },
+        "answer": {
+          "size": 14,
+          "line": 22.4
+        },
+        "list": {
+          "size": 14,
+          "line": 22.4
+        },
+        "heading": {
+          "size": 19.25,
+          "line": 30.8
+        },
+        "table": {
+          "size": 14,
+          "line": 22.4
+        },
+        "code": {
+          "size": 14,
+          "line": 22.4
+        },
+        "ui": {
+          "size": 12,
+          "line": 18
+        }
+      },
+      "bubble": {
+        "height": 125,
+        "textHeight": 21,
+        "fileHeight": 84,
+        "lines": 1,
+        "width": 466.46875,
+        "columnWidth": 640,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 20,
+        "color": "rgb(11, 11, 12)",
+        "expectedColor": "rgb(11, 11, 12)"
+      },
+      "composer": {
+        "height": 52,
+        "radius": 26
+      },
+      "sidebarWidth": 248.984375,
+      "panelRadius": 20,
+      "gap": 14,
+      "frame": "rgb(0, 0, 0)",
+      "panelColor": "rgb(28, 28, 30)",
+      "sidebarColor": "rgb(28, 28, 30)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "arrondi-dark-16": {
+      "fonts": {
+        "user": {
+          "size": 16,
+          "line": 24
+        },
+        "answer": {
+          "size": 16,
+          "line": 25.6
+        },
+        "list": {
+          "size": 16,
+          "line": 25.6
+        },
+        "heading": {
+          "size": 22,
+          "line": 35.2
+        },
+        "table": {
+          "size": 16,
+          "line": 25.6
+        },
+        "code": {
+          "size": 16,
+          "line": 25.6
+        },
+        "ui": {
+          "size": 14,
+          "line": 21
+        }
+      },
+      "bubble": {
+        "height": 152,
+        "textHeight": 48,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 512,
+        "columnWidth": 640,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 20,
+        "color": "rgb(11, 11, 12)",
+        "expectedColor": "rgb(11, 11, 12)"
+      },
+      "composer": {
+        "height": 52,
+        "radius": 26
+      },
+      "sidebarWidth": 250,
+      "panelRadius": 20,
+      "gap": 14,
+      "frame": "rgb(0, 0, 0)",
+      "panelColor": "rgb(28, 28, 30)",
+      "sidebarColor": "rgb(28, 28, 30)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "arrondi-dark-18": {
+      "fonts": {
+        "user": {
+          "size": 18,
+          "line": 27
+        },
+        "answer": {
+          "size": 18,
+          "line": 28.8
+        },
+        "list": {
+          "size": 18,
+          "line": 28.8
+        },
+        "heading": {
+          "size": 24.75,
+          "line": 39.6
+        },
+        "table": {
+          "size": 18,
+          "line": 28.8
+        },
+        "code": {
+          "size": 18,
+          "line": 28.8
+        },
+        "ui": {
+          "size": 15,
+          "line": 22.5
+        }
+      },
+      "bubble": {
+        "height": 158,
+        "textHeight": 54,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 512,
+        "columnWidth": 640,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 20,
+        "color": "rgb(11, 11, 12)",
+        "expectedColor": "rgb(11, 11, 12)"
+      },
+      "composer": {
+        "height": 52,
+        "radius": 26
+      },
+      "sidebarWidth": 250,
+      "panelRadius": 20,
+      "gap": 14,
+      "frame": "rgb(0, 0, 0)",
+      "panelColor": "rgb(28, 28, 30)",
+      "sidebarColor": "rgb(28, 28, 30)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "arrondi-dark-20": {
+      "fonts": {
+        "user": {
+          "size": 20,
+          "line": 30
+        },
+        "answer": {
+          "size": 20,
+          "line": 32
+        },
+        "list": {
+          "size": 20,
+          "line": 32
+        },
+        "heading": {
+          "size": 27.5,
+          "line": 44
+        },
+        "table": {
+          "size": 20,
+          "line": 32
+        },
+        "code": {
+          "size": 20,
+          "line": 32
+        },
+        "ui": {
+          "size": 17,
+          "line": 25.5
+        }
+      },
+      "bubble": {
+        "height": 164,
+        "textHeight": 60,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 512,
+        "columnWidth": 640,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 20,
+        "color": "rgb(11, 11, 12)",
+        "expectedColor": "rgb(11, 11, 12)"
+      },
+      "composer": {
+        "height": 52,
+        "radius": 26
+      },
+      "sidebarWidth": 250,
+      "panelRadius": 20,
+      "gap": 14,
+      "frame": "rgb(0, 0, 0)",
+      "panelColor": "rgb(28, 28, 30)",
+      "sidebarColor": "rgb(28, 28, 30)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "dense-dark-14": {
+      "fonts": {
+        "user": {
+          "size": 14,
+          "line": 21
+        },
+        "answer": {
+          "size": 14,
+          "line": 22.4
+        },
+        "list": {
+          "size": 14,
+          "line": 22.4
+        },
+        "heading": {
+          "size": 19.25,
+          "line": 30.8
+        },
+        "table": {
+          "size": 14,
+          "line": 22.4
+        },
+        "code": {
+          "size": 14,
+          "line": 22.4
+        },
+        "ui": {
+          "size": 12,
+          "line": 18
+        }
+      },
+      "bubble": {
+        "height": 125,
+        "textHeight": 21,
+        "fileHeight": 84,
+        "lines": 1,
+        "width": 482,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(236, 236, 232)",
+        "expectedColor": "rgb(236, 236, 232)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 232.890625,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(18, 18, 17)",
+      "panelColor": "rgb(18, 18, 17)",
+      "sidebarColor": "rgb(23, 23, 22)",
+      "sidebarRowHeight": 32,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "dense-dark-16": {
+      "fonts": {
+        "user": {
+          "size": 16,
+          "line": 24
+        },
+        "answer": {
+          "size": 16,
+          "line": 25.6
+        },
+        "list": {
+          "size": 16,
+          "line": 25.6
+        },
+        "heading": {
+          "size": 22,
+          "line": 35.2
+        },
+        "table": {
+          "size": 16,
+          "line": 25.6
+        },
+        "code": {
+          "size": 16,
+          "line": 25.6
+        },
+        "ui": {
+          "size": 14,
+          "line": 21
+        }
+      },
+      "bubble": {
+        "height": 128,
+        "textHeight": 24,
+        "fileHeight": 84,
+        "lines": 1,
+        "width": 548,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(236, 236, 232)",
+        "expectedColor": "rgb(236, 236, 232)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 232,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(18, 18, 17)",
+      "panelColor": "rgb(18, 18, 17)",
+      "sidebarColor": "rgb(23, 23, 22)",
+      "sidebarRowHeight": 32,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "dense-dark-18": {
+      "fonts": {
+        "user": {
+          "size": 18,
+          "line": 27
+        },
+        "answer": {
+          "size": 18,
+          "line": 28.8
+        },
+        "list": {
+          "size": 18,
+          "line": 28.8
+        },
+        "heading": {
+          "size": 24.75,
+          "line": 39.6
+        },
+        "table": {
+          "size": 18,
+          "line": 28.8
+        },
+        "code": {
+          "size": 18,
+          "line": 28.8
+        },
+        "ui": {
+          "size": 15,
+          "line": 22.5
+        }
+      },
+      "bubble": {
+        "height": 158,
+        "textHeight": 54,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 560,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(236, 236, 232)",
+        "expectedColor": "rgb(236, 236, 232)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 232,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(18, 18, 17)",
+      "panelColor": "rgb(18, 18, 17)",
+      "sidebarColor": "rgb(23, 23, 22)",
+      "sidebarRowHeight": 32,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "dense-dark-20": {
+      "fonts": {
+        "user": {
+          "size": 20,
+          "line": 30
+        },
+        "answer": {
+          "size": 20,
+          "line": 32
+        },
+        "list": {
+          "size": 20,
+          "line": 32
+        },
+        "heading": {
+          "size": 27.5,
+          "line": 44
+        },
+        "table": {
+          "size": 20,
+          "line": 32
+        },
+        "code": {
+          "size": 20,
+          "line": 32
+        },
+        "ui": {
+          "size": 17,
+          "line": 25.5
+        }
+      },
+      "bubble": {
+        "height": 164,
+        "textHeight": 60,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 560,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(236, 236, 232)",
+        "expectedColor": "rgb(236, 236, 232)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 232,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(18, 18, 17)",
+      "panelColor": "rgb(18, 18, 17)",
+      "sidebarColor": "rgb(23, 23, 22)",
+      "sidebarRowHeight": 32,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "document-dark-14": {
+      "fonts": {
+        "user": {
+          "size": 14,
+          "line": 21
+        },
+        "answer": {
+          "size": 14,
+          "line": 22.4
+        },
+        "list": {
+          "size": 14,
+          "line": 22.4
+        },
+        "heading": {
+          "size": 19.25,
+          "line": 30.8
+        },
+        "table": {
+          "size": 14,
+          "line": 22.4
+        },
+        "code": {
+          "size": 14,
+          "line": 22.4
+        },
+        "ui": {
+          "size": 12,
+          "line": 18
+        }
+      },
+      "bubble": {
+        "height": 125,
+        "textHeight": 21,
+        "fileHeight": 84,
+        "lines": 1,
+        "width": 489,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(230, 230, 227)",
+        "expectedColor": "rgb(230, 230, 227)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 230.40625,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(25, 25, 25)",
+      "panelColor": "rgb(25, 25, 25)",
+      "sidebarColor": "rgb(32, 32, 32)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "document-dark-16": {
+      "fonts": {
+        "user": {
+          "size": 16,
+          "line": 24
+        },
+        "answer": {
+          "size": 16,
+          "line": 25.6
+        },
+        "list": {
+          "size": 16,
+          "line": 25.6
+        },
+        "heading": {
+          "size": 22,
+          "line": 35.2
+        },
+        "table": {
+          "size": 16,
+          "line": 25.6
+        },
+        "code": {
+          "size": 16,
+          "line": 25.6
+        },
+        "ui": {
+          "size": 14,
+          "line": 21
+        }
+      },
+      "bubble": {
+        "height": 128,
+        "textHeight": 24,
+        "fileHeight": 84,
+        "lines": 1,
+        "width": 548,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(230, 230, 227)",
+        "expectedColor": "rgb(230, 230, 227)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 230,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(25, 25, 25)",
+      "panelColor": "rgb(25, 25, 25)",
+      "sidebarColor": "rgb(32, 32, 32)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "document-dark-18": {
+      "fonts": {
+        "user": {
+          "size": 18,
+          "line": 27
+        },
+        "answer": {
+          "size": 18,
+          "line": 28.8
+        },
+        "list": {
+          "size": 18,
+          "line": 28.8
+        },
+        "heading": {
+          "size": 24.75,
+          "line": 39.6
+        },
+        "table": {
+          "size": 18,
+          "line": 28.8
+        },
+        "code": {
+          "size": 18,
+          "line": 28.8
+        },
+        "ui": {
+          "size": 15,
+          "line": 22.5
+        }
+      },
+      "bubble": {
+        "height": 158,
+        "textHeight": 54,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 560,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(230, 230, 227)",
+        "expectedColor": "rgb(230, 230, 227)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 230,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(25, 25, 25)",
+      "panelColor": "rgb(25, 25, 25)",
+      "sidebarColor": "rgb(32, 32, 32)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    },
+    "document-dark-20": {
+      "fonts": {
+        "user": {
+          "size": 20,
+          "line": 30
+        },
+        "answer": {
+          "size": 20,
+          "line": 32
+        },
+        "list": {
+          "size": 20,
+          "line": 32
+        },
+        "heading": {
+          "size": 27.5,
+          "line": 44
+        },
+        "table": {
+          "size": 20,
+          "line": 32
+        },
+        "code": {
+          "size": 20,
+          "line": 32
+        },
+        "ui": {
+          "size": 17,
+          "line": 25.5
+        }
+      },
+      "bubble": {
+        "height": 164,
+        "textHeight": 60,
+        "fileHeight": 84,
+        "lines": 2,
+        "width": 560,
+        "columnWidth": 700,
+        "right": 0,
+        "padding": [
+          10,
+          16,
+          10,
+          16
+        ],
+        "radius": 8,
+        "color": "rgb(230, 230, 227)",
+        "expectedColor": "rgb(230, 230, 227)"
+      },
+      "composer": {
+        "height": 48,
+        "radius": 10
+      },
+      "sidebarWidth": 230,
+      "panelRadius": 0,
+      "gap": 0,
+      "frame": "rgb(25, 25, 25)",
+      "panelColor": "rgb(25, 25, 25)",
+      "sidebarColor": "rgb(32, 32, 32)",
+      "sidebarRowHeight": 34,
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "overflow": false
+    }
+  },
+  "languages": {
+    "fr-FR": "Param\u00e8tres d\u2019affichage",
+    "en-US": "Display settings",
+    "de-DE": "Anzeigeeinstellungen",
+    "es-ES": "Ajustes de pantalla",
+    "it-IT": "Impostazioni di visualizzazione",
+    "ja-JP": "Display settings"
+  },
+  "native_sidebar_resize": true
+}

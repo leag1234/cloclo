@@ -17,36 +17,48 @@ with sync_playwright() as p:
     page.wait_for_timeout(4000)
     prose = page.locator(".chat-assistant .markdown-prose")
     prose.wait_for()
+    code = page.locator(".cm-editor,.markdown-prose pre").first
+    code_line = page.locator(".cm-line,.markdown-prose pre").first
+    page.locator(
+        'link[href="/static/custom.css"],link[href="/static/atlas/chat-ui.css"]'
+    ).evaluate_all("links => links.forEach(link => link.disabled = true)")
+    page.locator(".chat-assistant").screenshot(path="reports/m24-rendering-before.png")
+    page.locator(
+        'link[href="/static/custom.css"],link[href="/static/atlas/chat-ui.css"]'
+    ).evaluate_all("links => links.forEach(link => link.disabled = false)")
+    page.mouse.move(0, 0)
+    page.wait_for_timeout(500)
     evidence = {
         "font": prose.evaluate("(e)=>getComputedStyle(e).fontFamily"),
         "paragraph_width": prose.locator("p").first.evaluate(
             "(e)=>getComputedStyle(e).maxWidth"
         ),
-        "gutters": page.locator(".cm-gutters").first.evaluate(
+        "gutters": "none"
+        if page.locator(".cm-gutters").count() == 0
+        else page.locator(".cm-gutters").first.evaluate(
             "(e)=>getComputedStyle(e).display"
         ),
         "copy": page.locator(".copy-code-button").first.evaluate(
             "(e)=>getComputedStyle(e).opacity"
         ),
-        "save": page.locator(".save-code-button").first.evaluate(
+        "save": page.get_by_text("Save", exact=True).first.evaluate(
             "(e)=>getComputedStyle(e).display"
         ),
-        "wrap": page.locator(".cm-line").first.evaluate(
-            "(e)=>getComputedStyle(e).whiteSpace"
-        ),
+        "wrap": code_line.evaluate("(e)=>getComputedStyle(e).whiteSpace"),
         "css_sha256": hashlib.sha256(
             Path("services/orchestrator/chat-ui.css").read_bytes()
         ).hexdigest(),
     }
     print(json.dumps(evidence), flush=True)
-    assert "Georgia" in evidence["font"]
+    assert "sans-serif" in evidence["font"].lower()
+    assert "serif" not in evidence["font"].lower().replace("sans-serif", "")
     assert evidence["paragraph_width"] == "700px"
     assert evidence["gutters"] == "none"
     assert evidence["copy"] == "0"
     assert evidence["save"] == "none"
     assert evidence["wrap"] == "pre"
     page.locator(".chat-assistant").screenshot(path="reports/m24-rendering-after.png")
-    page.locator(".cm-editor").first.hover()
+    code.hover()
     page.wait_for_timeout(300)
     print(
         "hover",
@@ -62,16 +74,18 @@ with sync_playwright() as p:
         == "1"
     )
     page.mouse.move(0, 0)
-    page.evaluate('localStorage.setItem("theme", "dark")')
+    page.evaluate(
+        'localStorage.setItem("theme", "dark"); localStorage.setItem("atlas-ui", JSON.stringify({style:"arrondi",mode:"dark",accent:"green",size:"16"}))'
+    )
     page.reload(wait_until="networkidle")
     page.wait_for_timeout(1000)
     page.locator(".chat-assistant").screenshot(path="reports/m24-rendering-dark.png")
     evidence["dark_font"] = prose.evaluate("(e)=>getComputedStyle(e).fontFamily")
     evidence["dark_color"] = prose.evaluate("(e)=>getComputedStyle(e).color")
     print("dark_color", evidence["dark_color"], flush=True)
-    assert evidence["dark_color"] == "rgb(227, 227, 223)"
+    assert evidence["dark_color"] == "rgb(245, 245, 247)"
     evidence["copy_on_hover"] = True
-    evidence["mode"] = "live"
+    evidence["mode"] = "local-ui"
     evidence["screenshots"] = {
         name: hashlib.sha256(Path("reports", name).read_bytes()).hexdigest()
         for name in (
