@@ -105,17 +105,34 @@ html[data-atlas-style="dense"] #chat-container nav { height:44px; min-height:44p
 html:is([data-atlas-style="dense"],[data-atlas-style="document"]) #sidebar { border-right:1px solid var(--atlas-border); }
 html[data-atlas-style="document"] #chat-container nav { height:48px; min-height:48px; }
 html[data-atlas-style="document"] .user-message { box-shadow:inset 3px 0 var(--atlas-border); }
-/* Native Tiptap composer: one input row; auxiliary native controls remain below. */
+/* Native Tiptap composer: attachments are a separate wrapping row above its controls. */
 #chat-pane > div:has(#message-input-container) { padding:0 24px 42px; flex-shrink:0; }
 #chat-pane div:has(> div > form) { max-width:var(--atlas-layout-column)!important; padding-left:0!important; padding-right:0!important; }
-#message-input-container { flex:none; min-height:var(--atlas-composer-height); border:1px solid var(--atlas-border)!important; border-radius:var(--atlas-composer-radius)!important; background:var(--atlas-surface)!important; padding:5px 8px; box-shadow:0 6px 24px rgba(0,0,0,.08)!important; }
-#message-input-container > .relative:has(#chat-input-container) { padding:0 48px!important; margin:auto 0; }
+#message-input-container { display:grid!important; grid-template-columns:52px minmax(0,1fr) 52px; flex:none; min-height:var(--atlas-composer-height); height:auto!important; border:1px solid var(--atlas-border)!important; border-radius:var(--atlas-composer-radius)!important; background:var(--atlas-surface)!important; padding:0!important; overflow:visible!important; box-shadow:0 6px 24px rgba(0,0,0,.08)!important; }
+/* Open WebUI inserts this direct child only while files are queued. Keep previews clear of the input row. */
+#message-input-container > div:first-of-type:has(button[aria-label]) { grid-column:1 / -1; display:flex!important; flex-wrap:wrap!important; gap:8px!important; margin:0!important; padding:10px 12px!important; overflow:visible!important; }
+#message-input-container:has(> div:first-of-type button[aria-label]) { row-gap:8px; border-radius:24px!important; }
+#message-input-container > .relative:has(#chat-input-container) { grid-column:2; grid-row:2; align-self:center; min-width:0; padding:0!important; margin:0!important; }
 #chat-input-container { padding:0!important; max-height:160px; }
 #chat-input, #chat-input p { font-family:var(--atlas-font)!important; font-size:var(--atlas-body-size)!important; line-height:1.5!important; margin:0!important; }
-#message-input-container > .justify-between { position:absolute; top:calc(100% + 6px); left:8px; right:8px; margin:0!important; height:28px; }
-#input-menu-button { position:absolute; left:0; top:calc(-1 * var(--atlas-composer-height)); width:40px; height:40px; background:var(--atlas-border)!important; border-radius:50%; color:var(--atlas-text)!important; }
+#message-input-container > .justify-between { display:contents!important; }
+#message-input-container > .justify-between > :first-child { grid-column:1; grid-row:2; display:flex!important; align-items:center; justify-content:center; min-width:0; min-height:52px; margin:0!important; }
+#message-input-container > .justify-between > :first-child > :not(:has(#input-menu-button)) { display:none!important; }
+#message-input-container > .justify-between > :last-child { grid-column:3; grid-row:2; display:flex!important; align-items:center; justify-content:center; min-width:0; min-height:52px; margin:0!important; }
+#message-input-container > .justify-between > :last-child > :not(:has(#send-message-button,#stop-response-button)) { display:none!important; }
+#input-menu-button { position:static!important; width:40px; height:40px; background:var(--atlas-border)!important; border-radius:50%; color:var(--atlas-text)!important; }
 #send-message-button, #stop-response-button,
-#message-input-container > .justify-between > .self-end > .items-center > .flex > button { position:absolute; right:0; top:calc(-1 * var(--atlas-composer-height)); width:40px; height:40px; display:flex; justify-content:center; align-items:center; border-radius:50%; background:var(--atlas-accent)!important; color:var(--atlas-on-accent)!important; }
+#message-input-container > .justify-between > .self-end > .items-center > .flex > button { position:static!important; width:40px; height:40px; display:flex; justify-content:center; align-items:center; border-radius:50%; background:var(--atlas-accent)!important; color:var(--atlas-on-accent)!important; }
+/* Actual image nodes are small utility thumbnails upstream; size the visible preview and its touch target here. */
+#message-input-container button:has(> img[data-cy="image"]) { display:block; width:64px; height:64px; }
+#message-input-container img[data-cy="image"] { display:block; width:64px!important; height:64px!important; border-radius:12px!important; object-fit:cover!important; }
+#message-input-container :has(> button > img[data-cy="image"]) { width:64px; height:64px; }
+#message-input-container > div:first-of-type button[aria-label]:not(:has(img[data-cy="image"])) { position:relative; z-index:2; width:44px; height:44px; min-width:44px; min-height:44px; display:flex!important; align-items:center; justify-content:center; padding:0!important; background:transparent!important; border:0!important; color:var(--atlas-text)!important; opacity:1!important; }
+#message-input-container > div:first-of-type button[aria-label]:not(:has(img[data-cy="image"]))::before { position:absolute; width:24px; height:24px; border:1px solid var(--atlas-border); border-radius:50%; background:var(--atlas-surface); content:""; box-shadow:0 1px 3px rgba(0,0,0,.18); }
+#message-input-container > div:first-of-type button[aria-label]:not(:has(img[data-cy="image"])) svg { position:relative; z-index:1; width:14px; height:14px; }
+/* Non-image queue entries stay legible without taking the whole composer width. */
+#message-input-container > div:first-of-type:has(button[aria-label]) > :not(:has(img[data-cy="image"])) { max-width:220px!important; min-width:0; }
+#message-input-container > div:first-of-type:has(button[aria-label]) :is(.truncate,[class*="truncate"]) { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #message-input-container :is(button,.text-gray-600) { font-size:var(--atlas-ui-size); }
 html:is([data-atlas-style="dense"],[data-atlas-style="document"]) #message-input-container { background:var(--atlas-bg)!important; box-shadow:0 1px 2px rgba(28,28,25,.04)!important; }
 html:is([data-atlas-style="dense"],[data-atlas-style="document"]) :is(#input-menu-button,#send-message-button,#stop-response-button) { width:36px; height:36px; border-radius:6px; }
