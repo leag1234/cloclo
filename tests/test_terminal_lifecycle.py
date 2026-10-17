@@ -51,7 +51,7 @@ class TerminalLifecycleTests(unittest.TestCase):
             patch("services.orchestrator.terminal_stack.uvicorn.Server"),
             patch("services.orchestrator.terminal_stack.threading.Thread"),
             patch(
-                "services.orchestrator.terminal_stack.loopback_forward",
+                "services.orchestrator.terminal_stack.loopback_html_injector",
                 return_value=nullcontext(),
             ),
             patch.object(serving, "wait_http"),

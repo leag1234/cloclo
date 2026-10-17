@@ -312,7 +312,12 @@ def main() -> None:
             Path("services/orchestrator/chat-ui.css").read_bytes()
         ).hexdigest()
     )
-    assert "serif" in rendering["font"] and rendering["gutters"] == "none"
+    assert (
+        "sans-serif" in rendering["font"].lower()
+        and "serif" not in rendering["font"].lower().replace("sans-serif", "")
+        and rendering["gutters"] == "none"
+    )
+    assert rendering["dark_color"] == "rgb(245, 245, 247)"
     assert rendering["save"] == "none" and rendering["copy"] == "0"
     for filename, digest in rendering["screenshots"].items():
         assert (

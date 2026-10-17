@@ -1,18 +1,18 @@
 {
-  "font": "Georgia, \"Iowan Old Style\", \"Times New Roman\", serif",
+  "font": "-apple-system, BlinkMacSystemFont, \"SF Pro Text\", system-ui, sans-serif",
   "paragraph_width": "700px",
   "gutters": "none",
   "copy": "0",
   "save": "none",
   "wrap": "pre",
-  "css_sha256": "9be2ebec159b6f382bc8af0dc79e18db86f367ff2f383fa08e7997c815908da1",
-  "dark_font": "Georgia, \"Iowan Old Style\", \"Times New Roman\", serif",
-  "dark_color": "rgb(227, 227, 223)",
+  "css_sha256": "bbb75689517c3ec258f2773f84d5f8d087d4b893f9f43c708961e75e299530a1",
+  "dark_font": "-apple-system, BlinkMacSystemFont, \"SF Pro Text\", system-ui, sans-serif",
+  "dark_color": "rgb(245, 245, 247)",
   "copy_on_hover": true,
-  "mode": "live",
+  "mode": "local-ui",
   "screenshots": {
-    "m24-rendering-before.png": "a56bfdc7ee033d2c1aa4eebdc75bfcfa0060b13fb744c2e96c71fb90d1a16f23",
-    "m24-rendering-after.png": "07221a005e120859d3943ec8237c33a01d749dd91f3000d0e60e4c1516dbd8bc",
-    "m24-rendering-dark.png": "088491c2d980026336c8bd220e4b1dfdf2fe8f01cd2169ffe2419fc8074fdf19"
+    "m24-rendering-before.png": "1d09535c8b1cf07c57b83849e294252cabe6973a0b09fcc45832e4ccf77668f0",
+    "m24-rendering-after.png": "4f452dee5f3069cb373f667a6dba48a3651e8688e7a7f87e8834f792155db295",
+    "m24-rendering-dark.png": "2a8de51c23bff47a68373a33661276144cfaed9acf4728de05a4fe4ba37b5388"
   }
 }
