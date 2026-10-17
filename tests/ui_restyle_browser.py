@@ -3,8 +3,16 @@
 import json
 import os
 from pathlib import Path
+from typing import cast
 
-from playwright.sync_api import Browser, Error, Page, TimeoutError, sync_playwright
+from playwright.sync_api import (
+    Browser,
+    Error,
+    FilePayload,
+    Page,
+    TimeoutError,
+    sync_playwright,
+)
 
 from ui_fidelity_browser import (
     languages,
@@ -20,7 +28,7 @@ OUTPUT = Path("reports/ui-restyle")
 MEASUREMENTS: dict[str, object] = {}
 
 
-def synthetic_images(count: int) -> list[dict[str, object]]:
+def synthetic_images(count: int) -> list[FilePayload]:
     """Return browser-file-chooser payloads for public, synthetic image previews."""
     colors = ("#e84d4d", "#2878d4", "#1f9d55")
     return [
@@ -37,7 +45,7 @@ def synthetic_images(count: int) -> list[dict[str, object]]:
     ]
 
 
-def synthetic_pdf() -> dict[str, object]:
+def synthetic_pdf() -> FilePayload:
     """A deliberately long synthetic name proves the native file-card truncation."""
     return {
         "name": "Synthetic public composer attachment with a deliberately long name for truncation evidence 2026.pdf",
@@ -46,7 +54,7 @@ def synthetic_pdf() -> dict[str, object]:
     }
 
 
-def attach(page: Page, files: list[dict[str, object]]) -> None:
+def attach(page: Page, files: list[FilePayload]) -> None:
     """Set files on Open WebUI's hidden native input and wait for decoded previews."""
     # The menu creates the real, hidden Upload Files input. Set it directly instead
     # of driving the browser chooser, then wait for Open WebUI to render its queue.
@@ -91,7 +99,7 @@ def boxes_do_not_intersect(page: Page) -> dict[str, object]:
         }"""
     )
     assert not values["collisions"], values
-    return values
+    return cast(dict[str, object], values)
 
 
 def composer_capture(
@@ -101,13 +109,15 @@ def composer_capture(
     theme: str,
     size: int,
     width: int,
-    files: list[dict[str, object]],
+    files: list[FilePayload],
     screenshot: bool = False,
 ) -> None:
     """Exercise one isolated native-composer scenario, retrying only that scenario."""
     last_error: Error | AssertionError | None = None
     for attempt in range(3):
-        page = browser.new_page(viewport={"width": width, "height": 900}, locale="fr-FR")
+        page = browser.new_page(
+            viewport={"width": width, "height": 900}, locale="fr-FR"
+        )
         try:
             page.goto(URL, wait_until="networkidle")
             try:
@@ -145,7 +155,7 @@ def _assert_composer(
     theme: str,
     size: int,
     width: int,
-    files: list[dict[str, object]],
+    files: list[FilePayload],
     screenshot: bool,
 ) -> None:
     """Assert the completed attachment queue before recording one isolated scenario."""
@@ -153,7 +163,9 @@ def _assert_composer(
     removes = page.locator(
         '#message-input-container > div:first-of-type button[aria-label]:not(:has(img[data-cy="image"]))'
     )
-    assert images.count() == sum(file["mimeType"].startswith("image/") for file in files)
+    assert images.count() == sum(
+        file["mimeType"].startswith("image/") for file in files
+    )
     assert removes.count() == len(files)
     if images.count():
         dimensions = images.evaluate_all(
@@ -164,10 +176,11 @@ def _assert_composer(
         "buttons => buttons.map(button => { const r = button.getBoundingClientRect(); return [r.width, r.height]; })"
     )
     assert all(width >= 44 and height >= 44 for width, height in remove_dimensions)
-    file_cards = page.locator('#message-input-container > div:first-of-type > button')
+    file_cards = page.locator("#message-input-container > div:first-of-type > button")
     if any(file["mimeType"] == "application/pdf" for file in files):
         assert file_cards.count() == 1
-        assert file_cards.first.bounding_box()["width"] <= 220
+        card_box = file_cards.first.bounding_box()
+        assert card_box is not None and card_box["width"] <= 220
         assert file_cards.first.locator(".truncate.pr-1").count() == 1
     values = boxes_do_not_intersect(page)
     composer = page.locator("#message-input-container").bounding_box()
@@ -189,6 +202,121 @@ def _assert_composer(
     }
     if screenshot:
         page.screenshot(path=OUTPUT / name, full_page=False)
+
+
+def bubble_fixture(page: Page) -> None:
+    """Add synthetic saved-message markup to the real Open WebUI shell."""
+    filenames = [
+        "SYNTHETIC QUARTERLY RECONCILIATION ARCHIVE 2026 001 ALPHA BRAVO CHARLIE DELTA.pdf",
+        "SYNTHETIC COMPLIANCE EVIDENCE REGISTER 2026 002 ECHO FOXTROT GOLF HOTEL.pdf",
+        "SYNTHETIC PROJECT DELIVERY RECORD 2026 003 INDIA JULIET KILO LIMA.pdf",
+    ]
+    pasted_lines = "<br>".join(
+        f"Synthetic pasted paragraph line {line:02d} with enough ordinary text to remain readable."
+        for line in range(1, 31)
+    )
+    cards = "".join(
+        f'<div class="mb-1"><div class="self-end"><button type="button"><span class="truncate">{name}</span><span class="text-gray-500">1.8 MB</span></button></div></div>'
+        for name in filenames
+    )
+    page.evaluate(
+        """([cards, pastedLines]) => {
+          document.querySelectorAll('[data-atlas-bubble-fixture]').forEach(node => node.remove());
+          const host = document.querySelector('#messages-container') || document.body;
+          host.insertAdjacentHTML('beforeend', `<div data-atlas-bubble-fixture class="message-listitem"><div class="user-message"><div class="chat-user">${cards}<div class="w-full"><div class="flex"><div class="rounded-3xl markdown-prose"><p>${pastedLines}</p></div></div></div></div></div></div><div data-atlas-bubble-fixture class="message-listitem"><div class="user-message"><div class="chat-user"><div class="mb-1"><div class="self-end"><button type="button"><span class="truncate">SYNTHETIC SHORT ATTACHMENT 2026.pdf</span><span class="text-gray-500">24 KB</span></button></div></div><div class="w-full"><div class="flex"><div class="rounded-3xl markdown-prose"><p>Short synthetic message.</p></div></div></div></div></div></div>`);
+        }""",
+        [cards, pasted_lines],
+    )
+
+
+def bubble_capture(
+    browser: Browser, style: str, theme: str, size: int, width: int
+) -> None:
+    """Check one synthetic long-message fixture through the injected browser UI."""
+    name = f"bubble-long-{style}-{theme}-{size}-{width}.png"
+    page = browser.new_page(viewport={"width": width, "height": 900}, locale="en-US")
+    try:
+        page.goto(URL, wait_until="networkidle")
+        try:
+            page.get_by_text("Okay, Let's Go!", exact=True).click(timeout=1000)
+        except TimeoutError:
+            pass
+        page.evaluate(
+            """([style, theme, size]) => {
+              localStorage.setItem('atlas-ui', JSON.stringify({style, mode: theme, accent: 'green', size: String(size)}));
+              localStorage.setItem('theme', theme);
+            }""",
+            [style, theme, size],
+        )
+        page.reload(wait_until="networkidle")
+        bubble_fixture(page)
+        long_bubble = page.locator("[data-atlas-bubble-fixture] .user-message").first
+        short_bubble = page.locator("[data-atlas-bubble-fixture] .user-message").nth(1)
+        toggle = long_bubble.locator(".atlas-message-toggle")
+        toggle.wait_for()
+        assert long_bubble.evaluate(
+            "bubble => bubble.scrollWidth <= bubble.clientWidth"
+        )
+        assert short_bubble.evaluate(
+            "bubble => bubble.scrollWidth <= bubble.clientWidth"
+        )
+        cards = long_bubble.locator(".mb-1 > .self-end > button")
+        assert cards.count() == 3
+        card_measurements = cards.evaluate_all(
+            """cards => cards.map(card => {
+              const bubble = card.closest('.user-message');
+              const name = card.querySelector('.truncate');
+              return {
+                cardWidth: card.getBoundingClientRect().width,
+                innerWidth: bubble.clientWidth - parseFloat(getComputedStyle(bubble).paddingLeft) - parseFloat(getComputedStyle(bubble).paddingRight),
+                nameOverflows: name.scrollWidth > name.clientWidth,
+                title: name.title,
+                textOverflow: getComputedStyle(name).textOverflow,
+                sizeVisible: card.querySelector('.text-gray-500').getBoundingClientRect().width > 0,
+              };
+            })"""
+        )
+        assert all(
+            card["cardWidth"] <= card["innerWidth"] + 1
+            and card["title"]
+            and card["textOverflow"] == "ellipsis"
+            and card["sizeVisible"]
+            for card in card_measurements
+        ), card_measurements
+        if width == 390:
+            assert all(card["nameOverflows"] for card in card_measurements), (
+                card_measurements
+            )
+        collapsed = long_bubble.locator(".markdown-prose")
+        collapsed_height = collapsed.evaluate(
+            "node => node.getBoundingClientRect().height"
+        )
+        line_height = collapsed.evaluate(
+            "node => parseFloat(getComputedStyle(node).lineHeight)"
+        )
+        assert collapsed_height <= line_height * 8 + 1, (collapsed_height, line_height)
+        assert toggle.get_attribute("aria-expanded") == "false"
+        long_bubble.screenshot(path=OUTPUT / name)
+        toggle.focus()
+        page.keyboard.press("Enter")
+        assert toggle.get_attribute("aria-expanded") == "true"
+        assert (
+            collapsed.evaluate("node => node.getBoundingClientRect().height")
+            > collapsed_height
+        )
+        assert "atlas-long-message" not in (short_bubble.get_attribute("class") or "")
+        MEASUREMENTS[name] = {
+            "style": style,
+            "theme": theme,
+            "size": size,
+            "viewport_width": width,
+            "cards": card_measurements,
+            "collapsed_height": collapsed_height,
+            "line_height": line_height,
+            "toggle_expanded": True,
+        }
+    finally:
+        page.close()
 
 
 def capture(page: Page, name: str, style: str, theme: str, size: int = 16) -> None:
@@ -224,14 +352,91 @@ with sync_playwright() as playwright:
             for style in ("arrondi", "dense", "document"):
                 for theme in ("light", "dark"):
                     for size in (14, 16, 18, 20):
-                        composer_capture(browser, f"composer-matrix-{style}-{theme}-{size}-1280", style, theme, size, 1280, synthetic_images(1))
-                        composer_capture(browser, f"composer-matrix-{style}-{theme}-{size}-390", style, theme, size, 390, synthetic_images(1))
-        composer_capture(browser, "composer-one-image.png", "arrondi", "light", 16, 1280, synthetic_images(1), True)
-        composer_capture(browser, "composer-three-images.png", "dense", "light", 18, 1280, synthetic_images(3), True)
-        composer_capture(browser, "composer-pdf-and-long-name.png", "document", "light", 20, 1280, [synthetic_pdf()], True)
-        composer_capture(browser, "composer-mobile.png", "arrondi", "light", 16, 390, synthetic_images(3), True)
-        composer_capture(browser, "composer-dark.png", "document", "dark", 20, 1280, synthetic_images(1), True)
-        (OUTPUT / "measurements.json").write_text(json.dumps(MEASUREMENTS, indent=2) + "\n")
+                        composer_capture(
+                            browser,
+                            f"composer-matrix-{style}-{theme}-{size}-1280",
+                            style,
+                            theme,
+                            size,
+                            1280,
+                            synthetic_images(1),
+                        )
+                        composer_capture(
+                            browser,
+                            f"composer-matrix-{style}-{theme}-{size}-390",
+                            style,
+                            theme,
+                            size,
+                            390,
+                            synthetic_images(1),
+                        )
+        composer_capture(
+            browser,
+            "composer-one-image.png",
+            "arrondi",
+            "light",
+            16,
+            1280,
+            synthetic_images(1),
+            True,
+        )
+        composer_capture(
+            browser,
+            "composer-three-images.png",
+            "dense",
+            "light",
+            18,
+            1280,
+            synthetic_images(3),
+            True,
+        )
+        composer_capture(
+            browser,
+            "composer-pdf-and-long-name.png",
+            "document",
+            "light",
+            20,
+            1280,
+            [synthetic_pdf()],
+            True,
+        )
+        composer_capture(
+            browser,
+            "composer-mobile.png",
+            "arrondi",
+            "light",
+            16,
+            390,
+            synthetic_images(3),
+            True,
+        )
+        composer_capture(
+            browser,
+            "composer-dark.png",
+            "document",
+            "dark",
+            20,
+            1280,
+            synthetic_images(1),
+            True,
+        )
+        (OUTPUT / "measurements.json").write_text(
+            json.dumps(MEASUREMENTS, indent=2) + "\n"
+        )
+        browser.close()
+        raise SystemExit
+    if os.environ.get("ATLAS_BUBBLE_ONLY") == "1":
+        for style, theme in (
+            ("arrondi", "light"),
+            ("arrondi", "dark"),
+            ("dense", "light"),
+        ):
+            for size in (16, 20):
+                for width in (1280, 390):
+                    bubble_capture(browser, style, theme, size, width)
+        (OUTPUT / "measurements.json").write_text(
+            json.dumps(MEASUREMENTS, indent=2) + "\n"
+        )
         browser.close()
         raise SystemExit
     page.locator(".chat-assistant").wait_for()
@@ -304,10 +509,55 @@ with sync_playwright() as playwright:
                     390,
                     synthetic_images(1),
                 )
-    composer_capture(browser, "composer-one-image.png", "arrondi", "light", 16, 1280, synthetic_images(1), True)
-    composer_capture(browser, "composer-three-images.png", "dense", "light", 18, 1280, synthetic_images(3), True)
-    composer_capture(browser, "composer-pdf-and-long-name.png", "document", "light", 20, 1280, [synthetic_pdf()], True)
-    composer_capture(browser, "composer-mobile.png", "arrondi", "light", 16, 390, synthetic_images(3), True)
-    composer_capture(browser, "composer-dark.png", "document", "dark", 20, 1280, synthetic_images(1), True)
+    composer_capture(
+        browser,
+        "composer-one-image.png",
+        "arrondi",
+        "light",
+        16,
+        1280,
+        synthetic_images(1),
+        True,
+    )
+    composer_capture(
+        browser,
+        "composer-three-images.png",
+        "dense",
+        "light",
+        18,
+        1280,
+        synthetic_images(3),
+        True,
+    )
+    composer_capture(
+        browser,
+        "composer-pdf-and-long-name.png",
+        "document",
+        "light",
+        20,
+        1280,
+        [synthetic_pdf()],
+        True,
+    )
+    composer_capture(
+        browser,
+        "composer-mobile.png",
+        "arrondi",
+        "light",
+        16,
+        390,
+        synthetic_images(3),
+        True,
+    )
+    composer_capture(
+        browser,
+        "composer-dark.png",
+        "document",
+        "dark",
+        20,
+        1280,
+        synthetic_images(1),
+        True,
+    )
     (OUTPUT / "measurements.json").write_text(json.dumps(MEASUREMENTS, indent=2) + "\n")
     browser.close()

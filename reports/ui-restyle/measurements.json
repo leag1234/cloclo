@@ -1,399 +1,422 @@
 {
-  "composer-one-image.png": {
+  "bubble-long-arrondi-light-16-1280.png": {
     "style": "arrondi",
     "theme": "light",
     "size": 16,
     "viewport_width": 1280,
-    "composer": {
-      "x": 348,
-      "y": 343,
-      "width": 640,
-      "height": 146
-    },
-    "no_input_row_collisions": {
-      "attachments": [
-        {
-          "left": 361,
-          "right": 425,
-          "top": 354,
-          "bottom": 418,
-          "width": 64,
-          "height": 64
-        },
-        {
-          "left": 385,
-          "right": 429,
-          "top": 350,
-          "bottom": 394,
-          "width": 44,
-          "height": 44
-        }
-      ],
-      "controls": [
-        {
-          "left": 355,
-          "right": 395,
-          "top": 442,
-          "bottom": 482,
-          "width": 40,
-          "height": 40
-        },
-        {
-          "left": 941,
-          "right": 981,
-          "top": 442,
-          "bottom": 482,
-          "width": 40,
-          "height": 40
-        },
-        {
-          "left": 401,
-          "right": 935,
-          "top": 438,
-          "bottom": 486,
-          "width": 534,
-          "height": 48
-        }
-      ],
-      "collisions": []
-    },
-    "remove_dimensions": [
-      [
-        44,
-        44
-      ]
-    ]
+    "cards": [
+      {
+        "cardWidth": 670.40625,
+        "innerWidth": 670,
+        "nameOverflows": false,
+        "title": "SYNTHETIC QUARTERLY RECONCILIATION ARCHIVE 2026 001 ALPHA BRAVO CHARLIE DELTA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 670.40625,
+        "innerWidth": 670,
+        "nameOverflows": false,
+        "title": "SYNTHETIC COMPLIANCE EVIDENCE REGISTER 2026 002 ECHO FOXTROT GOLF HOTEL.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 670.40625,
+        "innerWidth": 670,
+        "nameOverflows": false,
+        "title": "SYNTHETIC PROJECT DELIVERY RECORD 2026 003 INDIA JULIET KILO LIMA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      }
+    ],
+    "collapsed_height": 192,
+    "line_height": 24,
+    "toggle_expanded": true
   },
-  "composer-three-images.png": {
-    "style": "dense",
-    "theme": "light",
-    "size": 18,
-    "viewport_width": 1280,
-    "composer": {
-      "x": 311,
-      "y": 338,
-      "width": 700,
-      "height": 148
-    },
-    "no_input_row_collisions": {
-      "attachments": [
-        {
-          "left": 324,
-          "right": 388,
-          "top": 349,
-          "bottom": 413,
-          "width": 64,
-          "height": 64
-        },
-        {
-          "left": 396,
-          "right": 460,
-          "top": 349,
-          "bottom": 413,
-          "width": 64,
-          "height": 64
-        },
-        {
-          "left": 468,
-          "right": 532,
-          "top": 349,
-          "bottom": 413,
-          "width": 64,
-          "height": 64
-        },
-        {
-          "left": 348,
-          "right": 392,
-          "top": 345,
-          "bottom": 389,
-          "width": 44,
-          "height": 44
-        },
-        {
-          "left": 420,
-          "right": 464,
-          "top": 345,
-          "bottom": 389,
-          "width": 44,
-          "height": 44
-        },
-        {
-          "left": 492,
-          "right": 536,
-          "top": 345,
-          "bottom": 389,
-          "width": 44,
-          "height": 44
-        }
-      ],
-      "controls": [
-        {
-          "left": 320,
-          "right": 356,
-          "top": 441,
-          "bottom": 477,
-          "width": 36,
-          "height": 36
-        },
-        {
-          "left": 964,
-          "right": 1004,
-          "top": 439,
-          "bottom": 479,
-          "width": 40,
-          "height": 40
-        },
-        {
-          "left": 364,
-          "right": 958,
-          "top": 431,
-          "bottom": 485,
-          "width": 594,
-          "height": 54
-        }
-      ],
-      "collisions": []
-    },
-    "remove_dimensions": [
-      [
-        44,
-        44
-      ],
-      [
-        44,
-        44
-      ],
-      [
-        44,
-        44
-      ]
-    ]
-  },
-  "composer-pdf-and-long-name.png": {
-    "style": "document",
-    "theme": "light",
-    "size": 20,
-    "viewport_width": 1280,
-    "composer": {
-      "x": 311,
-      "y": 353,
-      "width": 700,
-      "height": 122
-    },
-    "no_input_row_collisions": {
-      "attachments": [
-        {
-          "left": 503,
-          "right": 547,
-          "top": 361,
-          "bottom": 405,
-          "width": 44,
-          "height": 44
-        }
-      ],
-      "controls": [
-        {
-          "left": 320,
-          "right": 356,
-          "top": 430,
-          "bottom": 466,
-          "width": 36,
-          "height": 36
-        },
-        {
-          "left": 964,
-          "right": 1004,
-          "top": 428,
-          "bottom": 468,
-          "width": 40,
-          "height": 40
-        },
-        {
-          "left": 364,
-          "right": 958,
-          "top": 414,
-          "bottom": 474,
-          "width": 594,
-          "height": 60
-        }
-      ],
-      "collisions": []
-    },
-    "remove_dimensions": [
-      [
-        44,
-        44
-      ]
-    ]
-  },
-  "composer-mobile.png": {
+  "bubble-long-arrondi-light-16-390.png": {
     "style": "arrondi",
     "theme": "light",
     "size": 16,
     "viewport_width": 390,
-    "composer": {
-      "x": 28,
-      "y": 343,
-      "width": 334,
-      "height": 146
-    },
-    "no_input_row_collisions": {
-      "attachments": [
-        {
-          "left": 41,
-          "right": 105,
-          "top": 354,
-          "bottom": 418,
-          "width": 64,
-          "height": 64
-        },
-        {
-          "left": 113,
-          "right": 177,
-          "top": 354,
-          "bottom": 418,
-          "width": 64,
-          "height": 64
-        },
-        {
-          "left": 185,
-          "right": 249,
-          "top": 354,
-          "bottom": 418,
-          "width": 64,
-          "height": 64
-        },
-        {
-          "left": 65,
-          "right": 109,
-          "top": 350,
-          "bottom": 394,
-          "width": 44,
-          "height": 44
-        },
-        {
-          "left": 137,
-          "right": 181,
-          "top": 350,
-          "bottom": 394,
-          "width": 44,
-          "height": 44
-        },
-        {
-          "left": 209,
-          "right": 253,
-          "top": 350,
-          "bottom": 394,
-          "width": 44,
-          "height": 44
-        }
-      ],
-      "controls": [
-        {
-          "left": 35,
-          "right": 75,
-          "top": 442,
-          "bottom": 482,
-          "width": 40,
-          "height": 40
-        },
-        {
-          "left": 315,
-          "right": 355,
-          "top": 442,
-          "bottom": 482,
-          "width": 40,
-          "height": 40
-        },
-        {
-          "left": 81,
-          "right": 309,
-          "top": 438,
-          "bottom": 486,
-          "width": 228,
-          "height": 48
-        }
-      ],
-      "collisions": []
-    },
-    "remove_dimensions": [
-      [
-        44,
-        44
-      ],
-      [
-        44,
-        44
-      ],
-      [
-        44,
-        44
-      ]
-    ]
+    "cards": [
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC QUARTERLY RECONCILIATION ARCHIVE 2026 001 ALPHA BRAVO CHARLIE DELTA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC COMPLIANCE EVIDENCE REGISTER 2026 002 ECHO FOXTROT GOLF HOTEL.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC PROJECT DELIVERY RECORD 2026 003 INDIA JULIET KILO LIMA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      }
+    ],
+    "collapsed_height": 192,
+    "line_height": 24,
+    "toggle_expanded": true
   },
-  "composer-dark.png": {
-    "style": "document",
+  "bubble-long-arrondi-light-20-1280.png": {
+    "style": "arrondi",
+    "theme": "light",
+    "size": 20,
+    "viewport_width": 1280,
+    "cards": [
+      {
+        "cardWidth": 807.21875,
+        "innerWidth": 807,
+        "nameOverflows": false,
+        "title": "SYNTHETIC QUARTERLY RECONCILIATION ARCHIVE 2026 001 ALPHA BRAVO CHARLIE DELTA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 807.21875,
+        "innerWidth": 807,
+        "nameOverflows": false,
+        "title": "SYNTHETIC COMPLIANCE EVIDENCE REGISTER 2026 002 ECHO FOXTROT GOLF HOTEL.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 807.21875,
+        "innerWidth": 807,
+        "nameOverflows": false,
+        "title": "SYNTHETIC PROJECT DELIVERY RECORD 2026 003 INDIA JULIET KILO LIMA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      }
+    ],
+    "collapsed_height": 240,
+    "line_height": 30,
+    "toggle_expanded": true
+  },
+  "bubble-long-arrondi-light-20-390.png": {
+    "style": "arrondi",
+    "theme": "light",
+    "size": 20,
+    "viewport_width": 390,
+    "cards": [
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC QUARTERLY RECONCILIATION ARCHIVE 2026 001 ALPHA BRAVO CHARLIE DELTA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC COMPLIANCE EVIDENCE REGISTER 2026 002 ECHO FOXTROT GOLF HOTEL.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC PROJECT DELIVERY RECORD 2026 003 INDIA JULIET KILO LIMA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      }
+    ],
+    "collapsed_height": 240,
+    "line_height": 30,
+    "toggle_expanded": true
+  },
+  "bubble-long-arrondi-dark-16-1280.png": {
+    "style": "arrondi",
+    "theme": "dark",
+    "size": 16,
+    "viewport_width": 1280,
+    "cards": [
+      {
+        "cardWidth": 670.40625,
+        "innerWidth": 670,
+        "nameOverflows": false,
+        "title": "SYNTHETIC QUARTERLY RECONCILIATION ARCHIVE 2026 001 ALPHA BRAVO CHARLIE DELTA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 670.40625,
+        "innerWidth": 670,
+        "nameOverflows": false,
+        "title": "SYNTHETIC COMPLIANCE EVIDENCE REGISTER 2026 002 ECHO FOXTROT GOLF HOTEL.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 670.40625,
+        "innerWidth": 670,
+        "nameOverflows": false,
+        "title": "SYNTHETIC PROJECT DELIVERY RECORD 2026 003 INDIA JULIET KILO LIMA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      }
+    ],
+    "collapsed_height": 192,
+    "line_height": 24,
+    "toggle_expanded": true
+  },
+  "bubble-long-arrondi-dark-16-390.png": {
+    "style": "arrondi",
+    "theme": "dark",
+    "size": 16,
+    "viewport_width": 390,
+    "cards": [
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC QUARTERLY RECONCILIATION ARCHIVE 2026 001 ALPHA BRAVO CHARLIE DELTA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC COMPLIANCE EVIDENCE REGISTER 2026 002 ECHO FOXTROT GOLF HOTEL.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC PROJECT DELIVERY RECORD 2026 003 INDIA JULIET KILO LIMA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      }
+    ],
+    "collapsed_height": 192,
+    "line_height": 24,
+    "toggle_expanded": true
+  },
+  "bubble-long-arrondi-dark-20-1280.png": {
+    "style": "arrondi",
     "theme": "dark",
     "size": 20,
     "viewport_width": 1280,
-    "composer": {
-      "x": 311,
-      "y": 337,
-      "width": 700,
-      "height": 154
-    },
-    "no_input_row_collisions": {
-      "attachments": [
-        {
-          "left": 324,
-          "right": 388,
-          "top": 348,
-          "bottom": 412,
-          "width": 64,
-          "height": 64
-        },
-        {
-          "left": 348,
-          "right": 392,
-          "top": 344,
-          "bottom": 388,
-          "width": 44,
-          "height": 44
-        }
-      ],
-      "controls": [
-        {
-          "left": 320,
-          "right": 356,
-          "top": 446,
-          "bottom": 482,
-          "width": 36,
-          "height": 36
-        },
-        {
-          "left": 964,
-          "right": 1004,
-          "top": 444,
-          "bottom": 484,
-          "width": 40,
-          "height": 40
-        },
-        {
-          "left": 364,
-          "right": 958,
-          "top": 430,
-          "bottom": 490,
-          "width": 594,
-          "height": 60
-        }
-      ],
-      "collisions": []
-    },
-    "remove_dimensions": [
-      [
-        44,
-        44
-      ]
-    ]
+    "cards": [
+      {
+        "cardWidth": 807.21875,
+        "innerWidth": 807,
+        "nameOverflows": false,
+        "title": "SYNTHETIC QUARTERLY RECONCILIATION ARCHIVE 2026 001 ALPHA BRAVO CHARLIE DELTA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 807.21875,
+        "innerWidth": 807,
+        "nameOverflows": false,
+        "title": "SYNTHETIC COMPLIANCE EVIDENCE REGISTER 2026 002 ECHO FOXTROT GOLF HOTEL.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 807.21875,
+        "innerWidth": 807,
+        "nameOverflows": false,
+        "title": "SYNTHETIC PROJECT DELIVERY RECORD 2026 003 INDIA JULIET KILO LIMA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      }
+    ],
+    "collapsed_height": 240,
+    "line_height": 30,
+    "toggle_expanded": true
+  },
+  "bubble-long-arrondi-dark-20-390.png": {
+    "style": "arrondi",
+    "theme": "dark",
+    "size": 20,
+    "viewport_width": 390,
+    "cards": [
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC QUARTERLY RECONCILIATION ARCHIVE 2026 001 ALPHA BRAVO CHARLIE DELTA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC COMPLIANCE EVIDENCE REGISTER 2026 002 ECHO FOXTROT GOLF HOTEL.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC PROJECT DELIVERY RECORD 2026 003 INDIA JULIET KILO LIMA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      }
+    ],
+    "collapsed_height": 240,
+    "line_height": 30,
+    "toggle_expanded": true
+  },
+  "bubble-long-dense-light-16-1280.png": {
+    "style": "dense",
+    "theme": "light",
+    "size": 16,
+    "viewport_width": 1280,
+    "cards": [
+      {
+        "cardWidth": 702,
+        "innerWidth": 702,
+        "nameOverflows": false,
+        "title": "SYNTHETIC QUARTERLY RECONCILIATION ARCHIVE 2026 001 ALPHA BRAVO CHARLIE DELTA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 702,
+        "innerWidth": 702,
+        "nameOverflows": false,
+        "title": "SYNTHETIC COMPLIANCE EVIDENCE REGISTER 2026 002 ECHO FOXTROT GOLF HOTEL.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 702,
+        "innerWidth": 702,
+        "nameOverflows": false,
+        "title": "SYNTHETIC PROJECT DELIVERY RECORD 2026 003 INDIA JULIET KILO LIMA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      }
+    ],
+    "collapsed_height": 192,
+    "line_height": 24,
+    "toggle_expanded": true
+  },
+  "bubble-long-dense-light-16-390.png": {
+    "style": "dense",
+    "theme": "light",
+    "size": 16,
+    "viewport_width": 390,
+    "cards": [
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC QUARTERLY RECONCILIATION ARCHIVE 2026 001 ALPHA BRAVO CHARLIE DELTA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC COMPLIANCE EVIDENCE REGISTER 2026 002 ECHO FOXTROT GOLF HOTEL.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC PROJECT DELIVERY RECORD 2026 003 INDIA JULIET KILO LIMA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      }
+    ],
+    "collapsed_height": 192,
+    "line_height": 24,
+    "toggle_expanded": true
+  },
+  "bubble-long-dense-light-20-1280.png": {
+    "style": "dense",
+    "theme": "light",
+    "size": 20,
+    "viewport_width": 1280,
+    "cards": [
+      {
+        "cardWidth": 837,
+        "innerWidth": 837,
+        "nameOverflows": false,
+        "title": "SYNTHETIC QUARTERLY RECONCILIATION ARCHIVE 2026 001 ALPHA BRAVO CHARLIE DELTA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 837,
+        "innerWidth": 837,
+        "nameOverflows": false,
+        "title": "SYNTHETIC COMPLIANCE EVIDENCE REGISTER 2026 002 ECHO FOXTROT GOLF HOTEL.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 837,
+        "innerWidth": 837,
+        "nameOverflows": false,
+        "title": "SYNTHETIC PROJECT DELIVERY RECORD 2026 003 INDIA JULIET KILO LIMA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      }
+    ],
+    "collapsed_height": 240,
+    "line_height": 30,
+    "toggle_expanded": true
+  },
+  "bubble-long-dense-light-20-390.png": {
+    "style": "dense",
+    "theme": "light",
+    "size": 20,
+    "viewport_width": 390,
+    "cards": [
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC QUARTERLY RECONCILIATION ARCHIVE 2026 001 ALPHA BRAVO CHARLIE DELTA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC COMPLIANCE EVIDENCE REGISTER 2026 002 ECHO FOXTROT GOLF HOTEL.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      },
+      {
+        "cardWidth": 277,
+        "innerWidth": 277,
+        "nameOverflows": true,
+        "title": "SYNTHETIC PROJECT DELIVERY RECORD 2026 003 INDIA JULIET KILO LIMA.pdf",
+        "textOverflow": "ellipsis",
+        "sizeVisible": true
+      }
+    ],
+    "collapsed_height": 240,
+    "line_height": 30,
+    "toggle_expanded": true
   }
 }

@@ -5,14 +5,14 @@
   "copy": "0",
   "save": "none",
   "wrap": "pre",
-  "css_sha256": "89289263cf0f110c4b8e5e09e1b7187fa67342cd5edfb9abd431aad81a49afe5",
+  "css_sha256": "bbb75689517c3ec258f2773f84d5f8d087d4b893f9f43c708961e75e299530a1",
   "dark_font": "-apple-system, BlinkMacSystemFont, \"SF Pro Text\", system-ui, sans-serif",
   "dark_color": "rgb(245, 245, 247)",
   "copy_on_hover": true,
   "mode": "local-ui",
   "screenshots": {
-    "m24-rendering-before.png": "1e4d140f27b0c6974273c9713604491791b6498a6d5fede5e653c129406c6cb3",
-    "m24-rendering-after.png": "66d68af658b712549b893e1b9209b70e59f541606ffa4de774554d0b06c50fd3",
-    "m24-rendering-dark.png": "17503829121e1c88e5bd7305e55e1dca2fce9d82ebe7e3459f42a4f493e87f18"
+    "m24-rendering-before.png": "1d09535c8b1cf07c57b83849e294252cabe6973a0b09fcc45832e4ccf77668f0",
+    "m24-rendering-after.png": "4f452dee5f3069cb373f667a6dba48a3651e8688e7a7f87e8834f792155db295",
+    "m24-rendering-dark.png": "2a8de51c23bff47a68373a33661276144cfaed9acf4728de05a4fe4ba37b5388"
   }
 }

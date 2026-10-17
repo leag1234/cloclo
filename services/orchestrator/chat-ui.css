@@ -69,6 +69,15 @@ body,button,input,textarea { font-family:var(--atlas-font); }
 .user-message .chat-user > .mb-1 > .self-end > button .font-normal { font-weight:600; }
 .user-message .chat-user > .mb-1 > .self-end > button .text-gray-500 { color:var(--atlas-muted)!important; }
 .user-message .chat-user > .mb-1 > .self-end > button .truncate { font-size:var(--atlas-ui-size)!important; }
+.user-message .chat-user > .mb-1,.user-message .chat-user > .mb-1 > .self-end { max-width:100%!important; min-width:0!important; }
+.user-message .chat-user > .mb-1 > .self-end > button { display:flex!important; max-width:100%!important; min-width:0!important; overflow:hidden!important; }
+.user-message .chat-user > .mb-1 > .self-end > button .truncate { flex:1 1 auto!important; min-width:0!important; overflow:hidden!important; text-overflow:ellipsis!important; white-space:nowrap!important; }
+.user-message .chat-user > .mb-1 > .self-end > button .text-gray-500 { flex:0 0 auto!important; margin-left:.5rem!important; white-space:nowrap!important; }
+/* A pasted essay needs a calm reading surface while short replies retain the accent chip. */
+.user-message.atlas-long-message { background:var(--atlas-user-bg)!important; color:var(--atlas-text)!important; border-left:3px solid var(--atlas-accent)!important; }
+.user-message.atlas-message-collapsed .markdown-prose,.user-message.atlas-message-collapsed [class*="message-content"],.user-message.atlas-message-collapsed .chat-user > .w-full > .flex { position:relative; max-height:calc(var(--atlas-body-size) * 1.5 * 8); overflow:hidden!important; }
+.user-message.atlas-message-collapsed .markdown-prose::after,.user-message.atlas-message-collapsed [class*="message-content"]::after,.user-message.atlas-message-collapsed .chat-user > .w-full > .flex::after { position:absolute; right:0; bottom:0; left:0; height:2.4em; content:""; pointer-events:none; background:linear-gradient(transparent,var(--atlas-user-bg)); }
+.atlas-message-toggle { min-width:44px; min-height:44px; align-self:flex-start; margin:4px 0 -6px; padding:0 8px; border:0; background:transparent; color:var(--atlas-accent); font:inherit; font-weight:600; text-decoration:underline; }
 #messages-container .message-listitem { max-width:var(--atlas-layout-column)!important; padding:0!important; margin-bottom:32px; }
 #messages-container .chat-assistant { background:transparent!important; }
 #messages-container .chat-assistant > div { padding-left:0!important; }

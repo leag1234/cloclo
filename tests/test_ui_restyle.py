@@ -122,6 +122,25 @@ class UIRestyleTest(unittest.TestCase):
         self.assertIn("navigator.language", script)
         self.assertIn("${value} px", script)
 
+    def test_long_message_toggle_is_localized_for_every_supported_language(
+        self,
+    ) -> None:
+        script = Path("services/orchestrator/chat-ui.js").read_text()
+        expected = {
+            "en": ("Show more", "Show less"),
+            "fr": ("Afficher plus", "Afficher moins"),
+            "de": ("Mehr anzeigen", "Weniger anzeigen"),
+            "es": ("Mostrar más", "Mostrar menos"),
+            "it": ("Mostra di più", "Mostra di meno"),
+        }
+        for language, labels in expected.items():
+            section = script.split(f"    {language}: {{", 1)[1].split(" },", 1)[0]
+            for label in labels:
+                self.assertIn(label, section, f"{language}:{label}")
+        self.assertIn("new MutationObserver", script)
+        self.assertIn('attributeFilter: ["data-atlas-size"]', script)
+        self.assertIn('setAttribute("aria-expanded"', script)
+
     def test_file_card_text_is_readable_for_every_palette_and_accent(self) -> None:
         palettes = {
             "dense": (("#1c1c19", "#ffffff"), ("#ecece8", "#1a1a19")),
